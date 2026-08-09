@@ -42,7 +42,7 @@ pnpm audit --audit-level=high
 ```
 
 `pnpm check` runs formatting, linting, type checking, unit tests, and a Worker dry-run build.
-GitHub Actions adds Playwright/axe browser checks, dependency audit, and Gitleaks secret scanning.
+GitHub Actions adds Playwright/axe browser checks, dependency audit, and repository-owned secret scanning.
 
 ## Repository map
 
