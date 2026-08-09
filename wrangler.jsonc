@@ -1,0 +1,29 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "document-control",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-08-23",
+  "compatibility_flags": ["nodejs_compat"],
+  "d1_databases": [
+    {
+      "binding": "DOCUMENT_CONTROL_DB",
+      "database_name": "document-control",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations",
+    },
+  ],
+  "r2_buckets": [
+    {
+      "binding": "DOCUMENT_CONTENT",
+      "bucket_name": "document-control-content",
+      "preview_bucket_name": "document-control-content-preview",
+    },
+  ],
+  "vars": {
+    "APP_NAME": "Document Control",
+    "BRAND_COMPANY_NAME": "Lowcountry Digital Works",
+    "BRAND_PRIMARY": "#163b45",
+    "BRAND_SECONDARY": "#247b78",
+    "BRAND_ACCENT": "#8e4228",
+  },
+}
