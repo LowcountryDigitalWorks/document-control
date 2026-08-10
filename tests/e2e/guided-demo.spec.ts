@@ -19,7 +19,7 @@ test("runs the authorized persisted document lifecycle without browser-selected 
   expect(sessionCookie).toMatchObject({
     httpOnly: true,
     sameSite: "Strict",
-    path: "/demo/workflow",
+    path: "/demo",
   });
 
   await page

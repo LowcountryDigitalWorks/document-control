@@ -67,8 +67,8 @@ upload orchestration, compensation, limits, and scanning remain future work befo
   platform administration, and facade-to-permission mapping.
 
 This authorization layer does not authenticate users and stores no passwords, sessions, tokens, or
-identity-provider secrets. HTTP routes must use the authorized facade rather than invoking the raw
-persistence service directly.
+identity-provider secrets. HTTP routes must use authorized application facades rather than invoking
+raw persistence services directly.
 
 ### Guided authorized workflow UI (local/test only)
 
@@ -82,8 +82,8 @@ persistence service directly.
 - The browser supplies only the next allowed guided action. Tenant, workspace, identity, role, and
   permission context remain server-controlled synthetic values.
 - Each browser context receives an opaque, server-issued UUID in an HttpOnly, SameSite=Strict cookie
-  scoped to `/demo/workflow`. All synthetic record IDs are derived server-side from that validated
-  session identifier so parallel browser sessions do not share tenant/document/workflow state.
+  scoped to `/demo`. All synthetic record IDs are derived server-side from that validated session
+  identifier so parallel browser sessions do not share tenant/document/workflow state.
 - Same-origin POST enforcement protects guided mutations from cross-origin form submission.
 - Browser tests use a SQLite-backed D1 test binding and therefore exercise the real
   `D1DatabaseProvider`, authorization policy, and persisted workflow service rather than a fake
@@ -91,26 +91,51 @@ persistence service directly.
 - Playwright covers desktop/mobile lifecycle behavior, axe accessibility, responsive overflow,
   cross-origin mutation denial, cookie properties, and independent-session state isolation.
 
-The one-hour browser cookie is **not** a production public-demo lifecycle. Cookie expiration does not
-purge synthetic D1 rows. Do not enable the interactive guided flow on a shared public deployment
-until server-side session expiration/purge, quotas, rate limiting, Turnstile/abuse controls, and
-operational cleanup are implemented and validated.
+The one-hour browser cookie is **not** a production public-demo lifecycle or production login
+session. Cookie expiration does not purge synthetic D1 rows. Do not enable the interactive guided
+flow on a shared public deployment until server-side session expiration/purge, quotas, rate limiting,
+Turnstile/abuse controls, and operational cleanup are implemented and validated.
+
+### Authorized workspace read navigation (synthetic/test only)
+
+- `WorkspaceReadService` provides tenant/workspace-scoped overview, document-list, and template-list
+  read models over persisted D1-compatible data.
+- Current approval status is computed from the exact current document-version ID and SHA-256 hash;
+  historical approvals are not presented as approval of a newer current version.
+- `AuthorizedWorkspaceReadService` gates document and template reads with the existing configurable
+  permission model before records reach presentation code.
+- Server-rendered `/demo/app`, `/demo/app/documents`, and `/demo/app/templates` screens provide
+  responsive workspace navigation, overview counts, document status/version evidence, and controlled
+  template lifecycle/provenance information.
+- The read screens share the opaque `/demo` synthetic namespace with the guided workflow so a user can
+  create a synthetic record in the guided path and observe it through ordinary product navigation.
+  Tenant, workspace, subject, role, and permission authority remain server-controlled.
+- Independent browser sessions remain isolated: a document created in one synthetic session is not
+  visible in another session's workspace read screens.
+- Browser coverage verifies navigation, persisted read-after-write behavior, accessibility, responsive
+  overflow, and cross-session isolation on desktop and mobile.
+
+These screens are product-shape proofs, not an authenticated production tenant application. They
+remain behind the synthetic/test demo flag and must not be represented as production authentication
+or public-demo hardening.
 
 ## Repository posture
 
 - GitHub repository visibility: **public by explicit owner decision**.
 - Package metadata remains `private: true` only to prevent accidental package-registry publication.
-- Bootstrap PR #1, persisted-workflow PR #7, and authorization PR #8 are merged; `main` is the
-  authoritative foundation.
+- Merged milestones include bootstrap PR #1, persisted-workflow PR #7, authorization PR #8, and
+  guided-workflow UI PR #9; `main` is the authoritative foundation.
 - No production Cloudflare resources, custom domains, customer data, analytics, paid services, or
   public-upload capability have been introduced.
 
 ## Intentionally not implemented
 
-- Production authentication/SSO, session management, or identity-provider integration.
+- Production authentication/SSO, production session management, or identity-provider integration.
 - Production tenant provisioning.
 - Customer or arbitrary public document uploads or malware scanning.
-- General authenticated tenant application navigation/screens beyond the guided synthetic flow.
+- Production authenticated tenant application routing; current app-shaped routes are synthetic/test
+  only.
+- Document detail/version-history/audit/provenance screens beyond list-level evidence.
 - Public interactive demo hardening: durable server-side demo-session registry, automatic purge,
   Turnstile, rate limiting, quotas, and abuse telemetry/controls.
 - Rich document authoring, retention automation, legal hold, full-text search, GRC frameworks, or

@@ -1,15 +1,25 @@
 import { Hono } from "hono";
 import { secureHeaders } from "hono/secure-headers";
+import { AuthorizedWorkspaceReadService } from "./application/authorized-workspace-read-service";
 import { serializeExport } from "./application/export";
+import { WorkspaceReadService } from "./application/workspace-read-service";
 import { createSyntheticExport } from "./demo/fixtures";
 import {
+  createGuidedDemoContext,
+  ensureGuidedDemoSeed,
   isValidGuidedDemoSessionId,
   loadGuidedDemoState,
   runGuidedDemoAction,
   type GuidedDemoAction,
 } from "./demo/workflow-demo";
+import { DatabaseAuthorizationPolicy } from "./infrastructure/database-authorization-policy";
 import { D1DatabaseProvider } from "./infrastructure/d1-database-provider";
 import { renderGuidedDemo } from "./ui/render-guided-demo";
+import {
+  renderWorkspaceDocuments,
+  renderWorkspaceOverview,
+  renderWorkspaceTemplates,
+} from "./ui/render-workspace-app";
 import { renderHome, renderNotFound } from "./ui/render";
 import { createTheme } from "./ui/theme";
 
@@ -56,20 +66,16 @@ app.get("/demo/workflow", async (context) => {
     return context.html(renderNotFound(createTheme(context.env)), 404);
   }
 
-  const existingSessionId = readGuidedDemoSession(context.req.header("Cookie"));
-  const sessionId = existingSessionId ?? crypto.randomUUID();
-  if (!existingSessionId) {
-    context.header(
-      "Set-Cookie",
-      createGuidedDemoSessionCookie(
-        sessionId,
-        new URL(context.req.url).protocol === "https:",
-      ),
-    );
+  const session = resolveGuidedDemoSession(
+    context.req.header("Cookie"),
+    context.req.url,
+  );
+  if (session.setCookie) {
+    context.header("Set-Cookie", session.setCookie);
   }
 
   const database = new D1DatabaseProvider(context.env.DOCUMENT_CONTROL_DB);
-  const state = await loadGuidedDemoState(database, sessionId);
+  const state = await loadGuidedDemoState(database, session.sessionId);
   return context.html(renderGuidedDemo(createTheme(context.env), state));
 });
 
@@ -111,6 +117,92 @@ app.post("/demo/workflow/actions/:action", async (context) => {
   return context.redirect("/demo/workflow", 303);
 });
 
+app.get("/demo/app", async (context) => {
+  if (!guidedDemoEnabled(context.env)) {
+    return context.html(renderNotFound(createTheme(context.env)), 404);
+  }
+
+  const session = resolveGuidedDemoSession(
+    context.req.header("Cookie"),
+    context.req.url,
+  );
+  if (session.setCookie) {
+    context.header("Set-Cookie", session.setCookie);
+  }
+  const database = new D1DatabaseProvider(context.env.DOCUMENT_CONTROL_DB);
+  const demo = createGuidedDemoContext(session.sessionId);
+  await ensureGuidedDemoSeed(database, session.sessionId);
+  const read = createAuthorizedWorkspaceReadService(database);
+  const overview = await read.getOverview({
+    subjectId: demo.authorSubjectId,
+    tenantId: demo.tenantId,
+    workspaceId: demo.workspaceId,
+  });
+  return context.html(
+    renderWorkspaceOverview(createTheme(context.env), overview),
+  );
+});
+
+app.get("/demo/app/documents", async (context) => {
+  if (!guidedDemoEnabled(context.env)) {
+    return context.html(renderNotFound(createTheme(context.env)), 404);
+  }
+
+  const session = resolveGuidedDemoSession(
+    context.req.header("Cookie"),
+    context.req.url,
+  );
+  if (session.setCookie) {
+    context.header("Set-Cookie", session.setCookie);
+  }
+  const database = new D1DatabaseProvider(context.env.DOCUMENT_CONTROL_DB);
+  const demo = createGuidedDemoContext(session.sessionId);
+  await ensureGuidedDemoSeed(database, session.sessionId);
+  const read = createAuthorizedWorkspaceReadService(database);
+  const documents = await read.listDocuments({
+    subjectId: demo.authorSubjectId,
+    tenantId: demo.tenantId,
+    workspaceId: demo.workspaceId,
+  });
+  return context.html(
+    renderWorkspaceDocuments(
+      createTheme(context.env),
+      demo.workspaceName,
+      documents,
+    ),
+  );
+});
+
+app.get("/demo/app/templates", async (context) => {
+  if (!guidedDemoEnabled(context.env)) {
+    return context.html(renderNotFound(createTheme(context.env)), 404);
+  }
+
+  const session = resolveGuidedDemoSession(
+    context.req.header("Cookie"),
+    context.req.url,
+  );
+  if (session.setCookie) {
+    context.header("Set-Cookie", session.setCookie);
+  }
+  const database = new D1DatabaseProvider(context.env.DOCUMENT_CONTROL_DB);
+  const demo = createGuidedDemoContext(session.sessionId);
+  await ensureGuidedDemoSeed(database, session.sessionId);
+  const read = createAuthorizedWorkspaceReadService(database);
+  const templates = await read.listTemplates({
+    subjectId: demo.authorSubjectId,
+    tenantId: demo.tenantId,
+    workspaceId: demo.workspaceId,
+  });
+  return context.html(
+    renderWorkspaceTemplates(
+      createTheme(context.env),
+      demo.workspaceName,
+      templates,
+    ),
+  );
+});
+
 app.get("/demo/export", (context) => {
   const exportedAt = new Date().toISOString();
   return context.body(serializeExport(createSyntheticExport(exportedAt)), 200, {
@@ -135,6 +227,15 @@ app.notFound((context) =>
   context.html(renderNotFound(createTheme(context.env)), 404),
 );
 
+function createAuthorizedWorkspaceReadService(
+  database: D1DatabaseProvider,
+): AuthorizedWorkspaceReadService {
+  return new AuthorizedWorkspaceReadService(
+    new WorkspaceReadService(database),
+    new DatabaseAuthorizationPolicy(database),
+  );
+}
+
 function guidedDemoEnabled(bindings: Bindings): boolean {
   return bindings.DEMO_MUTATIONS_ENABLED === "true";
 }
@@ -150,6 +251,25 @@ function parseGuidedDemoAction(value: string): GuidedDemoAction | null {
     return value;
   }
   return null;
+}
+
+function resolveGuidedDemoSession(
+  cookieHeader: string | undefined,
+  requestUrl: string,
+): { sessionId: string; setCookie?: string } {
+  const existingSessionId = readGuidedDemoSession(cookieHeader);
+  if (existingSessionId) {
+    return { sessionId: existingSessionId };
+  }
+
+  const sessionId = crypto.randomUUID();
+  return {
+    sessionId,
+    setCookie: createGuidedDemoSessionCookie(
+      sessionId,
+      new URL(requestUrl).protocol === "https:",
+    ),
+  };
 }
 
 function readGuidedDemoSession(
@@ -179,7 +299,7 @@ function createGuidedDemoSessionCookie(
   secure: boolean,
 ): string {
   const secureAttribute = secure ? "; Secure" : "";
-  return `${guidedDemoSessionCookie}=${sessionId}; Path=/demo/workflow; Max-Age=3600; HttpOnly; SameSite=Strict${secureAttribute}`;
+  return `${guidedDemoSessionCookie}=${sessionId}; Path=/demo; Max-Age=3600; HttpOnly; SameSite=Strict${secureAttribute}`;
 }
 
 function hasSameOrigin(
