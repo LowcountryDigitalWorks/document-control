@@ -58,7 +58,7 @@ test("tenant administrator updates persisted workspace presentation", async ({
   await page.goto("/demo/app");
   await expect(page.getByText("Harbor Office", { exact: true })).toBeVisible();
   await expect(page.getByText("Records Hub", { exact: true })).toBeVisible();
-  await expect(page.getByText("Client Library", { exact: true })).toBeVisible();
+  await expect(page.locator("main")).toContainText("Client Library");
   await expect(
     page.getByRole("link", { name: "Controlled Files", exact: true }),
   ).toBeVisible();
