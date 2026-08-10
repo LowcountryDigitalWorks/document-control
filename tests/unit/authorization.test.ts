@@ -28,7 +28,10 @@ class SqliteDatabaseProvider implements DatabaseProvider {
     parameters: readonly unknown[] = [],
   ): Promise<DatabaseResult> {
     const result = this.database.prepare(sql).run(...toSqlValues(parameters));
-    return { changes: Number(result.changes), lastRowId: Number(result.lastInsertRowid) };
+    return {
+      changes: Number(result.changes),
+      lastRowId: Number(result.lastInsertRowid),
+    };
   }
 
   public async executeBatch(
@@ -40,7 +43,10 @@ class SqliteDatabaseProvider implements DatabaseProvider {
         const result = this.database
           .prepare(statement.sql)
           .run(...toSqlValues(statement.parameters ?? []));
-        return { changes: Number(result.changes), lastRowId: Number(result.lastInsertRowid) };
+        return {
+          changes: Number(result.changes),
+          lastRowId: Number(result.lastInsertRowid),
+        };
       });
       this.database.exec("COMMIT");
       return results;
@@ -72,7 +78,10 @@ async function createDatabase(): Promise<DatabaseSync> {
     "utf8",
   );
   const permissions = await readFile(
-    new URL("../../migrations/0002_system_role_permissions.sql", import.meta.url),
+    new URL(
+      "../../migrations/0002_system_role_permissions.sql",
+      import.meta.url,
+    ),
     "utf8",
   );
   const database = new DatabaseSync(":memory:");
@@ -164,7 +173,9 @@ describe("database authorization policy", () => {
   it("allows configured author permissions only inside the bound workspace", async () => {
     const database = await createDatabase();
     seedAuthorizationScenario(database);
-    const policy = new DatabaseAuthorizationPolicy(new SqliteDatabaseProvider(database));
+    const policy = new DatabaseAuthorizationPolicy(
+      new SqliteDatabaseProvider(database),
+    );
 
     await expect(
       policy.assertAllowed({
@@ -203,7 +214,9 @@ describe("database authorization policy", () => {
   it("resolves document scope and enforces viewer permissions", async () => {
     const database = await createDatabase();
     seedAuthorizationScenario(database);
-    const policy = new DatabaseAuthorizationPolicy(new SqliteDatabaseProvider(database));
+    const policy = new DatabaseAuthorizationPolicy(
+      new SqliteDatabaseProvider(database),
+    );
 
     await expect(
       policy.assertAllowed({
@@ -226,7 +239,9 @@ describe("database authorization policy", () => {
   it("allows a platform administrator across tenants without tenant membership", async () => {
     const database = await createDatabase();
     seedAuthorizationScenario(database);
-    const policy = new DatabaseAuthorizationPolicy(new SqliteDatabaseProvider(database));
+    const policy = new DatabaseAuthorizationPolicy(
+      new SqliteDatabaseProvider(database),
+    );
 
     await expect(
       policy.assertAllowed({
@@ -245,7 +260,9 @@ describe("database authorization policy", () => {
       database,
       "UPDATE tenant_memberships SET status = 'suspended' WHERE id = 'membership-author'",
     );
-    const policy = new DatabaseAuthorizationPolicy(new SqliteDatabaseProvider(database));
+    const policy = new DatabaseAuthorizationPolicy(
+      new SqliteDatabaseProvider(database),
+    );
 
     await expect(
       policy.assertAllowed({

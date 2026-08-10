@@ -9,7 +9,12 @@ import type {
   TransitionWorkflowCommand,
 } from "./document-workflow-service";
 import type { AuthorizationPolicy } from "./authorization";
-import type { Approval, DocumentVersion, Review, WorkflowInstance } from "../domain/models";
+import type {
+  Approval,
+  DocumentVersion,
+  Review,
+  WorkflowInstance,
+} from "../domain/models";
 
 export class AuthorizedDocumentWorkflowService {
   public constructor(

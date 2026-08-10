@@ -65,7 +65,10 @@ export class DatabaseAuthorizationPolicy implements AuthorizationPolicy {
 
     if (
       rows.some((row) =>
-        permissionListAllows(parsePermissionList(row.permissionsJson), request.permission),
+        permissionListAllows(
+          parsePermissionList(row.permissionsJson),
+          request.permission,
+        ),
       )
     ) {
       return;
@@ -84,7 +87,9 @@ export class DatabaseAuthorizationPolicy implements AuthorizationPolicy {
     ].filter((value) => value !== undefined).length;
 
     if (resourceCount > 1) {
-      throw new Error("Authorization requests must identify at most one resource scope.");
+      throw new Error(
+        "Authorization requests must identify at most one resource scope.",
+      );
     }
 
     if (request.workspaceId) {
@@ -135,7 +140,10 @@ export class DatabaseAuthorizationPolicy implements AuthorizationPolicy {
 
 function parsePermissionList(serialized: string): readonly string[] {
   const parsed: unknown = JSON.parse(serialized);
-  if (!Array.isArray(parsed) || parsed.some((value) => typeof value !== "string")) {
+  if (
+    !Array.isArray(parsed) ||
+    parsed.some((value) => typeof value !== "string")
+  ) {
     throw new Error("Role permissions must be a JSON array of strings.");
   }
   return parsed;
