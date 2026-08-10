@@ -2,22 +2,25 @@
 
 ## Authoritative state
 
-`main` is the authoritative product foundation. Bootstrap PR #1 was squash-merged on 2026-08-10 as
-commit `e5902256cfbe1f36b67143cae8daf687fe684732`.
+`main` is the authoritative product foundation.
+
+Merged milestones:
+
+- PR #1, bootstrap foundation → `e5902256cfbe1f36b67143cae8daf687fe684732`.
+- PR #7, persisted document workflow → `2c4d07c54738d59dcdceaa488d9deeafd39853d1`.
 
 The repository is public by explicit owner decision. Package metadata remains `private: true` only to
 prevent accidental package-registry publication. No production Cloudflare resources, customer data,
 paid services, analytics, or public-upload capability exist.
 
-The active post-bootstrap workstream is the persisted document-workflow slice. Normal development is
-performed through this repository, GitHub pull requests, and GitHub Actions; Codex is not a routine
-release dependency.
+Normal development uses this repository, branches/pull requests, and GitHub Actions. Codex is not a
+routine development or release dependency.
 
 ## Foundation decisions
 
 - TypeScript + Hono modular monolith on Cloudflare Workers.
 - D1/SQLite stores relational application metadata; R2 stores binaries.
-- `migrations/0001_initial.sql` is the authoritative executable schema.
+- SQL migrations are authoritative executable schema/data evolution.
 - Core code stays vendor-independent behind `DatabaseProvider` and `ContentStore` ports.
 - R2 version objects are create-once and their bytes are SHA-256 verified.
 - Content keys are built by application-owned tenant/workspace/version key builders.
@@ -32,26 +35,32 @@ release dependency.
 - The LDW theme is a configurable reference theme; final colors/assets are not hard-coded decisions.
 - Bear Necessities is a candidate deployment/offering tier, not a domain/product architecture name.
 
-## Persisted workflow slice
+## Persisted workflow capability
 
-The application-service layer now supports the core persisted sequence:
+The application-service layer supports:
 
 `published template -> document/version -> workflow -> review -> exact-version approval -> changed version -> prior approval does not apply to new version -> audit evidence`
 
-Important behavior:
+Related D1 metadata/state mutations use database batches. The application does not claim an atomic
+transaction across R2 binary creation and D1 metadata. Upload orchestration and compensation remain
+future work before customer uploads.
 
-- related D1 metadata/state mutations are submitted as transactional database batches;
-- document creation preserves exact approved-template provenance;
-- workflow instances are pinned to exact document and workflow-definition versions;
-- accepted reviews advance to approval through the bound workflow definition;
-- approval and state changes are persisted together and only for the current document version;
-- a workflow for an older version is rejected if a newer version became current before approval;
-- changed versions return the document to draft without mutating historical approvals;
-- service methods enforce canonical SHA-256 hashes and application-owned content keys.
+## Authorization boundary
 
-The application service does not create or claim an atomic transaction across R2 and D1. Customer
-upload orchestration, compensation behavior, malware scanning, content limits, retention, and recovery
-must be designed before production uploads are enabled.
+Authorization is intentionally separate from authentication.
+
+- `AuthorizationPolicy` defines the provider-neutral enforcement boundary.
+- Built-in roles receive explicit permission defaults in `0002_system_role_permissions.sql`.
+- `DatabaseAuthorizationPolicy` evaluates configurable role definitions/bindings at platform, tenant,
+  and workspace scope.
+- Active tenant membership is required for tenant/workspace access; a platform administrator remains
+  a deliberate global role.
+- Workspace scope can be resolved through workspace, document, or workflow-instance resources while
+  preserving the requested tenant boundary.
+- `AuthorizedDocumentWorkflowService` is the required facade for HTTP/UI workflow operations. Routes
+  must not invoke the raw persistence service directly.
+- Authentication/session/SSO selection is still deferred; no credentials or provider secrets are
+  stored by this boundary.
 
 ## Continue locally
 
@@ -63,14 +72,18 @@ must be designed before production uploads are enabled.
 
 ## Next product slice
 
-After the persisted workflow service is merged, wire it into tenant-scoped HTTP/UI routes using the
-existing D1 binding and synthetic/demo-safe data. The UI should let a user understand the document
-lifecycle without GRC terminology and should visibly show that an approval applies to one exact
-version but not to a later changed version.
+After the authorization boundary is merged, wire the authorized persisted service into
+**tenant-scoped HTTP/UI routes using synthetic/demo-safe identity context only**.
 
-Keep production authentication and arbitrary/customer uploads out of that slice. Introduce an
-explicit authorization boundary/interface before selecting a production identity provider.
+The UI should make the document lifecycle understandable to an ordinary office-document user and
+visibly demonstrate:
 
-Do not introduce customer uploads until permitted-data policy, allowed content types, size limits,
-malware scanning, retention, authorization, backup/recovery, and failure/compensation behavior are
-explicitly approved.
+`template -> document -> review -> approval -> changed version -> old approval no longer applies`
+
+The HTTP layer must use `AuthorizedDocumentWorkflowService`. Do not choose a production identity
+provider merely to build the UI slice. A synthetic/demo identity context may be used only where it is
+clearly isolated and cannot be mistaken for production authentication.
+
+Keep arbitrary/customer uploads out of scope. Do not introduce them until permitted-data policy,
+content types, size limits, malware scanning, retention, authorization, backup/recovery, and
+failure/compensation behavior are explicitly approved.
