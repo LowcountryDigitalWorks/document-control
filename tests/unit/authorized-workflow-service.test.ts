@@ -9,7 +9,6 @@ import { DocumentWorkflowService } from "../../src/application/document-workflow
 import type {
   DatabaseProvider,
   DatabaseResult,
-  DatabaseStatement,
 } from "../../src/application/ports";
 
 class NeverCalledDatabase implements DatabaseProvider {
@@ -21,9 +20,7 @@ class NeverCalledDatabase implements DatabaseProvider {
     throw new Error("Persistence must not run after authorization denial.");
   }
 
-  public async executeBatch(
-    _statements: readonly DatabaseStatement[],
-  ): Promise<readonly DatabaseResult[]> {
+  public async executeBatch(): Promise<readonly DatabaseResult[]> {
     throw new Error("Persistence must not run after authorization denial.");
   }
 }
