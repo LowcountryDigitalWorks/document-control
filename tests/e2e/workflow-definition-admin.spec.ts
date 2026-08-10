@@ -126,7 +126,11 @@ test("a newly created seeded-workflow version does not silently change the guide
     .getByRole("button", { name: "Submit version 1 for review" })
     .click();
   await page.goto("/demo/app/documents");
-  await page.getByRole("link", { name: "Harbor Opening Checklist" }).click();
+  const documentCard = page
+    .locator(".record-card")
+    .filter({ hasText: "Harbor Opening Checklist" });
+  await expect(documentCard).toHaveCount(1);
+  await documentCard.getByRole("link", { name: "View evidence" }).click();
   await expect(
     page.getByText("Standard review and approval · v1", { exact: true }),
   ).toBeVisible();
