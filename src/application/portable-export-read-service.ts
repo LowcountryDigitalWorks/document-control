@@ -30,7 +30,7 @@ import type {
   Workspace,
 } from "../domain/models";
 
-interface TenantRow extends Tenant {}
+type TenantRow = Tenant;
 interface WorkspaceRow {
   id: string;
   tenantId: string;
@@ -81,7 +81,7 @@ interface DocumentRow {
   sourceTemplateHash: string | null;
   templateProvenance: TemplateProvenance;
 }
-interface DocumentVersionRow extends DocumentVersion {}
+type DocumentVersionRow = DocumentVersion;
 interface TemplateRow {
   id: string;
   tenantId: string;
@@ -111,7 +111,7 @@ interface WorkflowDefinitionRow {
   version: number;
   definitionJson: string;
 }
-interface WorkflowInstanceRow extends WorkflowInstance {}
+type WorkflowInstanceRow = WorkflowInstance;
 interface ReviewRow {
   id: string;
   tenantId: string;
@@ -122,7 +122,7 @@ interface ReviewRow {
   comment: string | null;
   createdAt: string;
 }
-interface ApprovalRow extends Approval {}
+type ApprovalRow = Approval;
 interface AuditRow {
   id: string;
   tenantId: string;
