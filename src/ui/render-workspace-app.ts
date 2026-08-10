@@ -28,11 +28,12 @@ export function renderWorkspaceOverview(
       <div>
         <p class="eyebrow">Explore the workspace</p>
         <h2 id="next-title">See the records behind the counts.</h2>
-        <p>Documents and Templates use independent read permissions even though this synthetic Author currently has both.</p>
+        <p>Documents, Templates, and workflow queues use independent permission checks before persisted records reach the UI.</p>
       </div>
       <div class="actions">
         <a class="button" href="/demo/app/documents">View documents</a>
         <a class="button secondary" href="/demo/app/templates">View templates</a>
+        <a class="button secondary" href="/demo/app/reviews">Reviews &amp; approvals</a>
       </div>
     </section>`,
   );
@@ -160,6 +161,7 @@ function renderWorkspacePage(
       ${navLink("/demo/app", "Overview", active === "overview")}
       ${navLink("/demo/app/documents", "Documents", active === "documents")}
       ${navLink("/demo/app/templates", "Templates", active === "templates")}
+      <a href="/demo/app/reviews">Reviews &amp; Approvals</a>
       <hr>
       <a href="/demo/workflow">Guided workflow</a>
       <a href="/">Product overview</a>
