@@ -52,3 +52,291 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm secrets:scan
+
+  wire-admin-presentation:
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.head_ref == 'agent/admin-presentation-settings'
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Wire administration routes and runtime theme
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          index = Path("src/index.ts")
+          text = index.read_text()
+
+          def replace_once(old: str, new: str, label: str) -> None:
+              global text
+              if old not in text:
+                  raise SystemExit(f"missing {label} marker")
+              text = text.replace(old, new, 1)
+
+          replace_once(
+              'import { AuthorizationDeniedError } from "./application/authorization";\n',
+              'import { AuthorizationDeniedError } from "./application/authorization";\nimport { AuthorizedPresentationSettingsService } from "./application/authorized-presentation-settings-service";\n',
+              "authorization import",
+          )
+          replace_once(
+              'import { PortableExportReadService } from "./application/portable-export-read-service";\n',
+              'import { PortableExportReadService } from "./application/portable-export-read-service";\nimport {\n  parsePresentationSettingsInput,\n  PresentationSettingsValidationError,\n} from "./application/presentation-settings-input";\nimport { PresentationSettingsService } from "./application/presentation-settings-service";\n',
+              "settings imports",
+          )
+          replace_once(
+              'import { ensureGuidedBackupAdmin } from "./demo/backup-context";\n',
+              'import { ensureGuidedBackupAdmin } from "./demo/backup-context";\nimport { createPersistedTenantTheme } from "./demo/persisted-theme";\nimport { ensureGuidedTenantAdmin } from "./demo/tenant-admin-context";\n',
+              "demo imports",
+          )
+          replace_once(
+              'import { renderAuditLog } from "./ui/render-audit-log";\n',
+              'import { renderAdminSettings } from "./ui/render-admin-settings";\nimport { renderAuditLog } from "./ui/render-audit-log";\n',
+              "admin renderer import",
+          )
+
+          route_marker = 'app.get("/demo/app/admin/backup", async (context) => {'
+          admin_routes = '''app.get("/demo/app/admin/settings", async (context) => {
+            if (!guidedDemoEnabled(context.env)) {
+              return context.html(renderNotFound(createTheme(context.env)), 404);
+            }
+
+            const session = resolveGuidedDemoSession(
+              context.req.header("Cookie"),
+              context.req.url,
+            );
+            if (session.setCookie) {
+              context.header("Set-Cookie", session.setCookie);
+            }
+            const database = new D1DatabaseProvider(context.env.DOCUMENT_CONTROL_DB);
+            const demo = createGuidedDemoContext(session.sessionId);
+            await ensureGuidedDemoSeed(database, session.sessionId);
+            const admin = await ensureGuidedTenantAdmin(database, session.sessionId);
+            const service = createAuthorizedPresentationSettingsService(database);
+
+            try {
+              const settings = await service.getSettings({
+                subjectId: admin.subjectId,
+                tenantId: demo.tenantId,
+                workspaceId: demo.workspaceId,
+              });
+              const theme = await createPersistedTenantTheme(
+                database,
+                context.env,
+                demo.tenantId,
+              );
+              context.header("Cache-Control", "no-store");
+              return context.html(
+                renderAdminSettings(
+                  theme,
+                  settings,
+                  new URL(context.req.url).searchParams.get("saved") === "1",
+                ),
+              );
+            } catch (error) {
+              if (error instanceof AuthorizationDeniedError) {
+                return context.html(renderNotFound(createTheme(context.env)), 404);
+              }
+              throw error;
+            }
+          });
+
+          app.post("/demo/app/admin/settings", async (context) => {
+            if (!guidedDemoEnabled(context.env)) {
+              return context.notFound();
+            }
+            if (!hasSameOrigin(context.req.url, context.req.header("Origin"))) {
+              return context.json({ error: "Same-origin demo request required." }, 403);
+            }
+
+            const sessionId = readGuidedDemoSession(context.req.header("Cookie"));
+            if (!sessionId) {
+              return context.json(
+                { error: "Synthetic administration session missing. Reload Administration." },
+                409,
+              );
+            }
+
+            let formData: FormData;
+            try {
+              formData = await context.req.raw.formData();
+            } catch {
+              return context.text("A valid form body is required.", 400);
+            }
+            const values = new URLSearchParams();
+            for (const key of [
+              "workspaceName",
+              "appName",
+              "companyName",
+              "primary",
+              "secondary",
+              "accent",
+              "workspaceTerm",
+              "documentTerm",
+              "approvalTerm",
+            ]) {
+              const value = formData.get(key);
+              if (typeof value === "string") values.set(key, value);
+            }
+
+            const database = new D1DatabaseProvider(context.env.DOCUMENT_CONTROL_DB);
+            const demo = createGuidedDemoContext(sessionId);
+            await ensureGuidedDemoSeed(database, sessionId);
+            const admin = await ensureGuidedTenantAdmin(database, sessionId);
+            const service = createAuthorizedPresentationSettingsService(database);
+
+            try {
+              const input = parsePresentationSettingsInput(values);
+              await service.updateSettings(
+                {
+                  subjectId: admin.subjectId,
+                  tenantId: demo.tenantId,
+                  workspaceId: demo.workspaceId,
+                },
+                {
+                  input,
+                  occurredAt: new Date().toISOString(),
+                  auditEventId: `settings-${crypto.randomUUID()}`,
+                },
+              );
+            } catch (error) {
+              if (error instanceof PresentationSettingsValidationError) {
+                return context.text(error.message, 400);
+              }
+              if (error instanceof AuthorizationDeniedError) {
+                return context.html(renderNotFound(createTheme(context.env)), 404);
+              }
+              throw error;
+            }
+
+            return context.redirect("/demo/app/admin/settings?saved=1", 303);
+          });
+
+          '''
+          if route_marker not in text:
+              raise SystemExit("missing admin route insertion marker")
+          text = text.replace(route_marker, admin_routes + route_marker, 1)
+
+          helper_marker = '''function createAuthorizedPortableExportService(
+            database: D1DatabaseProvider,
+          ): AuthorizedPortableExportService {'''
+          helper = '''function createAuthorizedPresentationSettingsService(
+            database: D1DatabaseProvider,
+          ): AuthorizedPresentationSettingsService {
+            return new AuthorizedPresentationSettingsService(
+              new PresentationSettingsService(database),
+              new DatabaseAuthorizationPolicy(database),
+            );
+          }
+
+          '''
+          if helper_marker not in text:
+              raise SystemExit("missing settings helper insertion marker")
+          text = text.replace(helper_marker, helper + helper_marker, 1)
+
+          render_replacements = [
+              (
+                  'renderWorkspaceOverview(createTheme(context.env), overview)',
+                  'renderWorkspaceOverview(\n      await createPersistedTenantTheme(database, context.env, demo.tenantId),\n      overview,\n    )',
+              ),
+              (
+                  'renderWorkspaceDocuments(\n      createTheme(context.env),',
+                  'renderWorkspaceDocuments(\n      await createPersistedTenantTheme(database, context.env, demo.tenantId),',
+              ),
+              (
+                  'renderDocumentDetail(createTheme(context.env), detail)',
+                  'renderDocumentDetail(\n        await createPersistedTenantTheme(database, context.env, demo.tenantId),\n        detail,\n      )',
+              ),
+              (
+                  'renderWorkspaceTemplates(\n      createTheme(context.env),',
+                  'renderWorkspaceTemplates(\n      await createPersistedTenantTheme(database, context.env, demo.tenantId),',
+              ),
+              (
+                  'renderReviewApprovalQueue(\n      createTheme(context.env),',
+                  'renderReviewApprovalQueue(\n      await createPersistedTenantTheme(database, context.env, demo.tenantId),',
+              ),
+              (
+                  'renderBackupPortability(createTheme(context.env), exported)',
+                  'renderBackupPortability(\n      await createPersistedTenantTheme(database, context.env, demo.tenantId),\n      exported,\n    )',
+              ),
+              (
+                  'renderAuditLog(\n      createTheme(context.env),',
+                  'renderAuditLog(\n      await createPersistedTenantTheme(database, context.env, demo.tenantId),',
+              ),
+          ]
+          for old, new in render_replacements:
+              if old in text:
+                  text = text.replace(old, new)
+          index.write_text(text)
+
+          workspace_ui = Path("src/ui/render-workspace-app.ts")
+          ui = workspace_ui.read_text()
+          nav_old = '''      ${navLink("/demo/app/documents", "Documents", active === "documents")}
+                ${navLink("/demo/app/templates", "Templates", active === "templates")}
+                <a href="/demo/app/reviews">Reviews &amp; Approvals</a>
+                <a href="/demo/app/audit">Audit Log</a>
+                <hr>'''
+          nav_new = '''      ${navLink("/demo/app/documents", pluralLabel(theme.terminology.document), active === "documents")}
+                ${navLink("/demo/app/templates", "Templates", active === "templates")}
+                <a href="/demo/app/reviews">Reviews &amp; ${escapeHtml(pluralLabel(theme.terminology.approval))}</a>
+                <a href="/demo/app/audit">Audit Log</a>
+                <a href="/demo/app/admin/settings">Administration</a>
+                <hr>'''
+          if nav_old not in ui:
+              raise SystemExit("missing workspace navigation marker")
+          ui = ui.replace(nav_old, nav_new, 1)
+          ui = ui.replace(
+              '<span class="demo-label">Synthetic workspace · read-only UI</span>',
+              '<span class="demo-label">Synthetic ${escapeHtml(theme.terminology.workspace.toLowerCase())} · read-only UI</span>',
+              1,
+          )
+          plural_marker = '''function metric(label: string, value: string, detail: string): string {'''
+          plural_helper = '''function pluralLabel(value: string): string {
+            if (/s$/iu.test(value)) return value;
+            if (/[^aeiou]y$/iu.test(value)) return `${value.slice(0, -1)}ies`;
+            return `${value}s`;
+          }
+
+          '''
+          if plural_marker not in ui:
+              raise SystemExit("missing plural helper marker")
+          ui = ui.replace(plural_marker, plural_helper + plural_marker, 1)
+          workspace_ui.write_text(ui)
+          PY
+
+          pnpm exec prettier --write \
+            src/index.ts \
+            src/application/presentation-settings-input.ts \
+            src/application/presentation-settings-service.ts \
+            src/application/authorized-presentation-settings-service.ts \
+            src/demo/tenant-admin-context.ts \
+            src/demo/backup-context.ts \
+            src/demo/persisted-theme.ts \
+            src/ui/theme.ts \
+            src/ui/render-admin-settings.ts \
+            src/ui/render-workspace-app.ts \
+            tests/unit/presentation-settings-input.test.ts \
+            tests/unit/presentation-settings-authorization.test.ts \
+            tests/e2e/admin-presentation-settings.spec.ts
+
+          if ! git diff --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add src tests
+            git commit -m "Wire tenant presentation administration"
+            git push origin "HEAD:${GITHUB_HEAD_REF}"
+          fi
