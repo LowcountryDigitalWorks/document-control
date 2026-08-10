@@ -52,3 +52,49 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm secrets:scan
+
+  normalize-guided-demo:
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.head_ref == 'agent/authorized-demo-ui'
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Normalize guided demo source
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm exec prettier --write \
+            scripts/e2e-d1.ts \
+            src/demo/workflow-demo.ts \
+            src/index.ts \
+            tests/e2e/guided-demo.spec.ts
+          if ! git diff --quiet -- \
+            scripts/e2e-d1.ts \
+            src/demo/workflow-demo.ts \
+            src/index.ts \
+            tests/e2e/guided-demo.spec.ts; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add \
+              scripts/e2e-d1.ts \
+              src/demo/workflow-demo.ts \
+              src/index.ts \
+              tests/e2e/guided-demo.spec.ts
+            git commit -m "Normalize guided demo source"
+            git push origin "HEAD:${GITHUB_HEAD_REF}"
+          else
+            echo "Guided demo source already normalized."
+          fi
