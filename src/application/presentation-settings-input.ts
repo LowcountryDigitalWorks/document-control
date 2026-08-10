@@ -85,7 +85,7 @@ function requiredText(
       `${label} must be ${maximumLength} characters or fewer.`,
     );
   }
-  if (/[\u0000-\u001f\u007f]/u.test(value)) {
+  if (containsControlCharacter(value)) {
     throw new PresentationSettingsValidationError(
       `${label} cannot contain control characters.`,
     );
@@ -105,4 +105,11 @@ function requiredColor(
     );
   }
   return value;
+}
+
+function containsControlCharacter(value: string): boolean {
+  return Array.from(value).some((character) => {
+    const code = character.charCodeAt(0);
+    return code <= 31 || code === 127;
+  });
 }
