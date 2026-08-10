@@ -4,29 +4,47 @@ import type { DatabaseProvider } from "../application/ports";
 import { buildDocumentVersionContentKey } from "../infrastructure/content-key";
 import { DatabaseAuthorizationPolicy } from "../infrastructure/database-authorization-policy";
 
-export const guidedDemo = {
-  tenantId: "demo-tenant-guided",
-  tenantName: "Harbor Works Demo",
-  workspaceId: "demo-workspace-operations",
-  workspaceName: "Operations",
-  templateId: "demo-template-sop",
-  templateName: "Standard Operating Procedure",
-  workflowDefinitionId: "demo-workflow-standard",
-  documentId: "demo-document-opening-checklist",
-  documentTitle: "Harbor Opening Checklist",
-  versionOneId: "demo-document-version-1",
-  versionTwoId: "demo-document-version-2",
-  workflowInstanceId: "demo-workflow-instance-1",
-  authorSubjectId: "demo-subject-author",
-  reviewerSubjectId: "demo-subject-reviewer",
-  approverSubjectId: "demo-subject-approver",
-} as const;
-
 export type GuidedDemoAction =
-  "create" | "submit" | "review" | "approve" | "change";
+  | "create"
+  | "submit"
+  | "review"
+  | "approve"
+  | "change";
 
 export type GuidedDemoPhase =
-  "ready" | "created" | "review" | "approval" | "approved" | "changed";
+  | "ready"
+  | "created"
+  | "review"
+  | "approval"
+  | "approved"
+  | "changed";
+
+export interface GuidedDemoContext {
+  sessionId: string;
+  tenantId: string;
+  tenantName: string;
+  tenantSlug: string;
+  workspaceId: string;
+  workspaceName: string;
+  templateId: string;
+  templateVersionId: string;
+  templateName: string;
+  workflowDefinitionId: string;
+  documentId: string;
+  documentTitle: string;
+  versionOneId: string;
+  versionTwoId: string;
+  workflowInstanceId: string;
+  authorSubjectId: string;
+  reviewerSubjectId: string;
+  approverSubjectId: string;
+  authorMembershipId: string;
+  reviewerMembershipId: string;
+  approverMembershipId: string;
+  authorBindingId: string;
+  reviewerBindingId: string;
+  approverBindingId: string;
+}
 
 export interface GuidedDemoVersion {
   id: string;
@@ -62,121 +80,149 @@ const versionTwoHash = `sha256:${"2".repeat(64)}`;
 const templateHash = `sha256:${"a".repeat(64)}`;
 const seedTimestamp = "2026-08-10T20:30:00.000Z";
 
+export function createGuidedDemoContext(sessionId: string): GuidedDemoContext {
+  if (!isValidGuidedDemoSessionId(sessionId)) {
+    throw new Error("Guided demo session identifiers must be canonical UUIDs.");
+  }
+
+  const namespace = sessionId.toLowerCase().replaceAll("-", "");
+  const prefix = `demo-${namespace}`;
+  return {
+    sessionId: sessionId.toLowerCase(),
+    tenantId: `${prefix}-tenant`,
+    tenantName: "Harbor Works Demo",
+    tenantSlug: `guided-demo-${namespace}`,
+    workspaceId: `${prefix}-workspace-operations`,
+    workspaceName: "Operations",
+    templateId: `${prefix}-template-sop`,
+    templateVersionId: `${prefix}-template-version-1`,
+    templateName: "Standard Operating Procedure",
+    workflowDefinitionId: `${prefix}-workflow-standard`,
+    documentId: `${prefix}-document-opening-checklist`,
+    documentTitle: "Harbor Opening Checklist",
+    versionOneId: `${prefix}-document-version-1`,
+    versionTwoId: `${prefix}-document-version-2`,
+    workflowInstanceId: `${prefix}-workflow-instance-1`,
+    authorSubjectId: `${prefix}-subject-author`,
+    reviewerSubjectId: `${prefix}-subject-reviewer`,
+    approverSubjectId: `${prefix}-subject-approver`,
+    authorMembershipId: `${prefix}-membership-author`,
+    reviewerMembershipId: `${prefix}-membership-reviewer`,
+    approverMembershipId: `${prefix}-membership-approver`,
+    authorBindingId: `${prefix}-binding-author`,
+    reviewerBindingId: `${prefix}-binding-reviewer`,
+    approverBindingId: `${prefix}-binding-approver`,
+  };
+}
+
+export function isValidGuidedDemoSessionId(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value,
+  );
+}
+
 export async function ensureGuidedDemoSeed(
   database: DatabaseProvider,
+  sessionId: string,
 ): Promise<void> {
   await assertAuthorizationMigration(database);
+  const demo = createGuidedDemoContext(sessionId);
 
   await database.executeBatch([
     statement(
       "INSERT OR IGNORE INTO identity_subjects (id, display_name, provider, provider_subject, created_at) VALUES (?, ?, 'external', ?, ?)",
-      [
-        guidedDemo.authorSubjectId,
-        "Avery Author",
-        guidedDemo.authorSubjectId,
-        seedTimestamp,
-      ],
+      [demo.authorSubjectId, "Avery Author", demo.authorSubjectId, seedTimestamp],
     ),
     statement(
       "INSERT OR IGNORE INTO identity_subjects (id, display_name, provider, provider_subject, created_at) VALUES (?, ?, 'external', ?, ?)",
       [
-        guidedDemo.reviewerSubjectId,
+        demo.reviewerSubjectId,
         "Riley Reviewer",
-        guidedDemo.reviewerSubjectId,
+        demo.reviewerSubjectId,
         seedTimestamp,
       ],
     ),
     statement(
       "INSERT OR IGNORE INTO identity_subjects (id, display_name, provider, provider_subject, created_at) VALUES (?, ?, 'external', ?, ?)",
       [
-        guidedDemo.approverSubjectId,
+        demo.approverSubjectId,
         "Alex Approver",
-        guidedDemo.approverSubjectId,
+        demo.approverSubjectId,
         seedTimestamp,
       ],
     ),
     statement(
       "INSERT OR IGNORE INTO tenants (id, name, slug, created_at) VALUES (?, ?, ?, ?)",
-      [
-        guidedDemo.tenantId,
-        guidedDemo.tenantName,
-        "guided-demo",
-        seedTimestamp,
-      ],
+      [demo.tenantId, demo.tenantName, demo.tenantSlug, seedTimestamp],
     ),
     statement(
       "INSERT OR IGNORE INTO workspaces (id, tenant_id, name, created_at) VALUES (?, ?, ?, ?)",
+      [demo.workspaceId, demo.tenantId, demo.workspaceName, seedTimestamp],
+    ),
+    statement(
+      "INSERT OR IGNORE INTO tenant_memberships (id, tenant_id, subject_id, status, created_at) VALUES (?, ?, ?, 'active', ?)",
       [
-        guidedDemo.workspaceId,
-        guidedDemo.tenantId,
-        guidedDemo.workspaceName,
+        demo.authorMembershipId,
+        demo.tenantId,
+        demo.authorSubjectId,
         seedTimestamp,
       ],
     ),
     statement(
       "INSERT OR IGNORE INTO tenant_memberships (id, tenant_id, subject_id, status, created_at) VALUES (?, ?, ?, 'active', ?)",
       [
-        "demo-membership-author",
-        guidedDemo.tenantId,
-        guidedDemo.authorSubjectId,
+        demo.reviewerMembershipId,
+        demo.tenantId,
+        demo.reviewerSubjectId,
         seedTimestamp,
       ],
     ),
     statement(
       "INSERT OR IGNORE INTO tenant_memberships (id, tenant_id, subject_id, status, created_at) VALUES (?, ?, ?, 'active', ?)",
       [
-        "demo-membership-reviewer",
-        guidedDemo.tenantId,
-        guidedDemo.reviewerSubjectId,
-        seedTimestamp,
-      ],
-    ),
-    statement(
-      "INSERT OR IGNORE INTO tenant_memberships (id, tenant_id, subject_id, status, created_at) VALUES (?, ?, ?, 'active', ?)",
-      [
-        "demo-membership-approver",
-        guidedDemo.tenantId,
-        guidedDemo.approverSubjectId,
+        demo.approverMembershipId,
+        demo.tenantId,
+        demo.approverSubjectId,
         seedTimestamp,
       ],
     ),
     statement(
       "INSERT OR IGNORE INTO role_bindings (id, role_definition_id, subject_id, tenant_id, workspace_id, created_at) VALUES (?, 'role-author', ?, ?, ?, ?)",
       [
-        "demo-binding-author",
-        guidedDemo.authorSubjectId,
-        guidedDemo.tenantId,
-        guidedDemo.workspaceId,
+        demo.authorBindingId,
+        demo.authorSubjectId,
+        demo.tenantId,
+        demo.workspaceId,
         seedTimestamp,
       ],
     ),
     statement(
       "INSERT OR IGNORE INTO role_bindings (id, role_definition_id, subject_id, tenant_id, workspace_id, created_at) VALUES (?, 'role-reviewer', ?, ?, ?, ?)",
       [
-        "demo-binding-reviewer",
-        guidedDemo.reviewerSubjectId,
-        guidedDemo.tenantId,
-        guidedDemo.workspaceId,
+        demo.reviewerBindingId,
+        demo.reviewerSubjectId,
+        demo.tenantId,
+        demo.workspaceId,
         seedTimestamp,
       ],
     ),
     statement(
       "INSERT OR IGNORE INTO role_bindings (id, role_definition_id, subject_id, tenant_id, workspace_id, created_at) VALUES (?, 'role-approver', ?, ?, ?, ?)",
       [
-        "demo-binding-approver",
-        guidedDemo.approverSubjectId,
-        guidedDemo.tenantId,
-        guidedDemo.workspaceId,
+        demo.approverBindingId,
+        demo.approverSubjectId,
+        demo.tenantId,
+        demo.workspaceId,
         seedTimestamp,
       ],
     ),
     statement(
       "INSERT OR IGNORE INTO templates (id, tenant_id, workspace_id, name, current_version, created_at) VALUES (?, ?, ?, ?, NULL, ?)",
       [
-        guidedDemo.templateId,
-        guidedDemo.tenantId,
-        guidedDemo.workspaceId,
-        guidedDemo.templateName,
+        demo.templateId,
+        demo.tenantId,
+        demo.workspaceId,
+        demo.templateName,
         seedTimestamp,
       ],
     ),
@@ -186,12 +232,12 @@ export async function ensureGuidedDemoSeed(
           content_provider, content_key, created_by_subject_id, provenance, created_at, published_at)
        VALUES (?, ?, ?, 1, 'published', ?, 'r2', ?, ?, ?, ?, ?)`,
       [
-        "demo-template-version-1",
-        guidedDemo.tenantId,
-        guidedDemo.templateId,
+        demo.templateVersionId,
+        demo.tenantId,
+        demo.templateId,
         templateHash,
-        `tenants/${guidedDemo.tenantId}/workspaces/${guidedDemo.workspaceId}/templates/${guidedDemo.templateId}/versions/demo-template-version-1/content`,
-        guidedDemo.authorSubjectId,
+        `tenants/${demo.tenantId}/workspaces/${demo.workspaceId}/templates/${demo.templateId}/versions/${demo.templateVersionId}/content`,
+        demo.authorSubjectId,
         "Synthetic LDW guided document-control demonstration",
         seedTimestamp,
         seedTimestamp,
@@ -199,15 +245,15 @@ export async function ensureGuidedDemoSeed(
     ),
     statement(
       "UPDATE templates SET current_version = 1 WHERE id = ? AND tenant_id = ? AND current_version IS NULL",
-      [guidedDemo.templateId, guidedDemo.tenantId],
+      [demo.templateId, demo.tenantId],
     ),
     statement(
       `INSERT OR IGNORE INTO workflow_definitions
          (id, tenant_id, name, version, definition_json, created_at)
        VALUES (?, ?, 'Standard review and approval', 1, ?, ?)`,
       [
-        guidedDemo.workflowDefinitionId,
-        guidedDemo.tenantId,
+        demo.workflowDefinitionId,
+        demo.tenantId,
         JSON.stringify({
           states: ["draft", "review", "approval", "approved"],
           transitions: [
@@ -226,27 +272,29 @@ export async function ensureGuidedDemoSeed(
 
 export async function loadGuidedDemoState(
   database: DatabaseProvider,
+  sessionId: string,
 ): Promise<GuidedDemoState> {
-  await ensureGuidedDemoSeed(database);
+  const demo = createGuidedDemoContext(sessionId);
+  await ensureGuidedDemoSeed(database, sessionId);
   const service = createAuthorizedService(database);
 
   const documentRows = await database.query<{ id: string }>(
     "SELECT id FROM documents WHERE tenant_id = ? AND id = ?",
-    [guidedDemo.tenantId, guidedDemo.documentId],
+    [demo.tenantId, demo.documentId],
   );
 
   if (documentRows.length === 0) {
-    return stateForPhase("ready", []);
+    return stateForPhase(demo, "ready", []);
   }
 
   const evidence = await service.getEvidence({
-    tenantId: guidedDemo.tenantId,
-    documentId: guidedDemo.documentId,
-    actorSubjectId: guidedDemo.authorSubjectId,
+    tenantId: demo.tenantId,
+    documentId: demo.documentId,
+    actorSubjectId: demo.authorSubjectId,
   });
   const workflowRows = await database.query<WorkflowStateRow>(
     "SELECT state FROM workflow_instances WHERE tenant_id = ? AND id = ?",
-    [guidedDemo.tenantId, guidedDemo.workflowInstanceId],
+    [demo.tenantId, demo.workflowInstanceId],
   );
   const workflowState = workflowRows[0]?.state;
   const versions = evidence.versions.map((item) => ({
@@ -270,7 +318,7 @@ export async function loadGuidedDemoState(
   }
 
   return {
-    ...stateForPhase(phase, versions),
+    ...stateForPhase(demo, phase, versions),
     documentStatus: evidence.document.status,
     currentVersionNumber: evidence.currentVersion.versionNumber,
     workflowState,
@@ -279,10 +327,12 @@ export async function loadGuidedDemoState(
 
 export async function runGuidedDemoAction(
   database: DatabaseProvider,
+  sessionId: string,
   action: GuidedDemoAction,
   occurredAt: string,
 ): Promise<GuidedDemoState> {
-  const current = await loadGuidedDemoState(database);
+  const demo = createGuidedDemoContext(sessionId);
+  const current = await loadGuidedDemoState(database, sessionId);
   if (current.nextAction !== action) {
     throw new Error(
       "That demo action is not valid for the current document state.",
@@ -290,85 +340,86 @@ export async function runGuidedDemoAction(
   }
 
   const service = createAuthorizedService(database);
+  const id = (suffix: string) => `demo-${sessionId.replaceAll("-", "")}-${suffix}`;
 
   if (action === "create") {
     await service.createDocumentFromTemplate({
-      tenantId: guidedDemo.tenantId,
-      workspaceId: guidedDemo.workspaceId,
-      documentId: guidedDemo.documentId,
-      title: guidedDemo.documentTitle,
-      templateId: guidedDemo.templateId,
+      tenantId: demo.tenantId,
+      workspaceId: demo.workspaceId,
+      documentId: demo.documentId,
+      title: demo.documentTitle,
+      templateId: demo.templateId,
       templateVersion: 1,
-      versionId: guidedDemo.versionOneId,
+      versionId: demo.versionOneId,
       contentHash: versionOneHash,
       contentKey: buildDocumentVersionContentKey({
-        tenantId: guidedDemo.tenantId,
-        workspaceId: guidedDemo.workspaceId,
-        documentId: guidedDemo.documentId,
-        versionId: guidedDemo.versionOneId,
+        tenantId: demo.tenantId,
+        workspaceId: demo.workspaceId,
+        documentId: demo.documentId,
+        versionId: demo.versionOneId,
       }),
-      actorSubjectId: guidedDemo.authorSubjectId,
+      actorSubjectId: demo.authorSubjectId,
       occurredAt,
-      auditEventId: "demo-audit-document-created",
+      auditEventId: id("audit-document-created"),
     });
   } else if (action === "submit") {
     await service.startWorkflow({
-      tenantId: guidedDemo.tenantId,
-      documentId: guidedDemo.documentId,
-      workflowInstanceId: guidedDemo.workflowInstanceId,
-      workflowDefinitionId: guidedDemo.workflowDefinitionId,
+      tenantId: demo.tenantId,
+      documentId: demo.documentId,
+      workflowInstanceId: demo.workflowInstanceId,
+      workflowDefinitionId: demo.workflowDefinitionId,
       workflowDefinitionVersion: 1,
-      actorSubjectId: guidedDemo.authorSubjectId,
+      actorSubjectId: demo.authorSubjectId,
       occurredAt,
-      auditEventId: "demo-audit-workflow-started",
+      auditEventId: id("audit-workflow-started"),
     });
     await service.transition({
-      tenantId: guidedDemo.tenantId,
-      workflowInstanceId: guidedDemo.workflowInstanceId,
+      tenantId: demo.tenantId,
+      workflowInstanceId: demo.workflowInstanceId,
       targetState: "review",
-      actorSubjectId: guidedDemo.authorSubjectId,
+      actorSubjectId: demo.authorSubjectId,
       occurredAt,
-      auditEventId: "demo-audit-submitted-review",
+      auditEventId: id("audit-submitted-review"),
     });
   } else if (action === "review") {
     await service.recordReview({
-      tenantId: guidedDemo.tenantId,
-      workflowInstanceId: guidedDemo.workflowInstanceId,
-      reviewId: "demo-review-version-1",
-      actorSubjectId: guidedDemo.reviewerSubjectId,
+      tenantId: demo.tenantId,
+      workflowInstanceId: demo.workflowInstanceId,
+      reviewId: id("review-version-1"),
+      actorSubjectId: demo.reviewerSubjectId,
       decision: "accepted",
       comment: "Synthetic reviewer accepted version 1.",
       occurredAt,
-      auditEventId: "demo-audit-review-accepted",
+      auditEventId: id("audit-review-accepted"),
     });
   } else if (action === "approve") {
     await service.approveCurrentVersion({
-      tenantId: guidedDemo.tenantId,
-      workflowInstanceId: guidedDemo.workflowInstanceId,
-      approvalId: "demo-approval-version-1",
-      actorSubjectId: guidedDemo.approverSubjectId,
+      tenantId: demo.tenantId,
+      workflowInstanceId: demo.workflowInstanceId,
+      approvalId: id("approval-version-1"),
+      actorSubjectId: demo.approverSubjectId,
       occurredAt,
-      auditEventId: "demo-audit-version-approved",
+      auditEventId: id("audit-version-approved"),
     });
   } else {
     await service.createChangedVersion({
-      tenantId: guidedDemo.tenantId,
-      documentId: guidedDemo.documentId,
-      versionId: guidedDemo.versionTwoId,
+      tenantId: demo.tenantId,
+      documentId: demo.documentId,
+      versionId: demo.versionTwoId,
       contentHash: versionTwoHash,
       contentKey: buildDocumentVersionContentKey({
-        tenantId: guidedDemo.tenantId,
-        workspaceId: guidedDemo.workspaceId,
-        documentId: guidedDemo.documentId,
-        versionId: guidedDemo.versionTwoId,
+        tenantId: demo.tenantId,
+        workspaceId: demo.workspaceId,
+        documentId: demo.documentId,
+        versionId: demo.versionTwoId,
       }),
-      actorSubjectId: guidedDemo.authorSubjectId,
+      actorSubjectId: demo.authorSubjectId,
       occurredAt,
-      auditEventId: "demo-audit-version-two-created",
+      auditEventId: id("audit-version-two-created"),
     });
   }
 
-  return loadGuidedDemoState(database);
+  return loadGuidedDemoState(database, sessionId);
 }
 
 function createAuthorizedService(
@@ -381,16 +432,17 @@ function createAuthorizedService(
 }
 
 function stateForPhase(
+  demo: GuidedDemoContext,
   phase: GuidedDemoPhase,
   versions: readonly GuidedDemoVersion[],
 ): GuidedDemoState {
   const next = nextActionForPhase(phase);
   return {
     phase,
-    tenantName: guidedDemo.tenantName,
-    workspaceName: guidedDemo.workspaceName,
-    templateName: guidedDemo.templateName,
-    documentTitle: guidedDemo.documentTitle,
+    tenantName: demo.tenantName,
+    workspaceName: demo.workspaceName,
+    templateName: demo.templateName,
+    documentTitle: demo.documentTitle,
     versions,
     nextAction: next?.action,
     nextActionLabel: next?.label,
