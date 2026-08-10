@@ -154,6 +154,28 @@ Turnstile/abuse controls, and operational cleanup are implemented and validated.
   Queue -> cleared after exact approval, confirms changed-version stale-work exclusion, checks axe
   accessibility/responsive overflow, and preserves independent-session isolation.
 
+### Authorized workspace search and filtering (synthetic/test only)
+
+- Documents support bounded server-side filtering by literal title substring, document status, and
+  exact current-approval state; Templates support literal name substring and current lifecycle state.
+- Search/filter queries remain inside the existing tenant/workspace-scoped `document.read` and
+  `template.read` authorization boundaries; filtering does not introduce a separate search authority.
+- SQL remains parameterized. User-supplied backslash, `%`, and `_` characters are escaped for `LIKE`
+  so they are matched literally rather than becoming wildcard operators.
+- Search text is trimmed and capped at 100 characters. Unknown status, lifecycle, or approval values
+  are rejected with HTTP 400 before database work.
+- Result lists have a fixed 100-record cap and fixed server-side ordering. Clients cannot supply SQL
+  sort expressions or arbitrary limits.
+- Documents and Templates use ordinary GET forms with bookmarkable URLs and no client JavaScript;
+  filter values are preserved in the rendered form, and a zero-result filter is distinguished from a
+  genuinely empty workspace.
+- Current-approval filtering uses the same exact current-version ID and SHA-256 evidence rule as the
+  rest of the product; historical approvals do not make a changed current version appear approved.
+- No external search service, search index, vector store, or new infrastructure is introduced.
+- Unit and browser coverage verify validation, case-insensitive literal matching, wildcard escaping,
+  status/lifecycle filters, approval-state transitions, accessibility, responsive layout, and invalid
+  filter rejection.
+
 All app-shaped `/demo` screens remain product-shape proofs, not an authenticated production tenant
 application. They remain behind the synthetic/test demo flag and must not be represented as
 production authentication or public-demo hardening.
@@ -163,7 +185,8 @@ production authentication or public-demo hardening.
 - GitHub repository visibility: **public by explicit owner decision**.
 - Package metadata remains `private: true` only to prevent accidental package-registry publication.
 - Milestones include bootstrap PR #1, persisted-workflow PR #7, authorization PR #8, guided-workflow
-  UI PR #9, workspace navigation PR #10, document evidence PR #11, and Reviews & Approvals PR #12.
+  UI PR #9, workspace navigation PR #10, document evidence PR #11, Reviews & Approvals PR #12, and
+  workspace search/filter PR #13.
 - `main` is the authoritative integration branch after reviewed/validated pull requests are merged.
 - No production Cloudflare resources, custom domains, customer data, analytics, paid services, or
   public-upload capability have been introduced.
@@ -177,10 +200,10 @@ production authentication or public-demo hardening.
   only.
 - Public interactive demo hardening: durable server-side demo-session registry, automatic purge,
   Turnstile, rate limiting, quotas, and abuse telemetry/controls.
-- Search/filter UX beyond existing workspace queries.
+- Full-text/content-body search or an external/indexed search service; current search is bounded
+  metadata filtering only.
 - Administration/configuration UI for tenant/workspace/roles/branding/workflows/templates.
-- Rich document authoring, retention automation, legal hold, full-text search, GRC frameworks, or
-  AI functions.
+- Rich document authoring, retention automation, legal hold, GRC frameworks, or AI functions.
 - PostgreSQL and SharePoint adapters; the provider boundaries remain the extension points.
 - Bundled R2/SharePoint binaries in portable exports.
 
