@@ -62,11 +62,12 @@ test("filters exact current approval state as the workflow changes", async ({
   await approveVersionOne(page);
 
   await page.goto("/demo/app/documents?approval=approved&status=approved");
+  const approvedDocumentCard = page.locator(".record-card").filter({
+    has: page.getByRole("heading", { name: "Harbor Opening Checklist" }),
+  });
+  await expect(approvedDocumentCard).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "Harbor Opening Checklist" }),
-  ).toBeVisible();
-  await expect(
-    page.getByText("Current version approved", { exact: true }),
+    approvedDocumentCard.getByText("Current version approved", { exact: true }),
   ).toBeVisible();
 
   await page.goto("/demo/app/documents?approval=required");
@@ -77,11 +78,12 @@ test("filters exact current approval state as the workflow changes", async ({
   await page.goto("/demo/workflow");
   await page.getByRole("button", { name: "Create changed version 2" }).click();
   await page.goto("/demo/app/documents?approval=required&status=draft");
+  const changedDocumentCard = page.locator(".record-card").filter({
+    has: page.getByRole("heading", { name: "Harbor Opening Checklist" }),
+  });
+  await expect(changedDocumentCard).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "Harbor Opening Checklist" }),
-  ).toBeVisible();
-  await expect(
-    page.getByText("Current approval required", { exact: true }),
+    changedDocumentCard.getByText("Current approval required", { exact: true }),
   ).toBeVisible();
 });
 
