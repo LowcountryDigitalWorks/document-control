@@ -52,3 +52,118 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm secrets:scan
+
+  polish-portability:
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.head_ref == 'agent/backup-portability'
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Apply portability navigation and status updates
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          ui = Path('src/ui/render-workspace-app.ts')
+          text = ui.read_text()
+          old = '''      <a href="/demo/app/reviews">Reviews &amp; Approvals</a>
+      <hr>'''
+          new = '''      <a href="/demo/app/reviews">Reviews &amp; Approvals</a>
+      <a href="/demo/app/admin/backup">Backup &amp; Portability</a>
+      <hr>'''
+          if old not in text:
+              raise SystemExit('workspace navigation anchor not found')
+          text = text.replace(old, new, 1)
+          ui.write_text(text)
+
+          test = Path('tests/e2e/backup-portability.spec.ts')
+          test_text = test.read_text()
+          old = '  await page.goto("/demo/app/admin/backup");\n'
+          new = '''  await page.goto("/demo/app");
+          await page
+            .getByRole("link", { name: "Backup & Portability", exact: true })
+            .click();
+          '''
+          if old not in test_text:
+              raise SystemExit('backup direct navigation not found')
+          test_text = test_text.replace(old, new, 1)
+          test.write_text(test_text)
+
+          status = Path('docs/STATUS.md')
+          status_text = status.read_text()
+          marker = '''All app-shaped `/demo` screens remain product-shape proofs, not an authenticated production tenant
+          application. They remain behind the synthetic/test demo flag and must not be represented as
+          production authentication or public-demo hardening.'''
+          section = '''### Authorized Backup & Portability export (synthetic/test only)
+
+          - `PortableExportReadService` assembles the current tenant's persisted D1-compatible application
+            state into the existing versioned `PortableExportV1` contract and validates the package before
+            serialization.
+          - Export scope is deliberately tenant-wide and requires `export.create` at tenant scope. The
+            synthetic route uses a server-controlled Tenant Administrator; a workspace-scoped role binding is
+            not treated as authority to export an entire tenant.
+          - The package includes tenant configuration, identity subjects, memberships, role definitions and
+            bindings, workspaces, documents and immutable versions, templates and provenance, workflow
+            definitions/instances, reviews, approvals, append-only audit events, and external content
+            provider/key references.
+          - `/demo/app/admin/backup` previews live package counts and the permitted-data profile. The ordinary
+            workspace navigation links to this administration proof while route authorization remains
+            server-controlled.
+          - `/demo/app/admin/backup/export` returns the validated live tenant package as JSON with
+            `Cache-Control: no-store` and a sanitized tenant-derived filename.
+          - Content binaries are intentionally not bundled yet. R2/SharePoint objects remain external and are
+            represented by provider/content-key references; the export must not be described as a complete
+            binary backup until bundled-content support is deliberately implemented and validated.
+          - The original `/demo/export` static fixture remains only as a reference/compatibility artifact; the
+            Backup & Portability route exports the current isolated synthetic session's persisted state.
+          - Browser coverage creates, reviews, approves, and changes a document, downloads the live export,
+            parses it through the existing import/validation contract, verifies historical approval/current
+            version semantics, and proves separate synthetic sessions cannot export one another's records.
+          - This slice is not production backup scheduling, disaster recovery, retention, deletion, legal
+            hold, or restore orchestration.
+
+          '''
+          if marker not in status_text:
+              raise SystemExit('STATUS insertion marker not found')
+          status_text = status_text.replace(marker, section + marker, 1)
+          old_milestone = '''  UI PR #9, workspace navigation PR #10, document evidence PR #11, Reviews & Approvals PR #12, and
+            workspace search/filter PR #13.'''
+          new_milestone = '''  UI PR #9, workspace navigation PR #10, document evidence PR #11, Reviews & Approvals PR #12,
+            workspace search/filter PR #13, and Backup & Portability PR #14.'''
+          if old_milestone not in status_text:
+              raise SystemExit('STATUS milestone text not found')
+          status_text = status_text.replace(old_milestone, new_milestone, 1)
+          status.write_text(status_text)
+          PY
+          pnpm exec prettier --write \
+            src/ui/render-workspace-app.ts \
+            tests/e2e/backup-portability.spec.ts \
+            docs/STATUS.md
+          if ! git diff --quiet -- \
+            src/ui/render-workspace-app.ts \
+            tests/e2e/backup-portability.spec.ts \
+            docs/STATUS.md; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add \
+              src/ui/render-workspace-app.ts \
+              tests/e2e/backup-portability.spec.ts \
+              docs/STATUS.md
+            git commit -m "Document and link Backup and Portability"
+            git push origin "HEAD:${GITHUB_HEAD_REF}"
+          fi
