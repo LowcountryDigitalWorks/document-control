@@ -1,5 +1,9 @@
 import type { DatabaseProvider } from "../application/ports";
-import { createTheme, type ThemeConfig, type ThemeOverrides } from "../ui/theme";
+import {
+  createTheme,
+  type ThemeConfig,
+  type ThemeOverrides,
+} from "../ui/theme";
 
 interface TenantConfigurationRow {
   brandingJson: string;
@@ -30,10 +34,16 @@ export async function createPersistedTenantTheme(
   return createTheme(environment, overrides);
 }
 
-function parseStringRecord(serialized: string): Readonly<Record<string, string>> {
+function parseStringRecord(
+  serialized: string,
+): Readonly<Record<string, string>> {
   try {
     const parsed: unknown = JSON.parse(serialized);
-    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    if (
+      typeof parsed !== "object" ||
+      parsed === null ||
+      Array.isArray(parsed)
+    ) {
       return {};
     }
     const record: Record<string, string> = {};

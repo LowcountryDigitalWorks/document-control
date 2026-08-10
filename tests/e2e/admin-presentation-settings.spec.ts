@@ -18,7 +18,9 @@ async function updatePresentationSettings(page: Page): Promise<void> {
   for (const [name, value] of Object.entries(updatedValues)) {
     await page.locator(`[name="${name}"]`).fill(value);
   }
-  await page.getByRole("button", { name: "Save presentation settings" }).click();
+  await page
+    .getByRole("button", { name: "Save presentation settings" })
+    .click();
 }
 
 test("tenant administrator updates persisted workspace presentation", async ({
@@ -29,8 +31,12 @@ test("tenant administrator updates persisted workspace presentation", async ({
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(
     "Administration",
   );
-  await expect(page.getByText("Synthetic demo only", { exact: true })).toBeVisible();
-  await expect(page.locator('[name="workspaceName"]')).toHaveValue("Operations");
+  await expect(
+    page.getByText("Synthetic demo only", { exact: true }),
+  ).toBeVisible();
+  await expect(page.locator('[name="workspaceName"]')).toHaveValue(
+    "Operations",
+  );
   await expect(page.locator('[name="companyName"]')).toHaveValue(
     "Lowcountry Digital Works",
   );
@@ -40,9 +46,13 @@ test("tenant administrator updates persisted workspace presentation", async ({
   await expect(page.getByRole("status")).toHaveText(
     "Presentation settings saved.",
   );
-  await expect(page.getByText("Harbor Office · Records Hub", { exact: true })).toBeVisible();
   await expect(
-    page.getByText("Project Space · Controlled File · Sign-off", { exact: true }),
+    page.getByText("Harbor Office · Records Hub", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Project Space · Controlled File · Sign-off", {
+      exact: true,
+    }),
   ).toBeVisible();
 
   await page.goto("/demo/app");

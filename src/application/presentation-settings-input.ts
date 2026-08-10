@@ -34,7 +34,12 @@ export function parsePresentationSettingsInput(
       "Workspace name",
       textLimits.workspaceName,
     ),
-    appName: requiredText(values, "appName", "Application name", textLimits.appName),
+    appName: requiredText(
+      values,
+      "appName",
+      "Application name",
+      textLimits.appName,
+    ),
     companyName: requiredText(
       values,
       "companyName",

@@ -63,9 +63,9 @@ describe("AuthorizedPresentationSettingsService", () => {
 
   it("stops before persistence when either administration permission is denied", async () => {
     const tenantDenied = createHarness(1);
-    await expect(tenantDenied.service.getSettings(context)).rejects.toBeInstanceOf(
-      AuthorizationDeniedError,
-    );
+    await expect(
+      tenantDenied.service.getSettings(context),
+    ).rejects.toBeInstanceOf(AuthorizationDeniedError);
     expect(tenantDenied.getSettings).not.toHaveBeenCalled();
 
     const workspaceDenied = createHarness(2);

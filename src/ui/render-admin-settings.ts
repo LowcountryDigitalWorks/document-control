@@ -152,7 +152,8 @@ function configured(value: string | undefined, fallback: string): string {
 function profileLabel(value: string): string {
   if (value === "demo_synthetic") return "Synthetic demo only";
   if (value === "ordinary_business") return "Ordinary business data";
-  if (value === "regulated_approved") return "Regulated — explicitly approved deployment";
+  if (value === "regulated_approved")
+    return "Regulated — explicitly approved deployment";
   return value;
 }
 

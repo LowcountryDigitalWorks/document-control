@@ -89,7 +89,10 @@ export class PresentationSettingsService {
   public async updateSettings(
     command: UpdatePresentationSettingsCommand,
   ): Promise<PresentationSettingsUpdateResult> {
-    const current = await this.getSettings(command.tenantId, command.workspaceId);
+    const current = await this.getSettings(
+      command.tenantId,
+      command.workspaceId,
+    );
     const nextBranding = {
       ...current.branding,
       appName: command.input.appName,

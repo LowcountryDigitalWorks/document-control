@@ -32,7 +32,11 @@ export function createTheme(
   const branding = overrides.branding ?? {};
   const terminology = overrides.terminology ?? {};
   return {
-    appName: safeText(branding.appName, environment.APP_NAME ?? "Document Control", 80),
+    appName: safeText(
+      branding.appName,
+      environment.APP_NAME ?? "Document Control",
+      80,
+    ),
     companyName: safeText(
       branding.companyName,
       environment.BRAND_COMPANY_NAME ?? "Lowcountry Digital Works",

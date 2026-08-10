@@ -228,17 +228,18 @@ function renderWorkspacePage(
         <span>${escapeHtml(theme.companyName)}</span>
         <strong>${escapeHtml(theme.appName)}</strong>
       </a>
-      <span class="demo-label">Synthetic workspace · read-only UI</span>
+      <span class="demo-label">Synthetic ${escapeHtml(theme.terminology.workspace.toLowerCase())} · read-only UI</span>
     </div>
   </header>
   <div class="shell layout">
     <nav class="app-nav" aria-label="Workspace navigation">
       <p class="workspace-name">${escapeHtml(workspaceName)}</p>
       ${navLink("/demo/app", "Overview", active === "overview")}
-      ${navLink("/demo/app/documents", "Documents", active === "documents")}
+      ${navLink("/demo/app/documents", pluralLabel(theme.terminology.document), active === "documents")}
       ${navLink("/demo/app/templates", "Templates", active === "templates")}
-      <a href="/demo/app/reviews">Reviews &amp; Approvals</a>
+      <a href="/demo/app/reviews">Reviews &amp; ${escapeHtml(pluralLabel(theme.terminology.approval))}</a>
       <a href="/demo/app/audit">Audit Log</a>
+      <a href="/demo/app/admin/settings">Administration</a>
       <hr>
       <a href="/demo/workflow">Guided workflow</a>
       <a href="/">Product overview</a>
@@ -258,6 +259,12 @@ function navLabel(active: ActiveNavigation): string {
   if (active === "documents") return "Documents";
   if (active === "templates") return "Templates";
   return "Workspace";
+}
+
+function pluralLabel(value: string): string {
+  if (/s$/iu.test(value)) return value;
+  if (/[^aeiou]y$/iu.test(value)) return `${value.slice(0, -1)}ies`;
+  return `${value}s`;
 }
 
 function metric(label: string, value: string, detail: string): string {
