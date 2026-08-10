@@ -115,16 +115,56 @@ Turnstile/abuse controls, and operational cleanup are implemented and validated.
 - Browser coverage verifies navigation, persisted read-after-write behavior, accessibility, responsive
   overflow, and cross-session isolation on desktop and mobile.
 
-These screens are product-shape proofs, not an authenticated production tenant application. They
-remain behind the synthetic/test demo flag and must not be represented as production authentication
-or public-demo hardening.
+### Authorized document detail and evidence (synthetic/test only)
+
+- A tenant/document-scoped detail read model exposes source-template provenance, exact version
+  history, versioned workflow/review evidence, approvals, and append-only audit events.
+- `AuthorizedDocumentDetailReadService` requires both `document.read` and `audit.read` before the
+  evidence query executes.
+- The synthetic evidence route uses a server-controlled Document Owner identity rather than broadening
+  Author permissions merely for demo convenience.
+- `/demo/app/documents/:documentId` displays exact current-version approval applicability, source
+  template identity/version/hash/provenance, workflow definition/version/state, reviewer and approver
+  evidence, and sanitized audit history.
+- Authorization denial and document-not-found use the same not-found response so arbitrary IDs from
+  another synthetic session/tenant do not reveal record existence.
+- Browser coverage proves that version 1 remains historical approved evidence after version 2 becomes
+  current and requires a new approval, while independent sessions cannot read one another's detail
+  records.
+
+### Reviews and Approvals queues (synthetic/test only)
+
+- `ReviewApprovalQueueReadService` derives work directly from persisted workflow instances; it does
+  not introduce a second task/queue persistence model.
+- Reviewer work appears only for workflow instances currently in `review`; approval work appears only
+  for instances currently in `approval`.
+- A queue item is eligible only when the workflow instance is bound to the document's exact current
+  version. A workflow for an older version therefore cannot reappear after a changed version becomes
+  current.
+- Approval work additionally excludes a version that already has exact matching version/hash approval
+  evidence.
+- Reviewer Queue access requires both `document.read` and `document.review`; Approver Queue access
+  requires both `document.read` and `document.approve`. Authorization denial occurs before the queue
+  query runs.
+- `/demo/app/reviews` always evaluates the server-controlled synthetic Reviewer identity;
+  `/demo/app/approvals` always evaluates the server-controlled synthetic Approver identity. The
+  browser cannot choose a subject, role, tenant, workspace, or permission context.
+- Reviews & Approvals is linked from the ordinary workspace navigation and Overview.
+- Browser coverage verifies the lifecycle handoff from empty queue -> Reviewer Queue -> Approver
+  Queue -> cleared after exact approval, confirms changed-version stale-work exclusion, checks axe
+  accessibility/responsive overflow, and preserves independent-session isolation.
+
+All app-shaped `/demo` screens remain product-shape proofs, not an authenticated production tenant
+application. They remain behind the synthetic/test demo flag and must not be represented as
+production authentication or public-demo hardening.
 
 ## Repository posture
 
 - GitHub repository visibility: **public by explicit owner decision**.
 - Package metadata remains `private: true` only to prevent accidental package-registry publication.
-- Merged milestones include bootstrap PR #1, persisted-workflow PR #7, authorization PR #8, and
-  guided-workflow UI PR #9; `main` is the authoritative foundation.
+- Milestones include bootstrap PR #1, persisted-workflow PR #7, authorization PR #8, guided-workflow
+  UI PR #9, workspace navigation PR #10, document evidence PR #11, and Reviews & Approvals PR #12.
+- `main` is the authoritative integration branch after reviewed/validated pull requests are merged.
 - No production Cloudflare resources, custom domains, customer data, analytics, paid services, or
   public-upload capability have been introduced.
 
@@ -135,9 +175,10 @@ or public-demo hardening.
 - Customer or arbitrary public document uploads or malware scanning.
 - Production authenticated tenant application routing; current app-shaped routes are synthetic/test
   only.
-- Document detail/version-history/audit/provenance screens beyond list-level evidence.
 - Public interactive demo hardening: durable server-side demo-session registry, automatic purge,
   Turnstile, rate limiting, quotas, and abuse telemetry/controls.
+- Search/filter UX beyond existing workspace queries.
+- Administration/configuration UI for tenant/workspace/roles/branding/workflows/templates.
 - Rich document authoring, retention automation, legal hold, full-text search, GRC frameworks, or
   AI functions.
 - PostgreSQL and SharePoint adapters; the provider boundaries remain the extension points.

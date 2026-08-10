@@ -1,9 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
-async function approveVersionOne(
-  page: import("@playwright/test").Page,
-): Promise<void> {
+async function approveVersionOne(page: Page): Promise<void> {
   await page.goto("/demo/workflow");
   await page
     .getByRole("button", { name: "Create from approved template" })
