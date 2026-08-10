@@ -94,11 +94,13 @@ function run(
 }
 
 function seedFoundation(database: DatabaseSync): void {
-  for (const [id, name, providerSubject] of [
+  const subjects: readonly (readonly [string, string, string])[] = [
     ["subject-author", "Avery Author", "author"],
     ["subject-reviewer", "Riley Reviewer", "reviewer"],
     ["subject-approver", "Alex Approver", "approver"],
-  ]) {
+  ];
+
+  for (const [id, name, providerSubject] of subjects) {
     run(
       database,
       "INSERT INTO identity_subjects (id, display_name, provider, provider_subject, created_at) VALUES (?, ?, 'external', ?, ?)",
