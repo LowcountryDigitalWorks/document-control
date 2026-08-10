@@ -128,7 +128,11 @@ export class WorkflowDefinitionAdminService {
       }),
     ]);
 
-    return { ...definition, createdAt: command.occurredAt, instanceCount: 0 };
+    return {
+      ...definition,
+      createdAt: command.occurredAt,
+      instanceCount: 0,
+    };
   }
 
   public async createVersion(
@@ -177,7 +181,11 @@ export class WorkflowDefinitionAdminService {
       }),
     ]);
 
-    return { ...definition, createdAt: command.occurredAt, instanceCount: 0 };
+    return {
+      ...definition,
+      createdAt: command.occurredAt,
+      instanceCount: 0,
+    };
   }
 
   private async loadWorkspace(
