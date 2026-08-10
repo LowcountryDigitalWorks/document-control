@@ -1,25 +1,49 @@
-name: Roles Access Maintenance
+name: CI
 
 on:
+  pull_request:
   push:
-    branches: [agent/roles-access-admin]
+    branches: [main]
 
 permissions:
   contents: read
 
 concurrency:
-  group: roles-access-maintenance-${{ github.ref }}
+  group: document-control-ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  wire-roles-access:
-    permissions:
-      contents: write
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check
+      - run: pnpm audit --audit-level=high
+
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:e2e
+
+  secrets:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: agent/roles-access-admin
           fetch-depth: 0
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
@@ -27,26 +51,4 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Wire and normalize roles and access administration
-        shell: bash
-        run: |
-          set -euo pipefail
-          python .github/maintenance/wire_roles_access.py
-          pnpm exec prettier --write \
-            src/index.ts \
-            src/application/roles-access-admin-service.ts \
-            src/application/authorized-roles-access-admin-service.ts \
-            src/application/roles-access-input.ts \
-            src/ui/render-roles-access-admin.ts \
-            src/ui/render-admin-settings.ts \
-            tests/unit/roles-access-admin-service.test.ts \
-            tests/unit/roles-access-authorization.test.ts \
-            tests/unit/roles-access-input.test.ts \
-            tests/e2e/roles-access-admin.spec.ts
-          if ! git diff --quiet -- src tests; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add src tests
-            git commit -m "Wire workspace roles and access administration"
-            git push origin HEAD:agent/roles-access-admin
-          fi
+      - run: pnpm secrets:scan
