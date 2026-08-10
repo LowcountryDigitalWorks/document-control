@@ -6,4 +6,5 @@
 // away from the database invariants. A typed query layer may be introduced later
 // if it can be generated from, or mechanically verified against, the migration.
 
-export const authoritativeSchemaMigration = "migrations/0001_initial.sql" as const;
+export const authoritativeSchemaMigration =
+  "migrations/0001_initial.sql" as const;
