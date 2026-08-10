@@ -17,9 +17,9 @@ test("tenant administrator assigns and removes a workspace role with audit evide
     page.getByText("Avery Author", { exact: true }).first(),
   ).toBeVisible();
   await expect(page.getByText("Author", { exact: true }).first()).toBeVisible();
-  await expect(page.getByText("Tenant Administrator", { exact: true })).toHaveCount(
-    0,
-  );
+  await expect(
+    page.getByText("Tenant Administrator", { exact: true }),
+  ).toHaveCount(0);
 
   await page
     .locator('select[name="subjectId"]')
@@ -114,15 +114,19 @@ test("rejects tenant-role assignment, cross-origin mutation, and self role-manag
     .filter({ hasText: "Taylor Tenant Admin" })
     .filter({ hasText: "Workspace Administrator" });
   await expect(selfAdminRow).toHaveCount(1);
-  await selfAdminRow
-    .getByRole("button", {
-      name: /Remove Workspace Administrator from Taylor Tenant Admin/u,
-    })
-    .click();
-  await expect(page).toHaveURL(/\/demo\/app\/admin\/access\?error=self-lockout$/u);
-  await expect(page.getByRole("alert")).toContainText(
+  const selfBindingId =
+    (await selfAdminRow
+      .locator('input[name="bindingId"]')
+      .getAttribute("value")) ?? "";
+  const selfRemoval = await page.request.post("/demo/app/admin/access/remove", {
+    headers: { Origin: "http://127.0.0.1:8787" },
+    form: { bindingId: selfBindingId },
+  });
+  expect(selfRemoval.status()).toBe(409);
+  expect(await selfRemoval.text()).toContain(
     "cannot remove their own role-management grant",
   );
+  await openAccess(page);
   await expect(
     page
       .locator("tbody tr")

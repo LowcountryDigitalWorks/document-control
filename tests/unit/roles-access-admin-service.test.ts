@@ -64,7 +64,10 @@ async function createHarness(): Promise<{
     "utf8",
   );
   const permissions = await readFile(
-    new URL("../../migrations/0002_system_role_permissions.sql", import.meta.url),
+    new URL(
+      "../../migrations/0002_system_role_permissions.sql",
+      import.meta.url,
+    ),
     "utf8",
   );
   const database = new DatabaseSync(":memory:");

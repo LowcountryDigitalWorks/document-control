@@ -181,7 +181,10 @@ export class RolesAccessAdminService {
     command: AssignWorkspaceRoleCommand,
   ): Promise<AccessMutationResult> {
     await this.loadWorkspace(command.tenantId, command.workspaceId);
-    const member = await this.loadActiveMember(command.tenantId, command.subjectId);
+    const member = await this.loadActiveMember(
+      command.tenantId,
+      command.subjectId,
+    );
     const role = await this.loadEligibleWorkspaceRole(
       command.tenantId,
       command.roleDefinitionId,
@@ -195,12 +198,7 @@ export class RolesAccessAdminService {
          AND binding.tenant_id = ?
          AND binding.workspace_id = ?
        LIMIT 1`,
-      [
-        role.id,
-        member.subjectId,
-        command.tenantId,
-        command.workspaceId,
-      ],
+      [role.id, member.subjectId, command.tenantId, command.workspaceId],
     );
     if (existing) {
       return {
@@ -404,7 +402,10 @@ function parsePermissionList(serialized: string): readonly string[] {
   return parsed;
 }
 
-function statement(sql: string, parameters: readonly unknown[]): DatabaseStatement {
+function statement(
+  sql: string,
+  parameters: readonly unknown[],
+): DatabaseStatement {
   return { sql, parameters };
 }
 

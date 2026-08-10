@@ -23,7 +23,10 @@ export class AuthorizedRolesAccessAdminService {
     context: RolesAccessAuthorizationContext,
   ): Promise<WorkspaceAccessSnapshot> {
     await this.assertRoleManagementAllowed(context);
-    return this.access.getWorkspaceAccess(context.tenantId, context.workspaceId);
+    return this.access.getWorkspaceAccess(
+      context.tenantId,
+      context.workspaceId,
+    );
   }
 
   public async assignWorkspaceRole(
