@@ -31,6 +31,13 @@ export async function createE2eD1Database(): Promise<D1Database> {
       ),
       "utf8",
     ),
+    readFile(
+      new URL(
+        "../migrations/0003_workflow_definition_immutability.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
   ]);
   for (const migration of migrations) {
     database.exec(migration);
