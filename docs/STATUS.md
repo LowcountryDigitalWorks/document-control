@@ -19,7 +19,7 @@
 - Append-only audit database triggers.
 - Versioned application-data export with structural, referential, tenant-boundary, template,
   workflow, and approval validation.
-- Synthetic public demo, configurable LDW reference theme, light/dark styles, and no uploads.
+- Synthetic static demo, configurable LDW reference theme, light/dark styles, and no uploads.
 - Formatting, linting, strict type checking, executable SQLite migration/invariant tests, content
   integrity tests, Playwright, axe, responsive, dependency, history-aware secret, and Worker build
   checks.
@@ -70,11 +70,38 @@ This authorization layer does not authenticate users and stores no passwords, se
 identity-provider secrets. HTTP routes must use the authorized facade rather than invoking the raw
 persistence service directly.
 
+### Guided authorized workflow UI (local/test only)
+
+- An accessible server-rendered guided flow exercises the real D1-compatible persistence and
+  authorization layers through:
+  `approved template -> document -> review -> approval -> changed version`.
+- The UI visibly demonstrates that version 1's approval remains exact historical evidence after
+  version 2 becomes current and requires its own approval.
+- Interactive routes are disabled unless `DEMO_MUTATIONS_ENABLED=true`; the normal Worker
+  configuration does not enable them.
+- The browser supplies only the next allowed guided action. Tenant, workspace, identity, role, and
+  permission context remain server-controlled synthetic values.
+- Each browser context receives an opaque, server-issued UUID in an HttpOnly, SameSite=Strict cookie
+  scoped to `/demo/workflow`. All synthetic record IDs are derived server-side from that validated
+  session identifier so parallel browser sessions do not share tenant/document/workflow state.
+- Same-origin POST enforcement protects guided mutations from cross-origin form submission.
+- Browser tests use a SQLite-backed D1 test binding and therefore exercise the real
+  `D1DatabaseProvider`, authorization policy, and persisted workflow service rather than a fake
+  business service.
+- Playwright covers desktop/mobile lifecycle behavior, axe accessibility, responsive overflow,
+  cross-origin mutation denial, cookie properties, and independent-session state isolation.
+
+The one-hour browser cookie is **not** a production public-demo lifecycle. Cookie expiration does not
+purge synthetic D1 rows. Do not enable the interactive guided flow on a shared public deployment
+until server-side session expiration/purge, quotas, rate limiting, Turnstile/abuse controls, and
+operational cleanup are implemented and validated.
+
 ## Repository posture
 
 - GitHub repository visibility: **public by explicit owner decision**.
 - Package metadata remains `private: true` only to prevent accidental package-registry publication.
-- Bootstrap PR #1 and persisted-workflow PR #7 are merged; `main` is the authoritative foundation.
+- Bootstrap PR #1, persisted-workflow PR #7, and authorization PR #8 are merged; `main` is the
+  authoritative foundation.
 - No production Cloudflare resources, custom domains, customer data, analytics, paid services, or
   public-upload capability have been introduced.
 
@@ -83,13 +110,13 @@ persistence service directly.
 - Production authentication/SSO, session management, or identity-provider integration.
 - Production tenant provisioning.
 - Customer or arbitrary public document uploads or malware scanning.
-- HTTP/UI wiring for the persisted workflow service.
+- General authenticated tenant application navigation/screens beyond the guided synthetic flow.
+- Public interactive demo hardening: durable server-side demo-session registry, automatic purge,
+  Turnstile, rate limiting, quotas, and abuse telemetry/controls.
 - Rich document authoring, retention automation, legal hold, full-text search, GRC frameworks, or
   AI functions.
 - PostgreSQL and SharePoint adapters; the provider boundaries remain the extension points.
 - Bundled R2/SharePoint binaries in portable exports.
-- Public demo session provisioning, Turnstile, rate limiting, or abuse quotas until a real hosted
-  demo is created.
 
 ## Decisions pending approval
 
