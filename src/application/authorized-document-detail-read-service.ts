@@ -1,8 +1,5 @@
 import type { AuthorizationPolicy } from "./authorization";
-import type {
-  DocumentDetailEvidence,
-  DocumentDetailReadService,
-} from "./document-detail-read-service";
+import type { DocumentDetailEvidence } from "./document-detail-read-service";
 
 export interface DocumentDetailReadContext {
   subjectId: string;
@@ -10,9 +7,16 @@ export interface DocumentDetailReadContext {
   documentId: string;
 }
 
+export interface DocumentDetailReader {
+  getDocumentDetail(
+    tenantId: string,
+    documentId: string,
+  ): Promise<DocumentDetailEvidence>;
+}
+
 export class AuthorizedDocumentDetailReadService {
   public constructor(
-    private readonly read: DocumentDetailReadService,
+    private readonly read: DocumentDetailReader,
     private readonly authorization: AuthorizationPolicy,
   ) {}
 
