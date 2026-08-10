@@ -69,7 +69,11 @@ function safeText(
   maximumLength: number,
 ): string {
   const value = configured?.trim();
-  if (!value || value.length > maximumLength || containsControlCharacter(value)) {
+  if (
+    !value ||
+    value.length > maximumLength ||
+    containsControlCharacter(value)
+  ) {
     return fallback;
   }
   return value;
