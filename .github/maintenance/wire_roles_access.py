@@ -1,0 +1,279 @@
+from pathlib import Path
+
+index = Path("src/index.ts")
+text = index.read_text()
+
+
+def replace_once(old: str, new: str, label: str) -> None:
+    global text
+    if old not in text:
+        raise SystemExit(f"missing {label} marker")
+    text = text.replace(old, new, 1)
+
+
+replace_once(
+    'import { AuthorizedPresentationSettingsService } from "./application/authorized-presentation-settings-service";\n',
+    'import { AuthorizedPresentationSettingsService } from "./application/authorized-presentation-settings-service";\nimport { AuthorizedRolesAccessAdminService } from "./application/authorized-roles-access-admin-service";\n',
+    "authorized roles import",
+)
+replace_once(
+    'import { PresentationSettingsService } from "./application/presentation-settings-service";\n',
+    'import { PresentationSettingsService } from "./application/presentation-settings-service";\nimport {\n  parseRoleAssignmentInput,\n  parseRoleRemovalInput,\n  RolesAccessInputValidationError,\n} from "./application/roles-access-input";\nimport { RolesAccessAdminService } from "./application/roles-access-admin-service";\n',
+    "roles access imports",
+)
+replace_once(
+    'import { renderReviewApprovalQueue } from "./ui/render-review-approval-queue";\n',
+    'import { renderReviewApprovalQueue } from "./ui/render-review-approval-queue";\nimport { renderRolesAccessAdmin } from "./ui/render-roles-access-admin";\n',
+    "roles renderer import",
+)
+
+marker = 'app.get("/demo/app/admin/backup", async (context) => {'
+routes = '''app.get("/demo/app/admin/access", async (context) => {
+  if (!guidedDemoEnabled(context.env)) {
+    return context.html(renderNotFound(createTheme(context.env)), 404);
+  }
+
+  const session = resolveGuidedDemoSession(
+    context.req.header("Cookie"),
+    context.req.url,
+  );
+  if (session.setCookie) {
+    context.header("Set-Cookie", session.setCookie);
+  }
+  const database = new D1DatabaseProvider(context.env.DOCUMENT_CONTROL_DB);
+  const demo = createGuidedDemoContext(session.sessionId);
+  await ensureGuidedDemoSeed(database, session.sessionId);
+  const admin = await ensureGuidedTenantAdmin(database, session.sessionId);
+  const service = createAuthorizedRolesAccessAdminService(database);
+
+  try {
+    const snapshot = await service.getWorkspaceAccess({
+      subjectId: admin.subjectId,
+      tenantId: demo.tenantId,
+      workspaceId: demo.workspaceId,
+    });
+    const noticeValue = new URL(context.req.url).searchParams.get("notice");
+    const notice =
+      noticeValue === "assigned"
+        ? "Workspace role assigned."
+        : noticeValue === "removed"
+          ? "Workspace role removed."
+          : noticeValue === "unchanged"
+            ? "No access change was needed."
+            : undefined;
+    context.header("Cache-Control", "no-store");
+    return context.html(
+      renderRolesAccessAdmin(
+        await createPersistedTenantTheme(database, context.env, demo.tenantId),
+        snapshot,
+        notice,
+      ),
+    );
+  } catch (error) {
+    if (error instanceof AuthorizationDeniedError) {
+      return context.html(renderNotFound(createTheme(context.env)), 404);
+    }
+    throw error;
+  }
+});
+
+app.post("/demo/app/admin/access/assign", async (context) => {
+  if (!guidedDemoEnabled(context.env)) return context.notFound();
+  if (!hasSameOrigin(context.req.url, context.req.header("Origin"))) {
+    return context.json({ error: "Same-origin demo request required." }, 403);
+  }
+  const sessionId = readGuidedDemoSession(context.req.header("Cookie"));
+  if (!sessionId) {
+    return context.json(
+      { error: "Synthetic administration session missing. Reload Roles & Access." },
+      409,
+    );
+  }
+
+  try {
+    const input = parseRoleAssignmentInput(
+      await readFormValues(context.req.raw, ["subjectId", "roleDefinitionId"]),
+    );
+    const database = new D1DatabaseProvider(context.env.DOCUMENT_CONTROL_DB);
+    const demo = createGuidedDemoContext(sessionId);
+    await ensureGuidedDemoSeed(database, sessionId);
+    const admin = await ensureGuidedTenantAdmin(database, sessionId);
+    const result = await createAuthorizedRolesAccessAdminService(
+      database,
+    ).assignWorkspaceRole(
+      {
+        subjectId: admin.subjectId,
+        tenantId: demo.tenantId,
+        workspaceId: demo.workspaceId,
+      },
+      {
+        subjectId: input.subjectId,
+        roleDefinitionId: input.roleDefinitionId,
+        bindingId: `access-${crypto.randomUUID()}`,
+        auditEventId: `access-audit-${crypto.randomUUID()}`,
+        occurredAt: new Date().toISOString(),
+      },
+    );
+    return context.redirect(
+      `/demo/app/admin/access?notice=${result.changed ? "assigned" : "unchanged"}`,
+      303,
+    );
+  } catch (error) {
+    if (error instanceof RolesAccessInputValidationError) {
+      return context.text(error.message, 400);
+    }
+    if (error instanceof AuthorizationDeniedError) {
+      return context.html(renderNotFound(createTheme(context.env)), 404);
+    }
+    const message =
+      error instanceof Error ? error.message : "Role assignment failed.";
+    return context.text(message, 409);
+  }
+});
+
+app.post("/demo/app/admin/access/remove", async (context) => {
+  if (!guidedDemoEnabled(context.env)) return context.notFound();
+  if (!hasSameOrigin(context.req.url, context.req.header("Origin"))) {
+    return context.json({ error: "Same-origin demo request required." }, 403);
+  }
+  const sessionId = readGuidedDemoSession(context.req.header("Cookie"));
+  if (!sessionId) {
+    return context.json(
+      { error: "Synthetic administration session missing. Reload Roles & Access." },
+      409,
+    );
+  }
+
+  try {
+    const input = parseRoleRemovalInput(
+      await readFormValues(context.req.raw, ["bindingId"]),
+    );
+    const database = new D1DatabaseProvider(context.env.DOCUMENT_CONTROL_DB);
+    const demo = createGuidedDemoContext(sessionId);
+    await ensureGuidedDemoSeed(database, sessionId);
+    const admin = await ensureGuidedTenantAdmin(database, sessionId);
+    const result = await createAuthorizedRolesAccessAdminService(
+      database,
+    ).removeWorkspaceRole(
+      {
+        subjectId: admin.subjectId,
+        tenantId: demo.tenantId,
+        workspaceId: demo.workspaceId,
+      },
+      {
+        bindingId: input.bindingId,
+        auditEventId: `access-audit-${crypto.randomUUID()}`,
+        occurredAt: new Date().toISOString(),
+      },
+    );
+    return context.redirect(
+      `/demo/app/admin/access?notice=${result.changed ? "removed" : "unchanged"}`,
+      303,
+    );
+  } catch (error) {
+    if (error instanceof RolesAccessInputValidationError) {
+      return context.text(error.message, 400);
+    }
+    if (error instanceof AuthorizationDeniedError) {
+      return context.html(renderNotFound(createTheme(context.env)), 404);
+    }
+    const message = error instanceof Error ? error.message : "Role removal failed.";
+    return context.text(message, 409);
+  }
+});
+
+'''
+if marker not in text:
+    raise SystemExit("missing access route insertion marker")
+text = text.replace(marker, routes + marker, 1)
+
+helper_marker = '''function createAuthorizedPortableExportService(
+  database: D1DatabaseProvider,
+): AuthorizedPortableExportService {'''
+helper = '''function createAuthorizedRolesAccessAdminService(
+  database: D1DatabaseProvider,
+): AuthorizedRolesAccessAdminService {
+  return new AuthorizedRolesAccessAdminService(
+    new RolesAccessAdminService(database),
+    new DatabaseAuthorizationPolicy(database),
+  );
+}
+
+'''
+if helper_marker not in text:
+    raise SystemExit("missing access helper insertion marker")
+text = text.replace(helper_marker, helper + helper_marker, 1)
+
+form_helper_marker = '''function safeFileSegment(value: string): string {'''
+form_helper = '''async function readFormValues(
+  request: Request,
+  keys: readonly string[],
+): Promise<URLSearchParams> {
+  let formData: FormData;
+  try {
+    formData = await request.formData();
+  } catch {
+    throw new RolesAccessInputValidationError("A valid form body is required.");
+  }
+  const values = new URLSearchParams();
+  for (const key of keys) {
+    const value = formData.get(key);
+    if (typeof value === "string") values.set(key, value);
+  }
+  return values;
+}
+
+'''
+if form_helper_marker not in text:
+    raise SystemExit("missing form helper insertion marker")
+text = text.replace(form_helper_marker, form_helper + form_helper_marker, 1)
+index.write_text(text)
+
+admin_ui = Path("src/ui/render-admin-settings.ts")
+ui = admin_ui.read_text()
+admin_marker = '''      ${saved ? '<p class="notice" role="status">Presentation settings saved.</p>' : ""}
+    </section>'''
+admin_replacement = '''      ${saved ? '<p class="notice" role="status">Presentation settings saved.</p>' : ""}
+      <p><a href="/demo/app/admin/access"><strong>Manage Roles &amp; Access</strong></a> · <a href="/demo/app/admin/backup">Backup &amp; Portability</a></p>
+    </section>'''
+if admin_marker not in ui:
+    raise SystemExit("missing administration navigation marker")
+admin_ui.write_text(ui.replace(admin_marker, admin_replacement, 1))
+
+test_file = Path("tests/e2e/roles-access-admin.spec.ts")
+test_text = test_file.read_text()
+old = '''  await selfAdminRow
+    .getByRole("button", {
+      name: /Remove Workspace Administrator from Taylor Tenant Admin/u,
+    })
+    .click();
+  await expect(page).toHaveURL(/\\/demo\\/app\\/admin\\/access\\?error=self-lockout$/u);
+  await expect(page.getByRole("alert")).toContainText(
+    "cannot remove their own role-management grant",
+  );
+  await expect(
+    page
+      .locator("tbody tr")
+      .filter({ hasText: "Taylor Tenant Admin" })
+      .filter({ hasText: "Workspace Administrator" }),
+  ).toHaveCount(1);'''
+new = '''  const selfBindingId =
+    (await selfAdminRow.locator('input[name="bindingId"]').getAttribute("value")) ?? "";
+  const selfRemoval = await page.request.post("/demo/app/admin/access/remove", {
+    headers: { Origin: "http://127.0.0.1:8787" },
+    form: { bindingId: selfBindingId },
+  });
+  expect(selfRemoval.status()).toBe(409);
+  expect(await selfRemoval.text()).toContain(
+    "cannot remove their own role-management grant",
+  );
+  await openAccess(page);
+  await expect(
+    page
+      .locator("tbody tr")
+      .filter({ hasText: "Taylor Tenant Admin" })
+      .filter({ hasText: "Workspace Administrator" }),
+  ).toHaveCount(1);'''
+if old not in test_text:
+    raise SystemExit("missing self-lockout browser marker")
+test_file.write_text(test_text.replace(old, new, 1))
