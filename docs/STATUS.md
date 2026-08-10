@@ -50,17 +50,37 @@ The persistence service currently records metadata/state and content references.
 claim a cross-resource transaction between R2 binary creation and D1 metadata changes. Production
 upload orchestration, compensation, limits, and scanning remain future work before customer uploads.
 
+### Provider-neutral authorization boundary
+
+- A typed permission vocabulary separates authorization from the future authentication provider.
+- Configurable role definitions carry permission grants; built-in roles receive default grants
+  through migration `0002_system_role_permissions.sql`.
+- `DatabaseAuthorizationPolicy` evaluates platform, tenant, and workspace role bindings and requires
+  active tenant membership for tenant/workspace-scoped access.
+- Authorization can safely resolve workspace scope from a workspace, document, or workflow instance
+  while preserving the requested tenant boundary.
+- Platform Administrator uses an explicit wildcard grant; other built-in roles receive least-purpose
+  grants for their document-control responsibilities.
+- `AuthorizedDocumentWorkflowService` gates every persisted document-workflow operation before the
+  underlying persistence service is invoked.
+- Tests cover workspace isolation, viewer/author privilege separation, suspended membership denial,
+  platform administration, and facade-to-permission mapping.
+
+This authorization layer does not authenticate users and stores no passwords, sessions, tokens, or
+identity-provider secrets. HTTP routes must use the authorized facade rather than invoking the raw
+persistence service directly.
+
 ## Repository posture
 
 - GitHub repository visibility: **public by explicit owner decision**.
 - Package metadata remains `private: true` only to prevent accidental package-registry publication.
-- Bootstrap PR #1 is merged; `main` is the authoritative foundation.
+- Bootstrap PR #1 and persisted-workflow PR #7 are merged; `main` is the authoritative foundation.
 - No production Cloudflare resources, custom domains, customer data, analytics, paid services, or
   public-upload capability have been introduced.
 
 ## Intentionally not implemented
 
-- Production authentication/SSO or authorization middleware.
+- Production authentication/SSO, session management, or identity-provider integration.
 - Production tenant provisioning.
 - Customer or arbitrary public document uploads or malware scanning.
 - HTTP/UI wiring for the persisted workflow service.
