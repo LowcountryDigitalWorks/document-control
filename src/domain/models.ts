@@ -55,16 +55,10 @@ export interface RoleBinding {
 }
 
 export type DocumentStatus =
-  | "draft"
-  | "in_review"
-  | "approved"
-  | "superseded"
-  | "retired";
+  "draft" | "in_review" | "approved" | "superseded" | "retired";
 
 export type TemplateProvenance =
-  | "approved_template"
-  | "exception_no_approved_template"
-  | "none";
+  "approved_template" | "exception_no_approved_template" | "none";
 
 export interface Document {
   id: Identifier;
@@ -92,12 +86,7 @@ export interface DocumentVersion {
 }
 
 export type TemplateLifecycleState =
-  | "draft"
-  | "review"
-  | "approved"
-  | "published"
-  | "superseded"
-  | "retired";
+  "draft" | "review" | "approved" | "published" | "superseded" | "retired";
 
 export interface Template {
   id: Identifier;
@@ -174,9 +163,7 @@ export interface Approval {
 export interface TenantConfiguration {
   tenantId: Identifier;
   permittedDataProfile:
-    | "ordinary_business"
-    | "regulated_approved"
-    | "demo_synthetic";
+    "ordinary_business" | "regulated_approved" | "demo_synthetic";
   branding: Readonly<Record<string, string>>;
   terminology: Readonly<Record<string, string>>;
   updatedAt: IsoTimestamp;
