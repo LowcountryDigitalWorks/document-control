@@ -267,7 +267,11 @@ describe("D1/SQLite schema invariants", () => {
     );
 
     expect(() =>
-      run(database, "UPDATE audit_events SET event_type = 'changed' WHERE id = ?", "audit-1"),
+      run(
+        database,
+        "UPDATE audit_events SET event_type = 'changed' WHERE id = ?",
+        "audit-1",
+      ),
     ).toThrow(/append-only/);
     expect(() =>
       run(database, "DELETE FROM audit_events WHERE id = ?", "audit-1"),
