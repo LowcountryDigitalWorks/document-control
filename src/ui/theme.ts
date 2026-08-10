@@ -14,24 +14,79 @@ export interface ThemeConfig {
   };
 }
 
-export function createTheme(environment: {
-  APP_NAME?: string;
-  BRAND_COMPANY_NAME?: string;
-  BRAND_PRIMARY?: string;
-  BRAND_SECONDARY?: string;
-  BRAND_ACCENT?: string;
-}): ThemeConfig {
+export interface ThemeOverrides {
+  branding?: Readonly<Record<string, string>>;
+  terminology?: Readonly<Record<string, string>>;
+}
+
+export function createTheme(
+  environment: {
+    APP_NAME?: string;
+    BRAND_COMPANY_NAME?: string;
+    BRAND_PRIMARY?: string;
+    BRAND_SECONDARY?: string;
+    BRAND_ACCENT?: string;
+  },
+  overrides: ThemeOverrides = {},
+): ThemeConfig {
+  const branding = overrides.branding ?? {};
+  const terminology = overrides.terminology ?? {};
   return {
-    appName: environment.APP_NAME ?? "Document Control",
-    companyName: environment.BRAND_COMPANY_NAME ?? "Lowcountry Digital Works",
-    primary: environment.BRAND_PRIMARY ?? "#163b45",
-    secondary: environment.BRAND_SECONDARY ?? "#247b78",
-    accent: environment.BRAND_ACCENT ?? "#8e4228",
+    appName: safeText(
+      branding.appName,
+      environment.APP_NAME ?? "Document Control",
+      80,
+    ),
+    companyName: safeText(
+      branding.companyName,
+      environment.BRAND_COMPANY_NAME ?? "Lowcountry Digital Works",
+      100,
+    ),
+    primary: safeColor(
+      branding.primary,
+      safeColor(environment.BRAND_PRIMARY, "#163b45"),
+    ),
+    secondary: safeColor(
+      branding.secondary,
+      safeColor(environment.BRAND_SECONDARY, "#247b78"),
+    ),
+    accent: safeColor(
+      branding.accent,
+      safeColor(environment.BRAND_ACCENT, "#8e4228"),
+    ),
     faviconHref: "/favicon.svg",
     terminology: {
-      workspace: "Workspace",
-      document: "Document",
-      approval: "Approval",
+      workspace: safeText(terminology.workspace, "Workspace", 40),
+      document: safeText(terminology.document, "Document", 40),
+      approval: safeText(terminology.approval, "Approval", 40),
     },
   };
+}
+
+function safeText(
+  configured: string | undefined,
+  fallback: string,
+  maximumLength: number,
+): string {
+  const value = configured?.trim();
+  if (
+    !value ||
+    value.length > maximumLength ||
+    containsControlCharacter(value)
+  ) {
+    return fallback;
+  }
+  return value;
+}
+
+function safeColor(configured: string | undefined, fallback: string): string {
+  const value = configured?.trim().toLowerCase();
+  return value && /^#[0-9a-f]{6}$/u.test(value) ? value : fallback;
+}
+
+function containsControlCharacter(value: string): boolean {
+  return Array.from(value).some((character) => {
+    const code = character.charCodeAt(0);
+    return code <= 31 || code === 127;
+  });
 }

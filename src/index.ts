@@ -6,6 +6,7 @@ import {
 } from "./application/audit-log-filter-input";
 import { AuditLogReadService } from "./application/audit-log-read-service";
 import { AuthorizationDeniedError } from "./application/authorization";
+import { AuthorizedPresentationSettingsService } from "./application/authorized-presentation-settings-service";
 import { AuthorizedAuditLogReadService } from "./application/authorized-audit-log-read-service";
 import { AuthorizedDocumentDetailReadService } from "./application/authorized-document-detail-read-service";
 import { AuthorizedPortableExportService } from "./application/authorized-portable-export-service";
@@ -17,6 +18,11 @@ import {
 } from "./application/document-detail-read-service";
 import { serializeExport } from "./application/export";
 import { PortableExportReadService } from "./application/portable-export-read-service";
+import {
+  parsePresentationSettingsInput,
+  PresentationSettingsValidationError,
+} from "./application/presentation-settings-input";
+import { PresentationSettingsService } from "./application/presentation-settings-service";
 import { ReviewApprovalQueueReadService } from "./application/review-approval-queue-read-service";
 import {
   parseDocumentFilters,
@@ -26,6 +32,8 @@ import {
 import { WorkspaceReadService } from "./application/workspace-read-service";
 import { ensureGuidedAuditor } from "./demo/audit-context";
 import { ensureGuidedBackupAdmin } from "./demo/backup-context";
+import { createPersistedTenantTheme } from "./demo/persisted-theme";
+import { ensureGuidedTenantAdmin } from "./demo/tenant-admin-context";
 import { ensureGuidedEvidenceReader } from "./demo/evidence-context";
 import { createSyntheticExport } from "./demo/fixtures";
 import {
@@ -38,6 +46,7 @@ import {
 } from "./demo/workflow-demo";
 import { DatabaseAuthorizationPolicy } from "./infrastructure/database-authorization-policy";
 import { D1DatabaseProvider } from "./infrastructure/d1-database-provider";
+import { renderAdminSettings } from "./ui/render-admin-settings";
 import { renderAuditLog } from "./ui/render-audit-log";
 import { renderBackupPortability } from "./ui/render-backup-portability";
 import { renderDocumentDetail } from "./ui/render-document-detail";
@@ -167,7 +176,10 @@ app.get("/demo/app", async (context) => {
     workspaceId: demo.workspaceId,
   });
   return context.html(
-    renderWorkspaceOverview(createTheme(context.env), overview),
+    renderWorkspaceOverview(
+      await createPersistedTenantTheme(database, context.env, demo.tenantId),
+      overview,
+    ),
   );
 });
 
@@ -207,7 +219,7 @@ app.get("/demo/app/documents", async (context) => {
   );
   return context.html(
     renderWorkspaceDocuments(
-      createTheme(context.env),
+      await createPersistedTenantTheme(database, context.env, demo.tenantId),
       demo.workspaceName,
       documents,
       filters,
@@ -242,7 +254,12 @@ app.get("/demo/app/documents/:documentId", async (context) => {
       tenantId: demo.tenantId,
       documentId: context.req.param("documentId"),
     });
-    return context.html(renderDocumentDetail(createTheme(context.env), detail));
+    return context.html(
+      renderDocumentDetail(
+        await createPersistedTenantTheme(database, context.env, demo.tenantId),
+        detail,
+      ),
+    );
   } catch (error) {
     if (
       error instanceof AuthorizationDeniedError ||
@@ -290,7 +307,7 @@ app.get("/demo/app/templates", async (context) => {
   );
   return context.html(
     renderWorkspaceTemplates(
-      createTheme(context.env),
+      await createPersistedTenantTheme(database, context.env, demo.tenantId),
       demo.workspaceName,
       templates,
       filters,
@@ -321,7 +338,7 @@ app.get("/demo/app/reviews", async (context) => {
   });
   return context.html(
     renderReviewApprovalQueue(
-      createTheme(context.env),
+      await createPersistedTenantTheme(database, context.env, demo.tenantId),
       demo.workspaceName,
       "review",
       items,
@@ -352,7 +369,7 @@ app.get("/demo/app/approvals", async (context) => {
   });
   return context.html(
     renderReviewApprovalQueue(
-      createTheme(context.env),
+      await createPersistedTenantTheme(database, context.env, demo.tenantId),
       demo.workspaceName,
       "approval",
       items,
@@ -398,12 +415,131 @@ app.get("/demo/app/audit", async (context) => {
   );
   return context.html(
     renderAuditLog(
-      createTheme(context.env),
+      await createPersistedTenantTheme(database, context.env, demo.tenantId),
       demo.workspaceName,
       items,
       filters,
     ),
   );
+});
+
+app.get("/demo/app/admin/settings", async (context) => {
+  if (!guidedDemoEnabled(context.env)) {
+    return context.html(renderNotFound(createTheme(context.env)), 404);
+  }
+
+  const session = resolveGuidedDemoSession(
+    context.req.header("Cookie"),
+    context.req.url,
+  );
+  if (session.setCookie) {
+    context.header("Set-Cookie", session.setCookie);
+  }
+  const database = new D1DatabaseProvider(context.env.DOCUMENT_CONTROL_DB);
+  const demo = createGuidedDemoContext(session.sessionId);
+  await ensureGuidedDemoSeed(database, session.sessionId);
+  const admin = await ensureGuidedTenantAdmin(database, session.sessionId);
+  const service = createAuthorizedPresentationSettingsService(database);
+
+  try {
+    const settings = await service.getSettings({
+      subjectId: admin.subjectId,
+      tenantId: demo.tenantId,
+      workspaceId: demo.workspaceId,
+    });
+    const theme = await createPersistedTenantTheme(
+      database,
+      context.env,
+      demo.tenantId,
+    );
+    context.header("Cache-Control", "no-store");
+    return context.html(
+      renderAdminSettings(
+        theme,
+        settings,
+        new URL(context.req.url).searchParams.get("saved") === "1",
+      ),
+    );
+  } catch (error) {
+    if (error instanceof AuthorizationDeniedError) {
+      return context.html(renderNotFound(createTheme(context.env)), 404);
+    }
+    throw error;
+  }
+});
+
+app.post("/demo/app/admin/settings", async (context) => {
+  if (!guidedDemoEnabled(context.env)) {
+    return context.notFound();
+  }
+  if (!hasSameOrigin(context.req.url, context.req.header("Origin"))) {
+    return context.json({ error: "Same-origin demo request required." }, 403);
+  }
+
+  const sessionId = readGuidedDemoSession(context.req.header("Cookie"));
+  if (!sessionId) {
+    return context.json(
+      {
+        error:
+          "Synthetic administration session missing. Reload Administration.",
+      },
+      409,
+    );
+  }
+
+  let formData: FormData;
+  try {
+    formData = await context.req.raw.formData();
+  } catch {
+    return context.text("A valid form body is required.", 400);
+  }
+  const values = new URLSearchParams();
+  for (const key of [
+    "workspaceName",
+    "appName",
+    "companyName",
+    "primary",
+    "secondary",
+    "accent",
+    "workspaceTerm",
+    "documentTerm",
+    "approvalTerm",
+  ]) {
+    const value = formData.get(key);
+    if (typeof value === "string") values.set(key, value);
+  }
+
+  const database = new D1DatabaseProvider(context.env.DOCUMENT_CONTROL_DB);
+  const demo = createGuidedDemoContext(sessionId);
+  await ensureGuidedDemoSeed(database, sessionId);
+  const admin = await ensureGuidedTenantAdmin(database, sessionId);
+  const service = createAuthorizedPresentationSettingsService(database);
+
+  try {
+    const input = parsePresentationSettingsInput(values);
+    await service.updateSettings(
+      {
+        subjectId: admin.subjectId,
+        tenantId: demo.tenantId,
+        workspaceId: demo.workspaceId,
+      },
+      {
+        input,
+        occurredAt: new Date().toISOString(),
+        auditEventId: `settings-${crypto.randomUUID()}`,
+      },
+    );
+  } catch (error) {
+    if (error instanceof PresentationSettingsValidationError) {
+      return context.text(error.message, 400);
+    }
+    if (error instanceof AuthorizationDeniedError) {
+      return context.html(renderNotFound(createTheme(context.env)), 404);
+    }
+    throw error;
+  }
+
+  return context.redirect("/demo/app/admin/settings?saved=1", 303);
 });
 
 app.get("/demo/app/admin/backup", async (context) => {
@@ -430,7 +566,10 @@ app.get("/demo/app/admin/backup", async (context) => {
     exportedAt: new Date().toISOString(),
   });
   return context.html(
-    renderBackupPortability(createTheme(context.env), exported),
+    renderBackupPortability(
+      await createPersistedTenantTheme(database, context.env, demo.tenantId),
+      exported,
+    ),
   );
 });
 
@@ -521,6 +660,15 @@ function createAuthorizedAuditLogReadService(
 ): AuthorizedAuditLogReadService {
   return new AuthorizedAuditLogReadService(
     new AuditLogReadService(database),
+    new DatabaseAuthorizationPolicy(database),
+  );
+}
+
+function createAuthorizedPresentationSettingsService(
+  database: D1DatabaseProvider,
+): AuthorizedPresentationSettingsService {
+  return new AuthorizedPresentationSettingsService(
+    new PresentationSettingsService(database),
     new DatabaseAuthorizationPolicy(database),
   );
 }
