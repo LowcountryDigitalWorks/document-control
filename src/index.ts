@@ -2,12 +2,14 @@ import { Hono } from "hono";
 import { secureHeaders } from "hono/secure-headers";
 import { AuthorizationDeniedError } from "./application/authorization";
 import { AuthorizedDocumentDetailReadService } from "./application/authorized-document-detail-read-service";
+import { AuthorizedReviewApprovalQueueReadService } from "./application/authorized-review-approval-queue-read-service";
 import { AuthorizedWorkspaceReadService } from "./application/authorized-workspace-read-service";
 import {
   DocumentDetailReadService,
   DocumentNotFoundError,
 } from "./application/document-detail-read-service";
 import { serializeExport } from "./application/export";
+import { ReviewApprovalQueueReadService } from "./application/review-approval-queue-read-service";
 import { WorkspaceReadService } from "./application/workspace-read-service";
 import { ensureGuidedEvidenceReader } from "./demo/evidence-context";
 import { createSyntheticExport } from "./demo/fixtures";
@@ -23,6 +25,7 @@ import { DatabaseAuthorizationPolicy } from "./infrastructure/database-authoriza
 import { D1DatabaseProvider } from "./infrastructure/d1-database-provider";
 import { renderDocumentDetail } from "./ui/render-document-detail";
 import { renderGuidedDemo } from "./ui/render-guided-demo";
+import { renderReviewApprovalQueue } from "./ui/render-review-approval-queue";
 import {
   renderWorkspaceDocuments,
   renderWorkspaceOverview,
@@ -250,6 +253,68 @@ app.get("/demo/app/templates", async (context) => {
   );
 });
 
+app.get("/demo/app/reviews", async (context) => {
+  if (!guidedDemoEnabled(context.env)) {
+    return context.html(renderNotFound(createTheme(context.env)), 404);
+  }
+
+  const session = resolveGuidedDemoSession(
+    context.req.header("Cookie"),
+    context.req.url,
+  );
+  if (session.setCookie) {
+    context.header("Set-Cookie", session.setCookie);
+  }
+  const database = new D1DatabaseProvider(context.env.DOCUMENT_CONTROL_DB);
+  const demo = createGuidedDemoContext(session.sessionId);
+  await ensureGuidedDemoSeed(database, session.sessionId);
+  const read = createAuthorizedReviewApprovalQueueReadService(database);
+  const items = await read.listReviewQueue({
+    subjectId: demo.reviewerSubjectId,
+    tenantId: demo.tenantId,
+    workspaceId: demo.workspaceId,
+  });
+  return context.html(
+    renderReviewApprovalQueue(
+      createTheme(context.env),
+      demo.workspaceName,
+      "review",
+      items,
+    ),
+  );
+});
+
+app.get("/demo/app/approvals", async (context) => {
+  if (!guidedDemoEnabled(context.env)) {
+    return context.html(renderNotFound(createTheme(context.env)), 404);
+  }
+
+  const session = resolveGuidedDemoSession(
+    context.req.header("Cookie"),
+    context.req.url,
+  );
+  if (session.setCookie) {
+    context.header("Set-Cookie", session.setCookie);
+  }
+  const database = new D1DatabaseProvider(context.env.DOCUMENT_CONTROL_DB);
+  const demo = createGuidedDemoContext(session.sessionId);
+  await ensureGuidedDemoSeed(database, session.sessionId);
+  const read = createAuthorizedReviewApprovalQueueReadService(database);
+  const items = await read.listApprovalQueue({
+    subjectId: demo.approverSubjectId,
+    tenantId: demo.tenantId,
+    workspaceId: demo.workspaceId,
+  });
+  return context.html(
+    renderReviewApprovalQueue(
+      createTheme(context.env),
+      demo.workspaceName,
+      "approval",
+      items,
+    ),
+  );
+});
+
 app.get("/demo/export", (context) => {
   const exportedAt = new Date().toISOString();
   return context.body(serializeExport(createSyntheticExport(exportedAt)), 200, {
@@ -288,6 +353,15 @@ function createAuthorizedDocumentDetailReadService(
 ): AuthorizedDocumentDetailReadService {
   return new AuthorizedDocumentDetailReadService(
     new DocumentDetailReadService(database),
+    new DatabaseAuthorizationPolicy(database),
+  );
+}
+
+function createAuthorizedReviewApprovalQueueReadService(
+  database: D1DatabaseProvider,
+): AuthorizedReviewApprovalQueueReadService {
+  return new AuthorizedReviewApprovalQueueReadService(
+    new ReviewApprovalQueueReadService(database),
     new DatabaseAuthorizationPolicy(database),
   );
 }
