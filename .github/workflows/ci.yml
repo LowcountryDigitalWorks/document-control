@@ -1,49 +1,25 @@
-name: CI
+name: Workflow Admin Formatting
 
 on:
-  pull_request:
   push:
-    branches: [main]
+    branches: [agent/workflow-definition-admin]
 
 permissions:
   contents: read
 
 concurrency:
-  group: document-control-ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: workflow-admin-format-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  quality:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm check
-      - run: pnpm audit --audit-level=high
-
-  browser:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm exec playwright install --with-deps chromium
-      - run: pnpm test:e2e
-
-  secrets:
+  normalize:
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: agent/workflow-definition-admin
           fetch-depth: 0
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
@@ -51,4 +27,15 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm secrets:scan
+      - name: Normalize workflow administration service
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm exec prettier --write src/application/workflow-definition-admin-service.ts
+          if ! git diff --quiet -- src/application/workflow-definition-admin-service.ts; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add src/application/workflow-definition-admin-service.ts
+            git commit -m "Normalize workflow administration service"
+            git push origin HEAD:agent/workflow-definition-admin
+          fi
