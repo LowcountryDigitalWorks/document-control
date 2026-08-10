@@ -51,6 +51,27 @@ export async function ensureGuidedTenantAdmin(
         seedTimestamp,
       ],
     },
+    {
+      sql: `INSERT OR IGNORE INTO tenant_configurations
+              (tenant_id, permitted_data_profile, branding_json, terminology_json, updated_at)
+            VALUES (?, 'demo_synthetic', ?, ?, ?)`,
+      parameters: [
+        demo.tenantId,
+        JSON.stringify({
+          appName: "Document Control",
+          companyName: "Lowcountry Digital Works",
+          primary: "#163b45",
+          secondary: "#247b78",
+          accent: "#8e4228",
+        }),
+        JSON.stringify({
+          workspace: "Workspace",
+          document: "Document",
+          approval: "Approval",
+        }),
+        seedTimestamp,
+      ],
+    },
   ]);
 
   return admin;
