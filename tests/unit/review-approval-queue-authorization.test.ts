@@ -13,7 +13,7 @@ const context = {
   workspaceId: "workspace-1",
 };
 
-function createHarness(deny = false): {
+function createHarness(denyPermission?: string): {
   service: AuthorizedReviewApprovalQueueReadService;
   assertions: AuthorizationRequest[];
   listQueue: ReturnType<typeof vi.fn>;
@@ -22,7 +22,7 @@ function createHarness(deny = false): {
   const authorization: AuthorizationPolicy = {
     async assertAllowed(request) {
       assertions.push(request);
-      if (deny) {
+      if (request.permission === denyPermission) {
         throw new AuthorizationDeniedError();
       }
     },
@@ -37,12 +37,16 @@ function createHarness(deny = false): {
 }
 
 describe("AuthorizedReviewApprovalQueueReadService", () => {
-  it("requires document.review before listing review work", async () => {
+  it("requires document.read and document.review before listing review work", async () => {
     const harness = createHarness();
 
     await harness.service.listReviewQueue(context);
 
     expect(harness.assertions).toEqual([
+      {
+        ...context,
+        permission: "document.read",
+      },
       {
         ...context,
         permission: "document.review",
@@ -55,12 +59,16 @@ describe("AuthorizedReviewApprovalQueueReadService", () => {
     );
   });
 
-  it("requires document.approve before listing approval work", async () => {
+  it("requires document.read and document.approve before listing approval work", async () => {
     const harness = createHarness();
 
     await harness.service.listApprovalQueue(context);
 
     expect(harness.assertions).toEqual([
+      {
+        ...context,
+        permission: "document.read",
+      },
       {
         ...context,
         permission: "document.approve",
@@ -73,12 +81,23 @@ describe("AuthorizedReviewApprovalQueueReadService", () => {
     );
   });
 
-  it("does not query queue data after authorization denial", async () => {
-    const harness = createHarness(true);
+  it("does not query queue data when document.read is denied", async () => {
+    const harness = createHarness("document.read");
 
     await expect(harness.service.listReviewQueue(context)).rejects.toBeInstanceOf(
       AuthorizationDeniedError,
     );
+    expect(harness.assertions).toHaveLength(1);
+    expect(harness.listQueue).not.toHaveBeenCalled();
+  });
+
+  it("does not query queue data when the action permission is denied", async () => {
+    const harness = createHarness("document.approve");
+
+    await expect(
+      harness.service.listApprovalQueue(context),
+    ).rejects.toBeInstanceOf(AuthorizationDeniedError);
+    expect(harness.assertions).toHaveLength(2);
     expect(harness.listQueue).not.toHaveBeenCalled();
   });
 });
