@@ -4,18 +4,20 @@ import type {
   Identifier,
   IsoTimestamp,
   WorkflowDefinition,
+  WorkflowInstance,
 } from "./models";
 
 export interface ApprovalCommand {
   id: Identifier;
-  actorId: Identifier;
+  actorSubjectId: Identifier;
   approvedAt: IsoTimestamp;
   documentVersion: DocumentVersion;
   workflowDefinition: WorkflowDefinition;
+  workflowInstance: WorkflowInstance;
 }
 
 export function approveExactVersion(command: ApprovalCommand): Approval {
-  const { documentVersion, workflowDefinition } = command;
+  const { documentVersion, workflowDefinition, workflowInstance } = command;
 
   if (!/^sha256:[a-f0-9]{64}$/.test(documentVersion.contentHash)) {
     throw new Error("Approval requires a canonical SHA-256 content hash.");
@@ -25,13 +27,27 @@ export function approveExactVersion(command: ApprovalCommand): Approval {
     throw new Error("Approval requires a versioned workflow definition.");
   }
 
+  if (
+    workflowDefinition.tenantId !== documentVersion.tenantId ||
+    workflowInstance.tenantId !== documentVersion.tenantId ||
+    workflowInstance.documentId !== documentVersion.documentId ||
+    workflowInstance.documentVersionId !== documentVersion.id ||
+    workflowInstance.workflowDefinitionId !== workflowDefinition.id ||
+    workflowInstance.workflowDefinitionVersion !== workflowDefinition.version
+  ) {
+    throw new Error(
+      "Approval requires an exact document version and its bound workflow-definition version.",
+    );
+  }
+
   return Object.freeze({
     id: command.id,
     tenantId: documentVersion.tenantId,
     documentId: documentVersion.documentId,
     documentVersionId: documentVersion.id,
     contentHash: documentVersion.contentHash,
-    actorId: command.actorId,
+    actorSubjectId: command.actorSubjectId,
+    workflowInstanceId: workflowInstance.id,
     workflowDefinitionId: workflowDefinition.id,
     workflowDefinitionVersion: workflowDefinition.version,
     approvedAt: command.approvedAt,
