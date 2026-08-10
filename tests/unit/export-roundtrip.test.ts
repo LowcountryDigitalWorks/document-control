@@ -17,9 +17,10 @@ describe("portable export", () => {
 
   it("rejects cross-tenant records", () => {
     const source = createSyntheticExport();
+    const workspace = source.workspaces[0]!;
     const tampered = {
       ...source,
-      workspaces: [{ ...source.workspaces[0], tenantId: "tenant-other" }],
+      workspaces: [{ ...workspace, tenantId: "tenant-other" }],
     };
 
     expect(() => parseExport(JSON.stringify(tampered))).toThrow(
@@ -29,11 +30,12 @@ describe("portable export", () => {
 
   it("rejects approvals whose hash no longer matches the document version", () => {
     const source = createSyntheticExport();
+    const approval = source.approvals[0]!;
     const tampered = {
       ...source,
       approvals: [
         {
-          ...source.approvals[0],
+          ...approval,
           contentHash: `sha256:${"f".repeat(64)}`,
         },
       ],
