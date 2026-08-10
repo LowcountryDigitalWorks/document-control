@@ -77,7 +77,7 @@ export class WorkflowDefinitionAdminService {
        WHERE definition.tenant_id = ?
        GROUP BY definition.id, definition.tenant_id, definition.name,
                 definition.version, definition.definition_json, definition.created_at
-       ORDER BY definition.name ASC, definition.id ASC, definition.version DESC`,
+       ORDER BY definition.id ASC, definition.version DESC`,
       [tenantId],
     );
 
@@ -208,9 +208,7 @@ function mapCatalogRow(row: CatalogRow): WorkflowDefinitionRecord {
   }
   const record = parsed as Record<string, unknown>;
   if (!Array.isArray(record.states) || !Array.isArray(record.transitions)) {
-    throw new Error(
-      "Workflow definition JSON is missing states or transitions.",
-    );
+    throw new Error("Workflow definition JSON is missing states or transitions.");
   }
   const states = record.states.map((state) => {
     if (typeof state !== "string") {
