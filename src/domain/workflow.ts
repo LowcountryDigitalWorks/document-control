@@ -52,7 +52,8 @@ export function transitionWorkflow(
   }
 
   const allowed = definition.transitions.some(
-    (transition) => transition.from === instance.state && transition.to === target,
+    (transition) =>
+      transition.from === instance.state && transition.to === target,
   );
 
   if (!allowed) {
