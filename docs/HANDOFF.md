@@ -2,12 +2,16 @@
 
 ## Authoritative state
 
-The default branch remains authoritative until bootstrap PR #1 is reviewed and merged. The active
-bootstrap branch is `codex/initial-document-control-bootstrap`; the branch name reflects its origin
-only and does not require Codex for continuing development.
+`main` is the authoritative product foundation. Bootstrap PR #1 was squash-merged on 2026-08-10 as
+commit `e5902256cfbe1f36b67143cae8daf687fe684732`.
 
-The repository is public by explicit owner decision. No production Cloudflare resources or customer
-data exist in this bootstrap.
+The repository is public by explicit owner decision. Package metadata remains `private: true` only to
+prevent accidental package-registry publication. No production Cloudflare resources, customer data,
+paid services, analytics, or public-upload capability exist.
+
+The active post-bootstrap workstream is the persisted document-workflow slice. Normal development is
+performed through this repository, GitHub pull requests, and GitHub Actions; Codex is not a routine
+release dependency.
 
 ## Foundation decisions
 
@@ -28,6 +32,27 @@ data exist in this bootstrap.
 - The LDW theme is a configurable reference theme; final colors/assets are not hard-coded decisions.
 - Bear Necessities is a candidate deployment/offering tier, not a domain/product architecture name.
 
+## Persisted workflow slice
+
+The application-service layer now supports the core persisted sequence:
+
+`published template -> document/version -> workflow -> review -> exact-version approval -> changed version -> prior approval does not apply to new version -> audit evidence`
+
+Important behavior:
+
+- related D1 metadata/state mutations are submitted as transactional database batches;
+- document creation preserves exact approved-template provenance;
+- workflow instances are pinned to exact document and workflow-definition versions;
+- accepted reviews advance to approval through the bound workflow definition;
+- approval and state changes are persisted together and only for the current document version;
+- a workflow for an older version is rejected if a newer version became current before approval;
+- changed versions return the document to draft without mutating historical approvals;
+- service methods enforce canonical SHA-256 hashes and application-owned content keys.
+
+The application service does not create or claim an atomic transaction across R2 and D1. Customer
+upload orchestration, compensation behavior, malware scanning, content limits, retention, and recovery
+must be designed before production uploads are enabled.
+
 ## Continue locally
 
 1. Install Node.js 22 or newer.
@@ -36,22 +61,16 @@ data exist in this bootstrap.
 4. Run `pnpm dev` and open `http://127.0.0.1:8787`.
 5. Run `pnpm check` and `pnpm test:e2e` before proposing changes.
 
-## Required pre-merge review for PR #1
+## Next product slice
 
-Confirm the latest GitHub Actions run is green for quality, browser/axe, and secret scanning. Review
-all changes against the product-review comment on PR #1 and confirm no unresolved review findings.
-Do not merge automatically.
+After the persisted workflow service is merged, wire it into tenant-scoped HTTP/UI routes using the
+existing D1 binding and synthetic/demo-safe data. The UI should let a user understand the document
+lifecycle without GRC terminology and should visibly show that an approval applies to one exact
+version but not to a later changed version.
 
-## Next vertical slice after bootstrap merge
+Keep production authentication and arbitrary/customer uploads out of that slice. Introduce an
+explicit authorization boundary/interface before selecting a production identity provider.
 
-Persist the synthetic document-control lifecycle through application services and D1/R2 while
-keeping production authentication and public uploads out of scope:
-
-`published template -> document -> immutable version -> review -> approval -> changed version -> old approval no longer applies -> audit -> portable export`
-
-The next slice should introduce an explicit authorization boundary/interface and tenant-scoped
-service methods without committing to an identity provider. Production authentication can then be
-selected separately based on the deployment profile.
-
-Do not introduce customer uploads until permitted-data policy, content types, size limits, malware
-scanning, retention, authorization, and recovery expectations are explicitly approved.
+Do not introduce customer uploads until permitted-data policy, allowed content types, size limits,
+malware scanning, retention, authorization, backup/recovery, and failure/compensation behavior are
+explicitly approved.
