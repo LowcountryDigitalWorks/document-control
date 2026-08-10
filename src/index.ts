@@ -3,6 +3,7 @@ import { secureHeaders } from "hono/secure-headers";
 import { serializeExport } from "./application/export";
 import { createSyntheticExport } from "./demo/fixtures";
 import {
+  isValidGuidedDemoSessionId,
   loadGuidedDemoState,
   runGuidedDemoAction,
   type GuidedDemoAction,
@@ -23,6 +24,7 @@ export interface Bindings {
   DEMO_MUTATIONS_ENABLED?: string;
 }
 
+const guidedDemoSessionCookie = "ldw_guided_demo_session";
 const app = new Hono<{ Bindings: Bindings }>();
 
 app.use(
@@ -54,8 +56,22 @@ app.get("/demo/workflow", async (context) => {
     return context.html(renderNotFound(createTheme(context.env)), 404);
   }
 
+  const existingSessionId = readGuidedDemoSession(
+    context.req.header("Cookie"),
+  );
+  const sessionId = existingSessionId ?? crypto.randomUUID();
+  if (!existingSessionId) {
+    context.header(
+      "Set-Cookie",
+      createGuidedDemoSessionCookie(
+        sessionId,
+        new URL(context.req.url).protocol === "https:",
+      ),
+    );
+  }
+
   const database = new D1DatabaseProvider(context.env.DOCUMENT_CONTROL_DB);
-  const state = await loadGuidedDemoState(database);
+  const state = await loadGuidedDemoState(database, sessionId);
   return context.html(renderGuidedDemo(createTheme(context.env), state));
 });
 
@@ -67,6 +83,14 @@ app.post("/demo/workflow/actions/:action", async (context) => {
     return context.json({ error: "Same-origin demo request required." }, 403);
   }
 
+  const sessionId = readGuidedDemoSession(context.req.header("Cookie"));
+  if (!sessionId) {
+    return context.json(
+      { error: "Guided demo session missing. Reload the guided demo." },
+      409,
+    );
+  }
+
   const action = parseGuidedDemoAction(context.req.param("action"));
   if (!action) {
     return context.notFound();
@@ -74,7 +98,12 @@ app.post("/demo/workflow/actions/:action", async (context) => {
 
   const database = new D1DatabaseProvider(context.env.DOCUMENT_CONTROL_DB);
   try {
-    await runGuidedDemoAction(database, action, new Date().toISOString());
+    await runGuidedDemoAction(
+      database,
+      sessionId,
+      action,
+      new Date().toISOString(),
+    );
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "The guided demo action failed.";
@@ -123,6 +152,34 @@ function parseGuidedDemoAction(value: string): GuidedDemoAction | null {
     return value;
   }
   return null;
+}
+
+function readGuidedDemoSession(cookieHeader: string | undefined): string | null {
+  if (!cookieHeader) {
+    return null;
+  }
+
+  for (const part of cookieHeader.split(";")) {
+    const separator = part.indexOf("=");
+    if (separator < 0) {
+      continue;
+    }
+    const name = part.slice(0, separator).trim();
+    const value = part.slice(separator + 1).trim();
+    if (name === guidedDemoSessionCookie && isValidGuidedDemoSessionId(value)) {
+      return value.toLowerCase();
+    }
+  }
+
+  return null;
+}
+
+function createGuidedDemoSessionCookie(
+  sessionId: string,
+  secure: boolean,
+): string {
+  const secureAttribute = secure ? "; Secure" : "";
+  return `${guidedDemoSessionCookie}=${sessionId}; Path=/demo/workflow; Max-Age=3600; HttpOnly; SameSite=Strict${secureAttribute}`;
 }
 
 function hasSameOrigin(
