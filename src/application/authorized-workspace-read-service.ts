@@ -1,9 +1,9 @@
 import type { AuthorizationPolicy } from "./authorization";
-import {
+import type {
   WorkspaceReadService,
-  type WorkspaceDocumentListItem,
-  type WorkspaceOverview,
-  type WorkspaceTemplateListItem,
+  WorkspaceDocumentListItem,
+  WorkspaceOverview,
+  WorkspaceTemplateListItem,
 } from "./workspace-read-service";
 
 export interface WorkspaceReadContext {
