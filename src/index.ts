@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { secureHeaders } from "hono/secure-headers";
 import { AuthorizationDeniedError } from "./application/authorization";
 import { AuthorizedDocumentDetailReadService } from "./application/authorized-document-detail-read-service";
+import { AuthorizedPortableExportService } from "./application/authorized-portable-export-service";
 import { AuthorizedReviewApprovalQueueReadService } from "./application/authorized-review-approval-queue-read-service";
 import { AuthorizedWorkspaceReadService } from "./application/authorized-workspace-read-service";
 import {
@@ -9,6 +10,7 @@ import {
   DocumentNotFoundError,
 } from "./application/document-detail-read-service";
 import { serializeExport } from "./application/export";
+import { PortableExportReadService } from "./application/portable-export-read-service";
 import { ReviewApprovalQueueReadService } from "./application/review-approval-queue-read-service";
 import {
   parseDocumentFilters,
@@ -16,6 +18,7 @@ import {
   WorkspaceFilterValidationError,
 } from "./application/workspace-filter-input";
 import { WorkspaceReadService } from "./application/workspace-read-service";
+import { ensureGuidedBackupAdmin } from "./demo/backup-context";
 import { ensureGuidedEvidenceReader } from "./demo/evidence-context";
 import { createSyntheticExport } from "./demo/fixtures";
 import {
@@ -28,6 +31,7 @@ import {
 } from "./demo/workflow-demo";
 import { DatabaseAuthorizationPolicy } from "./infrastructure/database-authorization-policy";
 import { D1DatabaseProvider } from "./infrastructure/d1-database-provider";
+import { renderBackupPortability } from "./ui/render-backup-portability";
 import { renderDocumentDetail } from "./ui/render-document-detail";
 import { renderGuidedDemo } from "./ui/render-guided-demo";
 import { renderReviewApprovalQueue } from "./ui/render-review-approval-queue";
@@ -348,6 +352,65 @@ app.get("/demo/app/approvals", async (context) => {
   );
 });
 
+app.get("/demo/app/admin/backup", async (context) => {
+  if (!guidedDemoEnabled(context.env)) {
+    return context.html(renderNotFound(createTheme(context.env)), 404);
+  }
+
+  const session = resolveGuidedDemoSession(
+    context.req.header("Cookie"),
+    context.req.url,
+  );
+  if (session.setCookie) {
+    context.header("Set-Cookie", session.setCookie);
+  }
+  const database = new D1DatabaseProvider(context.env.DOCUMENT_CONTROL_DB);
+  const demo = createGuidedDemoContext(session.sessionId);
+  await ensureGuidedDemoSeed(database, session.sessionId);
+  const admin = await ensureGuidedBackupAdmin(database, session.sessionId);
+  const exported = await createAuthorizedPortableExportService(
+    database,
+  ).createTenantExport({
+    subjectId: admin.subjectId,
+    tenantId: demo.tenantId,
+    exportedAt: new Date().toISOString(),
+  });
+  return context.html(
+    renderBackupPortability(createTheme(context.env), exported),
+  );
+});
+
+app.get("/demo/app/admin/backup/export", async (context) => {
+  if (!guidedDemoEnabled(context.env)) {
+    return context.html(renderNotFound(createTheme(context.env)), 404);
+  }
+
+  const session = resolveGuidedDemoSession(
+    context.req.header("Cookie"),
+    context.req.url,
+  );
+  if (session.setCookie) {
+    context.header("Set-Cookie", session.setCookie);
+  }
+  const database = new D1DatabaseProvider(context.env.DOCUMENT_CONTROL_DB);
+  const demo = createGuidedDemoContext(session.sessionId);
+  await ensureGuidedDemoSeed(database, session.sessionId);
+  const admin = await ensureGuidedBackupAdmin(database, session.sessionId);
+  const exported = await createAuthorizedPortableExportService(
+    database,
+  ).createTenantExport({
+    subjectId: admin.subjectId,
+    tenantId: demo.tenantId,
+    exportedAt: new Date().toISOString(),
+  });
+  const fileName = `document-control-${safeFileSegment(exported.tenant.slug)}-export-v${exported.version}.json`;
+  return context.body(serializeExport(exported), 200, {
+    "Cache-Control": "no-store",
+    "Content-Disposition": `attachment; filename="${fileName}"`,
+    "Content-Type": "application/json; charset=utf-8",
+  });
+});
+
 app.get("/demo/export", (context) => {
   const exportedAt = new Date().toISOString();
   return context.body(serializeExport(createSyntheticExport(exportedAt)), 200, {
@@ -395,6 +458,15 @@ function createAuthorizedReviewApprovalQueueReadService(
 ): AuthorizedReviewApprovalQueueReadService {
   return new AuthorizedReviewApprovalQueueReadService(
     new ReviewApprovalQueueReadService(database),
+    new DatabaseAuthorizationPolicy(database),
+  );
+}
+
+function createAuthorizedPortableExportService(
+  database: D1DatabaseProvider,
+): AuthorizedPortableExportService {
+  return new AuthorizedPortableExportService(
+    new PortableExportReadService(database),
     new DatabaseAuthorizationPolicy(database),
   );
 }
@@ -473,6 +545,11 @@ function hasSameOrigin(
     return false;
   }
   return origin === new URL(requestUrl).origin;
+}
+
+function safeFileSegment(value: string): string {
+  const normalized = value.toLowerCase().replace(/[^a-z0-9-]+/g, "-");
+  return normalized.replace(/^-+|-+$/g, "") || "tenant";
 }
 
 export default app;
