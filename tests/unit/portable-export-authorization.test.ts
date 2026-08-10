@@ -57,9 +57,9 @@ describe("AuthorizedPortableExportService", () => {
   it("does not read tenant data after authorization denial", async () => {
     const harness = createHarness(true);
 
-    await expect(harness.service.createTenantExport(context)).rejects.toBeInstanceOf(
-      AuthorizationDeniedError,
-    );
+    await expect(
+      harness.service.createTenantExport(context),
+    ).rejects.toBeInstanceOf(AuthorizationDeniedError);
     expect(harness.createTenantExport).not.toHaveBeenCalled();
   });
 });

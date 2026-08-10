@@ -220,7 +220,9 @@ export class PortableExportReadService {
     return row;
   }
 
-  private async readConfiguration(tenantId: string): Promise<TenantConfiguration> {
+  private async readConfiguration(
+    tenantId: string,
+  ): Promise<TenantConfiguration> {
     const [row] = await this.database.query<TenantConfigurationRow>(
       `SELECT tenant_id AS tenantId,
               permitted_data_profile AS permittedDataProfile,
@@ -243,7 +245,9 @@ export class PortableExportReadService {
     };
   }
 
-  private async readIdentitySubjects(tenantId: string): Promise<IdentitySubject[]> {
+  private async readIdentitySubjects(
+    tenantId: string,
+  ): Promise<IdentitySubject[]> {
     const rows = await this.database.query<IdentitySubjectRow>(
       `SELECT subject.id,
               subject.display_name AS displayName,
@@ -297,7 +301,9 @@ export class PortableExportReadService {
     );
   }
 
-  private async readRoleDefinitions(tenantId: string): Promise<RoleDefinition[]> {
+  private async readRoleDefinitions(
+    tenantId: string,
+  ): Promise<RoleDefinition[]> {
     const rows = await this.database.query<RoleDefinitionRow>(
       `SELECT id,
               tenant_id AS tenantId,
@@ -383,7 +389,9 @@ export class PortableExportReadService {
     }));
   }
 
-  private async readDocumentVersions(tenantId: string): Promise<DocumentVersion[]> {
+  private async readDocumentVersions(
+    tenantId: string,
+  ): Promise<DocumentVersion[]> {
     return this.database.query<DocumentVersionRow>(
       `SELECT id,
               tenant_id AS tenantId,
@@ -422,7 +430,9 @@ export class PortableExportReadService {
     }));
   }
 
-  private async readTemplateVersions(tenantId: string): Promise<TemplateVersion[]> {
+  private async readTemplateVersions(
+    tenantId: string,
+  ): Promise<TemplateVersion[]> {
     const rows = await this.database.query<TemplateVersionRow>(
       `SELECT id,
               tenant_id AS tenantId,
@@ -459,7 +469,9 @@ export class PortableExportReadService {
     }));
   }
 
-  private async readWorkflowDefinitions(tenantId: string): Promise<WorkflowDefinition[]> {
+  private async readWorkflowDefinitions(
+    tenantId: string,
+  ): Promise<WorkflowDefinition[]> {
     const rows = await this.database.query<WorkflowDefinitionRow>(
       `SELECT id,
               tenant_id AS tenantId,
@@ -484,7 +496,9 @@ export class PortableExportReadService {
     });
   }
 
-  private async readWorkflowInstances(tenantId: string): Promise<WorkflowInstance[]> {
+  private async readWorkflowInstances(
+    tenantId: string,
+  ): Promise<WorkflowInstance[]> {
     return this.database.query<WorkflowInstanceRow>(
       `SELECT id,
               tenant_id AS tenantId,
@@ -576,9 +590,15 @@ export class PortableExportReadService {
   }
 }
 
-function parseStringArray(serialized: string, label: string): readonly string[] {
+function parseStringArray(
+  serialized: string,
+  label: string,
+): readonly string[] {
   const parsed: unknown = JSON.parse(serialized);
-  if (!Array.isArray(parsed) || parsed.some((value) => typeof value !== "string")) {
+  if (
+    !Array.isArray(parsed) ||
+    parsed.some((value) => typeof value !== "string")
+  ) {
     throw new Error(`${label} must be a JSON array of strings.`);
   }
   return parsed;

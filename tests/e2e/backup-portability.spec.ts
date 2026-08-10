@@ -17,7 +17,9 @@ async function approveAndChangeDocument(page: Page): Promise<void> {
   await page.getByRole("button", { name: "Create changed version 2" }).click();
 }
 
-test("exports the current synthetic tenant application state", async ({ page }) => {
+test("exports the current synthetic tenant application state", async ({
+  page,
+}) => {
   await approveAndChangeDocument(page);
 
   await page.goto("/demo/app/admin/backup");
