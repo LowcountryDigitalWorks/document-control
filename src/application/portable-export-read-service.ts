@@ -278,8 +278,9 @@ export class PortableExportReadService {
   }
 
   private async readMemberships(tenantId: string): Promise<TenantMembership[]> {
-    return this.database.query<MembershipRow>(
-      `SELECT id,
+    return (
+      await this.database.query<MembershipRow>(
+        `SELECT id,
               tenant_id AS tenantId,
               subject_id AS subjectId,
               status,
@@ -287,18 +288,21 @@ export class PortableExportReadService {
        FROM tenant_memberships
        WHERE tenant_id = ?
        ORDER BY id`,
-      [tenantId],
-    );
+        [tenantId],
+      )
+    ).slice();
   }
 
   private async readWorkspaces(tenantId: string): Promise<Workspace[]> {
-    return this.database.query<WorkspaceRow>(
-      `SELECT id, tenant_id AS tenantId, name
+    return (
+      await this.database.query<WorkspaceRow>(
+        `SELECT id, tenant_id AS tenantId, name
        FROM workspaces
        WHERE tenant_id = ?
        ORDER BY id`,
-      [tenantId],
-    );
+        [tenantId],
+      )
+    ).slice();
   }
 
   private async readRoleDefinitions(
@@ -392,8 +396,9 @@ export class PortableExportReadService {
   private async readDocumentVersions(
     tenantId: string,
   ): Promise<DocumentVersion[]> {
-    return this.database.query<DocumentVersionRow>(
-      `SELECT id,
+    return (
+      await this.database.query<DocumentVersionRow>(
+        `SELECT id,
               tenant_id AS tenantId,
               document_id AS documentId,
               version_number AS versionNumber,
@@ -405,8 +410,9 @@ export class PortableExportReadService {
        FROM document_versions
        WHERE tenant_id = ?
        ORDER BY document_id, version_number`,
-      [tenantId],
-    );
+        [tenantId],
+      )
+    ).slice();
   }
 
   private async readTemplates(tenantId: string): Promise<Template[]> {
@@ -499,8 +505,9 @@ export class PortableExportReadService {
   private async readWorkflowInstances(
     tenantId: string,
   ): Promise<WorkflowInstance[]> {
-    return this.database.query<WorkflowInstanceRow>(
-      `SELECT id,
+    return (
+      await this.database.query<WorkflowInstanceRow>(
+        `SELECT id,
               tenant_id AS tenantId,
               document_id AS documentId,
               document_version_id AS documentVersionId,
@@ -510,8 +517,9 @@ export class PortableExportReadService {
        FROM workflow_instances
        WHERE tenant_id = ?
        ORDER BY id`,
-      [tenantId],
-    );
+        [tenantId],
+      )
+    ).slice();
   }
 
   private async readReviews(tenantId: string): Promise<Review[]> {
@@ -542,8 +550,9 @@ export class PortableExportReadService {
   }
 
   private async readApprovals(tenantId: string): Promise<Approval[]> {
-    return this.database.query<ApprovalRow>(
-      `SELECT id,
+    return (
+      await this.database.query<ApprovalRow>(
+        `SELECT id,
               tenant_id AS tenantId,
               document_id AS documentId,
               document_version_id AS documentVersionId,
@@ -556,8 +565,9 @@ export class PortableExportReadService {
        FROM approvals
        WHERE tenant_id = ?
        ORDER BY approved_at, id`,
-      [tenantId],
-    );
+        [tenantId],
+      )
+    ).slice();
   }
 
   private async readAuditEvents(tenantId: string): Promise<AuditEvent[]> {
@@ -649,7 +659,7 @@ function parseWorkflowDefinition(serialized: string): {
       throw new Error("definition_json has an invalid workflow transition.");
     }
     const transition = value as Record<string, string>;
-    return { from: transition.from, to: transition.to };
+    return { from: transition.from as string, to: transition.to as string };
   });
   return { states: parsed.states as string[], transitions };
 }

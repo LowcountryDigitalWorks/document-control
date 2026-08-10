@@ -66,16 +66,16 @@ test("exports the current synthetic tenant application state", async ({
   expect(exported.approvals).toHaveLength(1);
   expect(exported.auditEvents.length).toBeGreaterThanOrEqual(6);
 
-  const document = exported.documents[0];
-  expect(document?.status).toBe("draft");
+  const exportedDocument = exported.documents[0];
+  expect(exportedDocument?.status).toBe("draft");
   const versions = [...exported.documentVersions].sort(
     (left, right) => left.versionNumber - right.versionNumber,
   );
-  expect(document?.currentVersionId).toBe(versions[1]?.id);
+  expect(exportedDocument?.currentVersionId).toBe(versions[1]?.id);
   expect(exported.approvals[0]?.documentVersionId).toBe(versions[0]?.id);
   expect(exported.approvals[0]?.contentHash).toBe(versions[0]?.contentHash);
   expect(exported.approvals[0]?.documentVersionId).not.toBe(
-    document?.currentVersionId,
+    exportedDocument?.currentVersionId,
   );
 
   for (const version of [
