@@ -42,13 +42,17 @@ test("navigates authorized workspace overview, templates, and documents", async 
   await expect(page.getByText("Draft created", { exact: true })).toBeVisible();
 
   await page.goto("/demo/app/documents");
+  const documentCard = page.locator(".record-card").filter({
+    has: page.getByRole("heading", { name: "Harbor Opening Checklist" }),
+  });
+  await expect(documentCard).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "Harbor Opening Checklist" }),
+    documentCard.getByText("Current approval required", { exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByText("Current approval required", { exact: true }),
+    documentCard.getByText("Current version", { exact: true }),
   ).toBeVisible();
-  await expect(page.getByText("Version 1", { exact: false })).toBeVisible();
+  await expect(documentCard.getByText("1", { exact: true })).toBeVisible();
 
   const documentAxe = await new AxeBuilder({ page }).analyze();
   expect(documentAxe.violations).toEqual([]);
