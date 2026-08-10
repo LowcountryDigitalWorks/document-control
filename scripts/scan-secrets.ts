@@ -5,7 +5,8 @@ const patterns = [
   { name: "AWS access key", expression: /\bAKIA[0-9A-Z]{16}\b/g },
   {
     name: "GitHub token",
-    expression: /\b(?:gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,})\b/g,
+    expression:
+      /\b(?:gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,})\b/g,
   },
   { name: "Google API key", expression: /\bAIza[0-9A-Za-z_-]{30,}\b/g },
   { name: "Slack token", expression: /\bxox[baprs]-[A-Za-z0-9-]{20,}\b/g },
@@ -34,7 +35,15 @@ for (const file of files) {
 
 const history = execFileSync(
   "git",
-  ["log", "--all", "-p", "--full-history", "--no-ext-diff", "--no-color", "--text"],
+  [
+    "log",
+    "--all",
+    "-p",
+    "--full-history",
+    "--no-ext-diff",
+    "--no-color",
+    "--text",
+  ],
   { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 },
 );
 scanText("git-history", history, findings);
