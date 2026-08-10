@@ -1,0 +1,47 @@
+{
+  "name": "@lowcountry-digital-works/document-control",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@11.16.0",
+  "description": "Clean-room, tenant-aware document control foundation for Cloudflare Workers.",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "wrangler deploy --dry-run --outdir dist",
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm secrets:scan && pnpm test:unit && pnpm build",
+    "db:migrate:local": "wrangler d1 migrations apply DOCUMENT_CONTROL_DB --local",
+    "db:migrate:remote": "wrangler d1 migrations apply DOCUMENT_CONTROL_DB --remote",
+    "deploy:preview": "wrangler versions upload",
+    "dev": "wrangler dev --local --port 8787",
+    "e2e:server": "tsx scripts/e2e-server.ts",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint .",
+    "secrets:scan": "tsx scripts/scan-secrets.ts",
+    "test:e2e": "playwright test",
+    "test:unit": "vitest run",
+    "test:unit:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "hono": "4.13.1"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.12.1",
+    "@cloudflare/workers-types": "5.20260801.1",
+    "@eslint/js": "10.0.1",
+    "@hono/node-server": "2.1.0",
+    "@playwright/test": "1.62.1",
+    "@types/node": "22.17.2",
+    "eslint": "10.8.1",
+    "globals": "17.9.0",
+    "prettier": "3.9.6",
+    "tsx": "4.23.11",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.66.0",
+    "vitest": "4.1.10",
+    "wrangler": "4.120.0"
+  }
+}
