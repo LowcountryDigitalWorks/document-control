@@ -1,5 +1,37 @@
 import type { DatabaseProvider } from "./ports";
 
+export const documentStatuses = [
+  "draft",
+  "in_review",
+  "approved",
+  "superseded",
+  "retired",
+] as const;
+export type DocumentStatusFilter = (typeof documentStatuses)[number];
+
+export const templateLifecycleStates = [
+  "draft",
+  "review",
+  "approved",
+  "published",
+  "superseded",
+  "retired",
+] as const;
+export type TemplateLifecycleFilter = (typeof templateLifecycleStates)[number];
+
+export type CurrentApprovalFilter = "approved" | "required";
+
+export interface WorkspaceDocumentFilters {
+  query?: string;
+  status?: DocumentStatusFilter;
+  currentApproval?: CurrentApprovalFilter;
+}
+
+export interface WorkspaceTemplateFilters {
+  query?: string;
+  lifecycle?: TemplateLifecycleFilter;
+}
+
 export interface WorkspaceOverview {
   tenantId: string;
   workspaceId: string;
@@ -60,6 +92,8 @@ interface TemplateRow {
   provenance: string | null;
 }
 
+const maximumListResults = 100;
+
 export class WorkspaceReadService {
   public constructor(private readonly database: DatabaseProvider) {}
 
@@ -117,7 +151,34 @@ export class WorkspaceReadService {
   public async listDocuments(
     tenantId: string,
     workspaceId: string,
+    filters: WorkspaceDocumentFilters = {},
   ): Promise<readonly WorkspaceDocumentListItem[]> {
+    const conditions = ["document.tenant_id = ?", "document.workspace_id = ?"];
+    const parameters: unknown[] = [tenantId, workspaceId];
+
+    if (filters.query) {
+      conditions.push("document.title COLLATE NOCASE LIKE ? ESCAPE '\\'");
+      parameters.push(`%${escapeLikePattern(filters.query)}%`);
+    }
+    if (filters.status) {
+      conditions.push("document.status = ?");
+      parameters.push(filters.status);
+    }
+    if (filters.currentApproval) {
+      const exactApproval = `version.id IS NOT NULL AND EXISTS (
+        SELECT 1 FROM approvals approval_filter
+        WHERE approval_filter.tenant_id = document.tenant_id
+          AND approval_filter.document_id = document.id
+          AND approval_filter.document_version_id = version.id
+          AND approval_filter.content_hash = version.content_hash
+      )`;
+      conditions.push(
+        filters.currentApproval === "approved"
+          ? `(${exactApproval})`
+          : `NOT (${exactApproval})`,
+      );
+    }
+
     const rows = await this.database.query<DocumentRow>(
       `SELECT
          document.id,
@@ -139,9 +200,10 @@ export class WorkspaceReadService {
          ON version.id = document.current_version_id
         AND version.tenant_id = document.tenant_id
         AND version.document_id = document.id
-       WHERE document.tenant_id = ? AND document.workspace_id = ?
-       ORDER BY document.updated_at DESC, document.title ASC`,
-      [tenantId, workspaceId],
+       WHERE ${conditions.join(" AND ")}
+       ORDER BY document.updated_at DESC, document.title COLLATE NOCASE ASC
+       LIMIT ${maximumListResults}`,
+      parameters,
     );
 
     return rows.map((row) => ({
@@ -159,7 +221,20 @@ export class WorkspaceReadService {
   public async listTemplates(
     tenantId: string,
     workspaceId: string,
+    filters: WorkspaceTemplateFilters = {},
   ): Promise<readonly WorkspaceTemplateListItem[]> {
+    const conditions = ["template.tenant_id = ?", "template.workspace_id = ?"];
+    const parameters: unknown[] = [tenantId, workspaceId];
+
+    if (filters.query) {
+      conditions.push("template.name COLLATE NOCASE LIKE ? ESCAPE '\\'");
+      parameters.push(`%${escapeLikePattern(filters.query)}%`);
+    }
+    if (filters.lifecycle) {
+      conditions.push("version.lifecycle_state = ?");
+      parameters.push(filters.lifecycle);
+    }
+
     const rows = await this.database.query<TemplateRow>(
       `SELECT
          template.id,
@@ -173,9 +248,10 @@ export class WorkspaceReadService {
          ON version.template_id = template.id
         AND version.tenant_id = template.tenant_id
         AND version.version_number = template.current_version
-       WHERE template.tenant_id = ? AND template.workspace_id = ?
-       ORDER BY template.name ASC`,
-      [tenantId, workspaceId],
+       WHERE ${conditions.join(" AND ")}
+       ORDER BY template.name COLLATE NOCASE ASC
+       LIMIT ${maximumListResults}`,
+      parameters,
     );
 
     return rows.map((row) => ({
@@ -187,4 +263,8 @@ export class WorkspaceReadService {
       provenance: row.provenance ?? undefined,
     }));
   }
+}
+
+function escapeLikePattern(value: string): string {
+  return value.replace(/[\\%_]/g, (character) => `\\${character}`);
 }

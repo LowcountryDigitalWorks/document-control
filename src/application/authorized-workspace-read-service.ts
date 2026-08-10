@@ -1,8 +1,10 @@
 import type { AuthorizationPolicy } from "./authorization";
 import type {
-  WorkspaceReadService,
+  WorkspaceDocumentFilters,
   WorkspaceDocumentListItem,
   WorkspaceOverview,
+  WorkspaceReadService,
+  WorkspaceTemplateFilters,
   WorkspaceTemplateListItem,
 } from "./workspace-read-service";
 
@@ -38,6 +40,7 @@ export class AuthorizedWorkspaceReadService {
 
   public async listDocuments(
     context: WorkspaceReadContext,
+    filters: WorkspaceDocumentFilters = {},
   ): Promise<readonly WorkspaceDocumentListItem[]> {
     await this.authorization.assertAllowed({
       subjectId: context.subjectId,
@@ -45,11 +48,16 @@ export class AuthorizedWorkspaceReadService {
       workspaceId: context.workspaceId,
       permission: "document.read",
     });
-    return this.read.listDocuments(context.tenantId, context.workspaceId);
+    return this.read.listDocuments(
+      context.tenantId,
+      context.workspaceId,
+      filters,
+    );
   }
 
   public async listTemplates(
     context: WorkspaceReadContext,
+    filters: WorkspaceTemplateFilters = {},
   ): Promise<readonly WorkspaceTemplateListItem[]> {
     await this.authorization.assertAllowed({
       subjectId: context.subjectId,
@@ -57,6 +65,10 @@ export class AuthorizedWorkspaceReadService {
       workspaceId: context.workspaceId,
       permission: "template.read",
     });
-    return this.read.listTemplates(context.tenantId, context.workspaceId);
+    return this.read.listTemplates(
+      context.tenantId,
+      context.workspaceId,
+      filters,
+    );
   }
 }
