@@ -23,17 +23,29 @@ test("shows the append-only workspace audit stream newest first", async ({
   await page.goto("/demo/app/audit");
 
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Audit Log");
-  await expect(page.getByText("Synthetic Auditor · read-only UI")).toBeVisible();
+  await expect(
+    page.getByText("Synthetic Auditor · read-only UI"),
+  ).toBeVisible();
   await expect(page.getByText(/6 events shown/)).toBeVisible();
 
   const cards = page.locator(".audit-card");
   await expect(cards).toHaveCount(6);
   await expect(cards.nth(0)).toContainText("Document · Version · Created");
-  await expect(page.getByText("Document · Created from template", { exact: true })).toBeVisible();
-  await expect(page.getByText("Workflow · Started", { exact: true })).toBeVisible();
-  await expect(page.getByText("Workflow · Transitioned", { exact: true })).toBeVisible();
-  await expect(page.getByText("Document · Version · Reviewed", { exact: true })).toBeVisible();
-  await expect(page.getByText("Document · Version · Approved", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("Document · Created from template", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Workflow · Started", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Workflow · Transitioned", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Document · Version · Reviewed", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Document · Version · Approved", { exact: true }),
+  ).toBeVisible();
   await expect(page.getByText("Alex Approver", { exact: true })).toBeVisible();
 
   const accessibility = await new AxeBuilder({ page }).analyze();
@@ -49,16 +61,26 @@ test("filters audit events with bounded literal search", async ({ page }) => {
   await completeChangedVersionLifecycle(page);
 
   await page.goto("/demo/app/audit?q=Alex%20Approver");
-  await expect(page.getByText("1 event matched.", { exact: false })).toBeVisible();
-  await expect(page.getByText("Document · Version · Approved", { exact: true })).toBeVisible();
-  await expect(page.getByLabel("Event, entity, ID, or actor contains")).toHaveValue(
-    "Alex Approver",
-  );
+  await expect(
+    page.getByText("1 event matched.", { exact: false }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Document · Version · Approved", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByLabel("Event, entity, ID, or actor contains"),
+  ).toHaveValue("Alex Approver");
 
   await page.goto("/demo/app/audit?q=workflow");
-  await expect(page.getByText("2 events matched.", { exact: false })).toBeVisible();
-  await expect(page.getByText("Workflow · Started", { exact: true })).toBeVisible();
-  await expect(page.getByText("Workflow · Transitioned", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("2 events matched.", { exact: false }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Workflow · Started", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Workflow · Transitioned", { exact: true }),
+  ).toBeVisible();
 
   await page.goto("/demo/app/audit?q=workflow%25");
   await expect(
@@ -88,10 +110,14 @@ test("keeps workspace audit history isolated between synthetic sessions", async 
       .getByRole("button", { name: "Create from approved template" })
       .click();
     await firstPage.goto("http://127.0.0.1:8787/demo/app/audit");
-    await expect(firstPage.getByText("1 event shown.", { exact: false })).toBeVisible();
+    await expect(
+      firstPage.getByText("1 event shown.", { exact: false }),
+    ).toBeVisible();
 
     await secondPage.goto("http://127.0.0.1:8787/demo/app/audit");
-    await expect(secondPage.getByText("0 events shown.", { exact: false })).toBeVisible();
+    await expect(
+      secondPage.getByText("0 events shown.", { exact: false }),
+    ).toBeVisible();
     await expect(
       secondPage.getByText("Document · Created from template", { exact: true }),
     ).toHaveCount(0);

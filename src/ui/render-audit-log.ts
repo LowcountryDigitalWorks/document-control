@@ -103,10 +103,7 @@ function renderAuditItem(item: AuditLogItem): string {
 }
 
 function humanizeEvent(value: string): string {
-  return value
-    .split(".")
-    .map(humanize)
-    .join(" · ");
+  return value.split(".").map(humanize).join(" · ");
 }
 
 function humanize(value: string): string {

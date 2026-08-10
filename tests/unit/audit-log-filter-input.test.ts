@@ -12,9 +12,7 @@ describe("audit log filter input", () => {
   });
 
   it("omits blank search text", () => {
-    expect(parseAuditLogFilters(new URLSearchParams({ q: "   " }))).toEqual(
-      {},
-    );
+    expect(parseAuditLogFilters(new URLSearchParams({ q: "   " }))).toEqual({});
   });
 
   it("rejects search text over the fixed bound", () => {

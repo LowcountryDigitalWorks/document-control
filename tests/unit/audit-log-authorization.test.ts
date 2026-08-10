@@ -55,9 +55,9 @@ describe("AuthorizedAuditLogReadService", () => {
   it("does not query audit data after authorization denial", async () => {
     const harness = createHarness(true);
 
-    await expect(harness.service.listAuditEvents(context)).rejects.toBeInstanceOf(
-      AuthorizationDeniedError,
-    );
+    await expect(
+      harness.service.listAuditEvents(context),
+    ).rejects.toBeInstanceOf(AuthorizationDeniedError);
     expect(harness.listAuditEvents).not.toHaveBeenCalled();
   });
 });
