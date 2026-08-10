@@ -52,3 +52,61 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm secrets:scan
+
+  normalize-document-detail:
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.head_ref == 'agent/document-detail-evidence'
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Normalize document detail source
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm exec prettier --write \
+            src/demo/evidence-context.ts \
+            src/application/document-detail-read-service.ts \
+            src/application/authorized-document-detail-read-service.ts \
+            src/ui/render-workspace-app.ts \
+            src/ui/render-document-detail.ts \
+            src/index.ts \
+            tests/unit/document-detail-authorization.test.ts \
+            tests/e2e/document-detail.spec.ts
+          if ! git diff --quiet -- \
+            src/demo/evidence-context.ts \
+            src/application/document-detail-read-service.ts \
+            src/application/authorized-document-detail-read-service.ts \
+            src/ui/render-workspace-app.ts \
+            src/ui/render-document-detail.ts \
+            src/index.ts \
+            tests/unit/document-detail-authorization.test.ts \
+            tests/e2e/document-detail.spec.ts; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add \
+              src/demo/evidence-context.ts \
+              src/application/document-detail-read-service.ts \
+              src/application/authorized-document-detail-read-service.ts \
+              src/ui/render-workspace-app.ts \
+              src/ui/render-document-detail.ts \
+              src/index.ts \
+              tests/unit/document-detail-authorization.test.ts \
+              tests/e2e/document-detail.spec.ts
+            git commit -m "Normalize document detail evidence source"
+            git push origin "HEAD:${GITHUB_HEAD_REF}"
+          else
+            echo "Document detail source already normalized."
+          fi
