@@ -4,10 +4,11 @@
 
 `main` is the authoritative product foundation.
 
-Merged milestones:
+Merged milestones before the guided UI slice:
 
 - PR #1, bootstrap foundation → `e5902256cfbe1f36b67143cae8daf687fe684732`.
 - PR #7, persisted document workflow → `2c4d07c54738d59dcdceaa488d9deeafd39853d1`.
+- PR #8, provider-neutral authorization boundary → `119f6d8d29291662b5ec5c788706f1d093723bac`.
 
 The repository is public by explicit owner decision. Package metadata remains `private: true` only to
 prevent accidental package-registry publication. No production Cloudflare resources, customer data,
@@ -62,28 +63,50 @@ Authorization is intentionally separate from authentication.
 - Authentication/session/SSO selection is still deferred; no credentials or provider secrets are
   stored by this boundary.
 
+## Guided workflow UI boundary
+
+The repository includes a guided synthetic HTTP/UI path that exercises the real authorization and
+persistence services. It is intentionally disabled unless `DEMO_MUTATIONS_ENABLED=true`.
+
+The browser supplies only the next allowed guided action. The server assigns all synthetic tenant,
+workspace, identity, role, workflow, template, and document context.
+
+Each browser context receives an opaque UUID through an HttpOnly, SameSite=Strict cookie scoped to
+`/demo/workflow`. The UUID is validated by the server and used only to namespace server-generated
+synthetic record IDs. It is not an identity credential and does not encode tenant/user/role authority.
+Independent browser contexts therefore receive independent synthetic tenants and workflow state.
+
+POST actions require a same-origin `Origin` header. There are no arbitrary input fields or file
+uploads in the guided flow.
+
+**Do not enable this interactive route on a shared public deployment yet.** The cookie has a one-hour
+browser lifetime, but cookie expiration does not delete D1 rows. Public enablement requires a durable
+server-side demo-session lifecycle with expiration/purge, quotas, rate limiting, Turnstile/abuse
+controls, and operational cleanup first.
+
 ## Continue locally
 
 1. Install Node.js 22 or newer.
 2. Run `pnpm install --frozen-lockfile`.
-3. Run `pnpm db:migrate:local`.
-4. Run `pnpm dev` and open `http://127.0.0.1:8787`.
-5. Run `pnpm check` and `pnpm test:e2e` before proposing changes.
+3. Run `pnpm db:migrate:local` so both migrations are applied.
+4. Run `pnpm dev` for the normal Worker; guided mutations remain disabled by default.
+5. Run `pnpm test:e2e` to exercise the isolated guided workflow through the SQLite-backed D1 test
+   binding.
+6. Run `pnpm check` and `pnpm test:e2e` before proposing changes.
 
 ## Next product slice
 
-After the authorization boundary is merged, wire the authorized persisted service into
-**tenant-scoped HTTP/UI routes using synthetic/demo-safe identity context only**.
+After the guided workflow UI is merged, keep the interactive demo disabled publicly and build the
+next ordinary application surface without choosing production authentication prematurely.
 
-The UI should make the document lifecycle understandable to an ordinary office-document user and
-visibly demonstrate:
+Recommended next slice: tenant/workspace document and template **read/navigation screens** backed by
+the authorization boundary, using synthetic/test identity context only. This begins turning the
+guided proof into understandable product navigation while avoiding customer uploads and public demo
+abuse exposure.
 
-`template -> document -> review -> approval -> changed version -> old approval no longer applies`
+A separate later slice should implement public-demo session persistence, expiry/purge, quotas, rate
+limits, Turnstile, and reset behavior before any shared public interactive deployment is approved.
 
-The HTTP layer must use `AuthorizedDocumentWorkflowService`. Do not choose a production identity
-provider merely to build the UI slice. A synthetic/demo identity context may be used only where it is
-clearly isolated and cannot be mistaken for production authentication.
-
-Keep arbitrary/customer uploads out of scope. Do not introduce them until permitted-data policy,
-content types, size limits, malware scanning, retention, authorization, backup/recovery, and
-failure/compensation behavior are explicitly approved.
+Keep arbitrary/customer uploads out of scope until permitted-data policy, content types, size limits,
+malware scanning, retention, authorization, backup/recovery, and failure/compensation behavior are
+explicitly approved.
