@@ -1,6 +1,8 @@
 # Status
 
-## Implemented in the bootstrap
+## Implemented
+
+### Bootstrap foundation
 
 - TypeScript Worker and Hono routing skeleton.
 - Authoritative D1/SQLite migration with tenant-aware composite foreign keys and integrity triggers.
@@ -23,18 +25,45 @@
   checks.
 - Worker compatibility date refreshed to the current tested bootstrap date (`2026-08-10`).
 
+### Persisted workflow application service
+
+- `DatabaseProvider` supports transactional batches; the D1 adapter executes application state
+  changes through D1 batch operations.
+- Documents can be created from an approved/published template while preserving exact template
+  version, hash, and provenance metadata.
+- Workflow instances bind to the document's exact current version and exact workflow-definition
+  version.
+- Review decisions persist with audit evidence and advance the bound workflow according to its
+  versioned definition.
+- Approval is recorded atomically with the workflow/document state change and remains bound to the
+  exact document version and SHA-256 evidence.
+- Creating a changed document version makes the new version current, returns the document to draft,
+  and leaves prior approvals applicable only to their original versions.
+- A workflow for an older version cannot approve that older version after a newer version becomes
+  current.
+- Application-owned R2 content keys and canonical SHA-256 hashes are enforced at the service
+  boundary.
+- Executable SQLite tests cover the complete persisted lifecycle, transactional rollback, arbitrary
+  content-key rejection, and stale-version approval rejection.
+
+The persistence service currently records metadata/state and content references. It does **not**
+claim a cross-resource transaction between R2 binary creation and D1 metadata changes. Production
+upload orchestration, compensation, limits, and scanning remain future work before customer uploads.
+
 ## Repository posture
 
 - GitHub repository visibility: **public by explicit owner decision**.
 - Package metadata remains `private: true` only to prevent accidental package-registry publication.
+- Bootstrap PR #1 is merged; `main` is the authoritative foundation.
 - No production Cloudflare resources, custom domains, customer data, analytics, paid services, or
-  public-upload capability are introduced by the bootstrap PR.
+  public-upload capability have been introduced.
 
 ## Intentionally not implemented
 
 - Production authentication/SSO or authorization middleware.
 - Production tenant provisioning.
 - Customer or arbitrary public document uploads or malware scanning.
+- HTTP/UI wiring for the persisted workflow service.
 - Rich document authoring, retention automation, legal hold, full-text search, GRC frameworks, or
   AI functions.
 - PostgreSQL and SharePoint adapters; the provider boundaries remain the extension points.
