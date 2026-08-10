@@ -255,8 +255,43 @@ Turnstile/abuse controls, and operational cleanup are implemented and validated.
   cross-origin mutation denial, accessibility/responsive behavior, audit evidence, and independent
   synthetic-session isolation.
 - This slice deliberately does not accept logo/favicon uploads or external branding URLs and does not
-  add production authentication, tenant provisioning, role management UI, workflow/template mutation
-  UI, production Cloudflare resources, customer data, analytics, or paid services.
+  add production authentication, tenant provisioning, role-definition/workflow/template mutation UI,
+  production Cloudflare resources, customer data, analytics, or paid services.
+
+### Authorized workspace Roles & Access administration (synthetic/test only)
+
+- `/demo/app/admin/access` manages workspace-scoped role assignments over the existing
+  `tenant_memberships`, `role_definitions`, and `role_bindings` tables; no parallel ACL or access store
+  is introduced.
+- The synthetic route uses the server-controlled Tenant Administrator and requires `role.manage` at
+  the current workspace before the member/role/binding read model or any mutation is executed.
+- Assignment independently verifies that the target subject is an active member of the same tenant,
+  that the selected role has `workspace` scope, and that a tenant-defined role belongs to the same
+  tenant. Platform- and tenant-scoped roles cannot be assigned from this surface.
+- The screen is assignment-only: system and tenant-defined role definitions and their permission
+  lists are displayed read-only and are never edited by this slice.
+- Duplicate exact workspace assignments are treated as no-ops rather than creating a second binding or
+  duplicate audit evidence.
+- Removal is constrained to an existing binding in the current tenant/workspace. As a conservative
+  self-lockout safeguard, an acting administrator cannot remove their own workspace binding when that
+  role grants `role.manage` or wildcard authority.
+- Successful changes use the existing transactional database abstraction and append
+  `role.binding.created` / `role.binding.removed` events to the existing immutable audit stream with
+  the subject, role-definition ID, and role key. Existing Backup & Portability export includes the
+  resulting role bindings automatically.
+- Administration POSTs require the validated synthetic session, fixed expected form fields, bounded
+  identifier validation, and same-origin enforcement. The browser cannot select the acting subject,
+  tenant, workspace, or authorization scope.
+- The UI also shows tenant membership status and eligible workspace role permissions for context, but
+  does not invite/create members, change membership state, configure an identity provider, or assign
+  tenant/platform roles.
+- Executable SQLite coverage verifies assign/remove/audit behavior, duplicate no-op behavior,
+  suspended-member and tenant-role rejection, and the self-role-management removal guard. Browser
+  coverage verifies assignment/removal, audit evidence, scope rejection, cross-origin denial,
+  accessibility/responsiveness, and independent synthetic-session isolation.
+- This slice does not add production authentication, SSO/group mapping, custom role-definition
+  creation/editing, tenant/platform binding administration, member invitations/provisioning,
+  production Cloudflare resources, or paid services.
 
 All app-shaped `/demo` screens remain product-shape proofs, not an authenticated production tenant
 application. They remain behind the synthetic/test demo flag and must not be represented as
@@ -268,8 +303,8 @@ production authentication or public-demo hardening.
 - Package metadata remains `private: true` only to prevent accidental package-registry publication.
 - Milestones include bootstrap PR #1, persisted-workflow PR #7, authorization PR #8, guided-workflow
   UI PR #9, workspace navigation PR #10, document evidence PR #11, Reviews & Approvals PR #12,
-  workspace search/filter PR #13, Backup & Portability PR #14, workspace Audit Log PR #15, and
-  tenant presentation administration PR #16.
+  workspace search/filter PR #13, Backup & Portability PR #14, workspace Audit Log PR #15,
+  tenant presentation administration PR #16, and workspace Roles & Access administration PR #17.
 - `main` is the authoritative integration branch after reviewed/validated pull requests are merged.
 - No production Cloudflare resources, custom domains, customer data, analytics, paid services, or
   public-upload capability have been introduced.
@@ -285,9 +320,9 @@ production authentication or public-demo hardening.
   Turnstile, rate limiting, quotas, and abuse telemetry/controls.
 - Full-text/content-body search or an external/indexed search service; current search is bounded
   metadata filtering only.
-- Administration UI for role/binding management, workflow-definition management, or controlled
-  template lifecycle mutation; presentation settings are the only persisted configuration edits so
-  far.
+- Custom/system role-definition creation/editing or permission-authoring UI; tenant/platform role
+  assignment administration; member invitations/provisioning; or identity-provider/group mapping.
+- Workflow-definition management or controlled-template lifecycle mutation UI.
 - Logo/favicon upload or external branding-asset URL management.
 - Rich document authoring, retention automation, legal hold, GRC frameworks, or AI functions.
 - PostgreSQL and SharePoint adapters; the provider boundaries remain the extension points.
