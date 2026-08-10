@@ -52,3 +52,137 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm secrets:scan
+
+  wire-audit-log:
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.head_ref == 'agent/audit-log'
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Wire Audit Log route and navigation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          index = Path('src/index.ts')
+          text = index.read_text()
+          replacements = [
+              (
+                  'import { AuthorizationDeniedError } from "./application/authorization";\n',
+                  'import { AuditLogFilterValidationError, parseAuditLogFilters } from "./application/audit-log-filter-input";\nimport { AuditLogReadService } from "./application/audit-log-read-service";\nimport { AuthorizationDeniedError } from "./application/authorization";\nimport { AuthorizedAuditLogReadService } from "./application/authorized-audit-log-read-service";\n',
+              ),
+              (
+                  'import { ensureGuidedBackupAdmin } from "./demo/backup-context";\n',
+                  'import { ensureGuidedAuditor } from "./demo/audit-context";\nimport { ensureGuidedBackupAdmin } from "./demo/backup-context";\n',
+              ),
+              (
+                  'import { renderBackupPortability } from "./ui/render-backup-portability";\n',
+                  'import { renderAuditLog } from "./ui/render-audit-log";\nimport { renderBackupPortability } from "./ui/render-backup-portability";\n',
+              ),
+          ]
+          for old, new in replacements:
+              if old not in text:
+                  raise SystemExit(f'missing import marker: {old}')
+              text = text.replace(old, new, 1)
+
+          marker = 'app.get("/demo/app/admin/backup", async (context) => {'
+          route = '''app.get("/demo/app/audit", async (context) => {
+            if (!guidedDemoEnabled(context.env)) {
+              return context.html(renderNotFound(createTheme(context.env)), 404);
+            }
+
+            let filters;
+            try {
+              filters = parseAuditLogFilters(new URL(context.req.url).searchParams);
+            } catch (error) {
+              if (error instanceof AuditLogFilterValidationError) {
+                return context.text(error.message, 400);
+              }
+              throw error;
+            }
+
+            const session = resolveGuidedDemoSession(
+              context.req.header("Cookie"),
+              context.req.url,
+            );
+            if (session.setCookie) {
+              context.header("Set-Cookie", session.setCookie);
+            }
+            const database = new D1DatabaseProvider(context.env.DOCUMENT_CONTROL_DB);
+            const demo = createGuidedDemoContext(session.sessionId);
+            await ensureGuidedDemoSeed(database, session.sessionId);
+            const auditor = await ensureGuidedAuditor(database, session.sessionId);
+            const items = await createAuthorizedAuditLogReadService(
+              database,
+            ).listAuditEvents(
+              {
+                subjectId: auditor.subjectId,
+                tenantId: demo.tenantId,
+                workspaceId: demo.workspaceId,
+              },
+              filters,
+            );
+            return context.html(
+              renderAuditLog(
+                createTheme(context.env),
+                demo.workspaceName,
+                items,
+                filters,
+              ),
+            );
+          });
+
+          '''
+          if marker not in text:
+              raise SystemExit('audit route insertion marker not found')
+          text = text.replace(marker, route + marker, 1)
+
+          helper_marker = '''function createAuthorizedPortableExportService(
+            database: D1DatabaseProvider,
+          ): AuthorizedPortableExportService {'''
+          helper = '''function createAuthorizedAuditLogReadService(
+            database: D1DatabaseProvider,
+          ): AuthorizedAuditLogReadService {
+            return new AuthorizedAuditLogReadService(
+              new AuditLogReadService(database),
+              new DatabaseAuthorizationPolicy(database),
+            );
+          }
+
+          '''
+          if helper_marker not in text:
+              raise SystemExit('audit helper insertion marker not found')
+          text = text.replace(helper_marker, helper + helper_marker, 1)
+          index.write_text(text)
+
+          ui = Path('src/ui/render-workspace-app.ts')
+          ui_text = ui.read_text()
+          nav_marker = '      <a href="/demo/app/reviews">Reviews &amp; Approvals</a>\n      <hr>'
+          nav_replacement = '      <a href="/demo/app/reviews">Reviews &amp; Approvals</a>\n      <a href="/demo/app/audit">Audit Log</a>\n      <hr>'
+          if nav_marker not in ui_text:
+              raise SystemExit('workspace navigation marker not found')
+          ui.write_text(ui_text.replace(nav_marker, nav_replacement, 1))
+          PY
+          pnpm exec prettier --write src/index.ts src/ui/render-workspace-app.ts
+          if ! git diff --quiet -- src/index.ts src/ui/render-workspace-app.ts; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add src/index.ts src/ui/render-workspace-app.ts
+            git commit -m "Wire Audit Log route and navigation"
+            git push origin "HEAD:${GITHUB_HEAD_REF}"
+          fi
