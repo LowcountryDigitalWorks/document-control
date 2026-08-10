@@ -48,7 +48,11 @@ describe("portable export", () => {
 
   it("rejects incomplete top-level structures instead of casting them", () => {
     const source = createSyntheticExport();
-    const { reviews: _reviews, ...withoutReviews } = source;
+    const withoutReviews = JSON.parse(JSON.stringify(source)) as Record<
+      string,
+      unknown
+    >;
+    delete withoutReviews.reviews;
 
     expect(() => parseExport(JSON.stringify(withoutReviews))).toThrow(
       /reviews must be an array/,
