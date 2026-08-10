@@ -1,4 +1,7 @@
-import { approveExactVersion, approvalAppliesToVersion } from "../domain/approval";
+import {
+  approveExactVersion,
+  approvalAppliesToVersion,
+} from "../domain/approval";
 import type {
   Approval,
   Document,
@@ -170,13 +173,19 @@ export class DocumentWorkflowService {
     );
 
     if (!template) {
-      throw new Error("The requested template version does not exist in this tenant.");
+      throw new Error(
+        "The requested template version does not exist in this tenant.",
+      );
     }
     if (template.workspaceId !== command.workspaceId) {
-      throw new Error("The requested template belongs to a different workspace.");
+      throw new Error(
+        "The requested template belongs to a different workspace.",
+      );
     }
     if (!["approved", "published"].includes(template.lifecycleState)) {
-      throw new Error("Documents can only be created from an approved template version.");
+      throw new Error(
+        "Documents can only be created from an approved template version.",
+      );
     }
 
     const version: DocumentVersion = {
@@ -238,10 +247,17 @@ export class DocumentWorkflowService {
     return version;
   }
 
-  public async startWorkflow(command: StartWorkflowCommand): Promise<WorkflowInstance> {
-    const document = await this.loadDocument(command.tenantId, command.documentId);
+  public async startWorkflow(
+    command: StartWorkflowCommand,
+  ): Promise<WorkflowInstance> {
+    const document = await this.loadDocument(
+      command.tenantId,
+      command.documentId,
+    );
     if (!document.currentVersionId) {
-      throw new Error("A document must have a current version before a workflow can start.");
+      throw new Error(
+        "A document must have a current version before a workflow can start.",
+      );
     }
     const definition = await this.loadWorkflowDefinition(
       command.tenantId,
@@ -303,17 +319,24 @@ export class DocumentWorkflowService {
     return instance;
   }
 
-  public async transition(command: TransitionWorkflowCommand): Promise<WorkflowInstance> {
+  public async transition(
+    command: TransitionWorkflowCommand,
+  ): Promise<WorkflowInstance> {
     const { instance, definition } = await this.loadWorkflowBundle(
       command.tenantId,
       command.workflowInstanceId,
     );
     if (command.targetState === "approved") {
-      throw new Error("Use approveCurrentVersion so approval evidence is recorded atomically.");
+      throw new Error(
+        "Use approveCurrentVersion so approval evidence is recorded atomically.",
+      );
     }
 
     const next = transitionWorkflow(instance, command.targetState, definition);
-    const document = await this.loadDocument(command.tenantId, instance.documentId);
+    const document = await this.loadDocument(
+      command.tenantId,
+      instance.documentId,
+    );
     const documentStatus = statusForWorkflowState(next.state);
     const statements: DatabaseStatement[] = [
       statement(
@@ -361,9 +384,14 @@ export class DocumentWorkflowService {
       command.workflowInstanceId,
     );
     if (instance.state !== "review") {
-      throw new Error("A review decision can only be recorded while the workflow is in review.");
+      throw new Error(
+        "A review decision can only be recorded while the workflow is in review.",
+      );
     }
-    const document = await this.loadDocument(command.tenantId, instance.documentId);
+    const document = await this.loadDocument(
+      command.tenantId,
+      instance.documentId,
+    );
 
     const review: Review = {
       id: command.reviewId,
@@ -449,17 +477,28 @@ export class DocumentWorkflowService {
       command.workflowInstanceId,
     );
     if (instance.state !== "approval") {
-      throw new Error("The workflow must be in approval before approval evidence is recorded.");
+      throw new Error(
+        "The workflow must be in approval before approval evidence is recorded.",
+      );
     }
-    const document = await this.loadDocument(command.tenantId, instance.documentId);
+    const document = await this.loadDocument(
+      command.tenantId,
+      instance.documentId,
+    );
     if (document.currentVersionId !== instance.documentVersionId) {
-      throw new Error("A superseded workflow version cannot be approved as the current document.");
+      throw new Error(
+        "A superseded workflow version cannot be approved as the current document.",
+      );
     }
     const version = await this.loadDocumentVersion(
       command.tenantId,
       instance.documentVersionId,
     );
-    const approvedInstance = transitionWorkflow(instance, "approved", definition);
+    const approvedInstance = transitionWorkflow(
+      instance,
+      "approved",
+      definition,
+    );
     const approval = approveExactVersion({
       id: command.approvalId,
       actorSubjectId: command.actorSubjectId,
@@ -490,16 +529,16 @@ export class DocumentWorkflowService {
       ),
       statement(
         "UPDATE workflow_instances SET state = ?, updated_at = ? WHERE id = ? AND tenant_id = ?",
-        [approvedInstance.state, command.occurredAt, instance.id, command.tenantId],
+        [
+          approvedInstance.state,
+          command.occurredAt,
+          instance.id,
+          command.tenantId,
+        ],
       ),
       statement(
         "UPDATE documents SET status = 'approved', updated_at = ? WHERE id = ? AND tenant_id = ? AND current_version_id = ?",
-        [
-          command.occurredAt,
-          document.id,
-          command.tenantId,
-          version.id,
-        ],
+        [command.occurredAt, document.id, command.tenantId, version.id],
       ),
       auditStatement({
         id: command.auditEventId,
@@ -525,7 +564,10 @@ export class DocumentWorkflowService {
     command: CreateChangedVersionCommand,
   ): Promise<DocumentVersion> {
     assertCanonicalHash(command.contentHash);
-    const document = await this.loadDocument(command.tenantId, command.documentId);
+    const document = await this.loadDocument(
+      command.tenantId,
+      command.documentId,
+    );
     assertExpectedContentKey({
       ...command,
       workspaceId: document.workspaceId,
@@ -553,7 +595,12 @@ export class DocumentWorkflowService {
       insertVersionStatement(version),
       statement(
         "UPDATE documents SET current_version_id = ?, status = 'draft', updated_at = ? WHERE id = ? AND tenant_id = ?",
-        [command.versionId, command.occurredAt, command.documentId, command.tenantId],
+        [
+          command.versionId,
+          command.occurredAt,
+          command.documentId,
+          command.tenantId,
+        ],
       ),
       auditStatement({
         id: command.auditEventId,
@@ -629,7 +676,10 @@ export class DocumentWorkflowService {
     return { document, currentVersion, versions };
   }
 
-  private async loadDocument(tenantId: string, documentId: string): Promise<Document> {
+  private async loadDocument(
+    tenantId: string,
+    documentId: string,
+  ): Promise<Document> {
     const [row] = await this.database.query<DocumentRow>(
       `SELECT
          id,
@@ -661,7 +711,9 @@ export class DocumentWorkflowService {
       [tenantId, versionId],
     );
     if (!row) {
-      throw new Error("Document version was not found in the requested tenant.");
+      throw new Error(
+        "Document version was not found in the requested tenant.",
+      );
     }
     return mapDocumentVersion(row);
   }
@@ -689,7 +741,9 @@ export class DocumentWorkflowService {
       [tenantId, definitionId, definitionVersion],
     );
     if (!row) {
-      throw new Error("Workflow definition was not found in the requested tenant.");
+      throw new Error(
+        "Workflow definition was not found in the requested tenant.",
+      );
     }
     return mapWorkflowDefinition(row);
   }
@@ -718,7 +772,9 @@ export class DocumentWorkflowService {
       [tenantId, instanceId],
     );
     if (!row) {
-      throw new Error("Workflow instance was not found in the requested tenant.");
+      throw new Error(
+        "Workflow instance was not found in the requested tenant.",
+      );
     }
     return {
       instance: {
@@ -856,7 +912,9 @@ function mapWorkflowDefinition(row: {
   }
   const record = parsed as Record<string, unknown>;
   if (!Array.isArray(record.states) || !Array.isArray(record.transitions)) {
-    throw new Error("Workflow definition JSON is missing states or transitions.");
+    throw new Error(
+      "Workflow definition JSON is missing states or transitions.",
+    );
   }
   const states = record.states.map((state) => {
     if (typeof state !== "string") {
@@ -873,7 +931,10 @@ function mapWorkflowDefinition(row: {
       throw new Error("Workflow transitions must be objects.");
     }
     const candidate = transition as Record<string, unknown>;
-    if (typeof candidate.from !== "string" || typeof candidate.to !== "string") {
+    if (
+      typeof candidate.from !== "string" ||
+      typeof candidate.to !== "string"
+    ) {
       throw new Error("Workflow transitions require string from/to states.");
     }
     return { from: candidate.from, to: candidate.to };
@@ -902,13 +963,17 @@ function assertExpectedContentKey(input: {
     versionId: input.versionId,
   });
   if (input.contentKey !== expected) {
-    throw new Error("Document content key must be generated by the application-owned key builder.");
+    throw new Error(
+      "Document content key must be generated by the application-owned key builder.",
+    );
   }
 }
 
 function assertCanonicalHash(hash: string): void {
   if (!/^sha256:[a-f0-9]{64}$/.test(hash)) {
-    throw new Error("Document versions require a canonical SHA-256 content hash.");
+    throw new Error(
+      "Document versions require a canonical SHA-256 content hash.",
+    );
   }
 }
 
