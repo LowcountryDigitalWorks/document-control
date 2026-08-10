@@ -69,11 +69,7 @@ function safeText(
   maximumLength: number,
 ): string {
   const value = configured?.trim();
-  if (
-    !value ||
-    value.length > maximumLength ||
-    /[\u0000-\u001f\u007f]/u.test(value)
-  ) {
+  if (!value || value.length > maximumLength || containsControlCharacter(value)) {
     return fallback;
   }
   return value;
@@ -82,4 +78,11 @@ function safeText(
 function safeColor(configured: string | undefined, fallback: string): string {
   const value = configured?.trim().toLowerCase();
   return value && /^#[0-9a-f]{6}$/u.test(value) ? value : fallback;
+}
+
+function containsControlCharacter(value: string): boolean {
+  return Array.from(value).some((character) => {
+    const code = character.charCodeAt(0);
+    return code <= 31 || code === 127;
+  });
 }
