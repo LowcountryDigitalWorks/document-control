@@ -21,10 +21,13 @@ test("navigates authorized workspace overview, templates, and documents", async 
 
   await page.getByRole("link", { name: "Templates", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Templates");
+  const templateCard = page.locator(".record-card").filter({
+    has: page.getByRole("heading", { name: "Standard Operating Procedure" }),
+  });
+  await expect(templateCard).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "Standard Operating Procedure" }),
+    templateCard.getByText("Published", { exact: true }),
   ).toBeVisible();
-  await expect(page.getByText("Published", { exact: true })).toBeVisible();
 
   await page.getByRole("link", { name: "Documents", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Documents");
