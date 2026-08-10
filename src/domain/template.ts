@@ -25,10 +25,8 @@ export function transitionTemplateVersion(
   return {
     ...version,
     lifecycleState: target,
-    publishedAt:
-      target === "published" ? occurredAt : version.publishedAt,
-    supersededAt:
-      target === "superseded" ? occurredAt : version.supersededAt,
+    publishedAt: target === "published" ? occurredAt : version.publishedAt,
+    supersededAt: target === "superseded" ? occurredAt : version.supersededAt,
   };
 }
 
