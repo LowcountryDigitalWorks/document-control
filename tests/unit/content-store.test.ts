@@ -24,10 +24,7 @@ class FakeR2Bucket {
       customMetadata?: Record<string, string>;
     },
   ): Promise<R2Object | null> {
-    if (
-      options?.onlyIf?.etagDoesNotMatch === "*" &&
-      this.objects.has(key)
-    ) {
+    if (options?.onlyIf?.etagDoesNotMatch === "*" && this.objects.has(key)) {
       return null;
     }
 
