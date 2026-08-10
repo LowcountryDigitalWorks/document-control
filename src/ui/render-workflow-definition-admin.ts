@@ -65,7 +65,10 @@ export function renderWorkflowDefinitionAdmin(
       <section class="panel" aria-labelledby="version-title">
         <p class="eyebrow">Immutable revision</p>
         <h2 id="version-title">Create next version</h2>
-        ${families.length === 0 ? '<p class="empty">No workflow families exist yet.</p>' : `<form method="post" action="/demo/app/admin/workflows/version">
+        ${
+          families.length === 0
+            ? '<p class="empty">No workflow families exist yet.</p>'
+            : `<form method="post" action="/demo/app/admin/workflows/version">
           <label>Existing workflow family
             <select name="workflowDefinitionId" required>
               <option value="">Select a workflow family</option>
@@ -74,7 +77,8 @@ export function renderWorkflowDefinitionAdmin(
           </label>
           ${definitionFields("Updated document workflow")}
           <button type="submit">Create next version</button>
-        </form>`}
+        </form>`
+        }
       </section>
     </div>
 

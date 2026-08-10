@@ -208,7 +208,9 @@ function mapCatalogRow(row: CatalogRow): WorkflowDefinitionRecord {
   }
   const record = parsed as Record<string, unknown>;
   if (!Array.isArray(record.states) || !Array.isArray(record.transitions)) {
-    throw new Error("Workflow definition JSON is missing states or transitions.");
+    throw new Error(
+      "Workflow definition JSON is missing states or transitions.",
+    );
   }
   const states = record.states.map((state) => {
     if (typeof state !== "string") {

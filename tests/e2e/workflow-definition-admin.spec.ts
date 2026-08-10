@@ -20,14 +20,20 @@ test("tenant administrator creates an immutable workflow family and next version
     page.getByText("Standard review and approval", { exact: true }).first(),
   ).toBeVisible();
 
-  const createForm = page.locator('form[action="/demo/app/admin/workflows/create"]');
+  const createForm = page.locator(
+    'form[action="/demo/app/admin/workflows/create"]',
+  );
   await createForm.locator('[name="name"]').fill("Records Review");
   await createForm.locator('[name="states"]').fill(states);
   await createForm.locator('[name="transitions"]').fill(transitions);
   await createForm.getByRole("button", { name: "Create workflow v1" }).click();
 
-  await expect(page).toHaveURL(/\/demo\/app\/admin\/workflows\?notice=created$/u);
-  await expect(page.getByRole("status")).toHaveText("Workflow definition created.");
+  await expect(page).toHaveURL(
+    /\/demo\/app\/admin\/workflows\?notice=created$/u,
+  );
+  await expect(page.getByRole("status")).toHaveText(
+    "Workflow definition created.",
+  );
   const createdCard = page
     .locator(".definition-card")
     .filter({ hasText: "Records Review" })
@@ -36,7 +42,9 @@ test("tenant administrator creates an immutable workflow family and next version
   const createdId = await createdCard.locator("code").first().textContent();
   expect(createdId).toBeTruthy();
 
-  const versionForm = page.locator('form[action="/demo/app/admin/workflows/version"]');
+  const versionForm = page.locator(
+    'form[action="/demo/app/admin/workflows/version"]',
+  );
   await versionForm
     .locator('[name="workflowDefinitionId"]')
     .selectOption(createdId ?? "");
@@ -45,10 +53,16 @@ test("tenant administrator creates an immutable workflow family and next version
   await versionForm
     .locator('[name="transitions"]')
     .fill(`${transitions}\napproval -> review`);
-  await versionForm.getByRole("button", { name: "Create next version" }).click();
+  await versionForm
+    .getByRole("button", { name: "Create next version" })
+    .click();
 
-  await expect(page).toHaveURL(/\/demo\/app\/admin\/workflows\?notice=versioned$/u);
-  await expect(page.getByRole("status")).toHaveText("Workflow version created.");
+  await expect(page).toHaveURL(
+    /\/demo\/app\/admin\/workflows\?notice=versioned$/u,
+  );
+  await expect(page.getByRole("status")).toHaveText(
+    "Workflow version created.",
+  );
   await expect(
     page
       .locator(".definition-card")
@@ -89,18 +103,28 @@ test("a newly created seeded-workflow version does not silently change the guide
   const seededId = await seededFamilyOption.getAttribute("value");
   expect(seededId).toBeTruthy();
 
-  const versionForm = page.locator('form[action="/demo/app/admin/workflows/version"]');
+  const versionForm = page.locator(
+    'form[action="/demo/app/admin/workflows/version"]',
+  );
   await versionForm
     .locator('[name="workflowDefinitionId"]')
     .selectOption(seededId ?? "");
-  await versionForm.locator('[name="name"]').fill("Standard review and approval v2");
+  await versionForm
+    .locator('[name="name"]')
+    .fill("Standard review and approval v2");
   await versionForm.locator('[name="states"]').fill(states);
   await versionForm.locator('[name="transitions"]').fill(transitions);
-  await versionForm.getByRole("button", { name: "Create next version" }).click();
+  await versionForm
+    .getByRole("button", { name: "Create next version" })
+    .click();
 
   await page.goto("/demo/workflow");
-  await page.getByRole("button", { name: "Create from approved template" }).click();
-  await page.getByRole("button", { name: "Submit version 1 for review" }).click();
+  await page
+    .getByRole("button", { name: "Create from approved template" })
+    .click();
+  await page
+    .getByRole("button", { name: "Submit version 1 for review" })
+    .click();
   await page.goto("/demo/app/documents");
   await page.getByRole("link", { name: "Harbor Opening Checklist" }).click();
   await expect(
@@ -125,7 +149,9 @@ test("rejects malformed and cross-origin workflow administration requests", asyn
     },
   });
   expect(invalid.status()).toBe(400);
-  expect(await invalid.text()).toContain("references a state that is not defined");
+  expect(await invalid.text()).toContain(
+    "references a state that is not defined",
+  );
 
   const crossOrigin = await page.request.post(
     "/demo/app/admin/workflows/create",

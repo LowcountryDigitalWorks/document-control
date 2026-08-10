@@ -67,7 +67,10 @@ async function createHarness(): Promise<{
   const database = new DatabaseSync(":memory:");
   for (const file of migrationFiles) {
     database.exec(
-      await readFile(new URL(`../../migrations/${file}`, import.meta.url), "utf8"),
+      await readFile(
+        new URL(`../../migrations/${file}`, import.meta.url),
+        "utf8",
+      ),
     );
   }
   database.exec(`
@@ -133,9 +136,9 @@ describe("WorkflowDefinitionAdminService", () => {
     expect(second.version).toBe(2);
 
     const catalog = await service.getCatalog("tenant-1", "workspace-1");
-    expect(catalog.definitions.map((definition) => definition.version)).toEqual([
-      2, 1,
-    ]);
+    expect(catalog.definitions.map((definition) => definition.version)).toEqual(
+      [2, 1],
+    );
     expect(catalog.definitions[1]?.name).toBe("Document Approval");
 
     expect(() =>

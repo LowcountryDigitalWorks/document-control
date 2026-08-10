@@ -22,7 +22,11 @@ const statePattern = /^[a-z][a-z0-9_-]*$/u;
 export function parseWorkflowDefinitionInput(
   values: URLSearchParams,
 ): WorkflowDefinitionInput {
-  const name = requiredText(values.get("name"), "Workflow name", maximumNameLength);
+  const name = requiredText(
+    values.get("name"),
+    "Workflow name",
+    maximumNameLength,
+  );
   const states = parseStates(values.get("states") ?? "");
   const transitions = parseTransitions(values.get("transitions") ?? "", states);
   return { name, states, transitions };
@@ -90,9 +94,7 @@ function parseTransitions(
   const stateSet = new Set(states);
   const seen = new Set<string>();
   return lines.map((line) => {
-    const match = /^([a-z][a-z0-9_-]*)\s*->\s*([a-z][a-z0-9_-]*)$/u.exec(
-      line,
-    );
+    const match = /^([a-z][a-z0-9_-]*)\s*->\s*([a-z][a-z0-9_-]*)$/u.exec(line);
     if (!match) {
       throw new WorkflowDefinitionInputValidationError(
         `Transition "${line}" must use the format from_state -> to_state.`,
