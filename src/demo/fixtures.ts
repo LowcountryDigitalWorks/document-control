@@ -73,15 +73,14 @@ export const syntheticIdentitySubjects: IdentitySubject[] = [
   syntheticApprover,
 ];
 
-export const syntheticMemberships: TenantMembership[] = syntheticIdentitySubjects.map(
-  (subject, index) => ({
+export const syntheticMemberships: TenantMembership[] =
+  syntheticIdentitySubjects.map((subject, index) => ({
     id: `membership-demo-${index + 1}`,
     tenantId: syntheticTenant.id,
     subjectId: subject.id,
     status: "active",
     createdAt: timestamp,
-  }),
-);
+  }));
 
 export const syntheticRoleDefinitions: RoleDefinition[] = [
   {
@@ -299,7 +298,10 @@ export const syntheticAuditEvents: AuditEvent[] = [
     entityType: "document_version",
     entityId: syntheticVersionOne.id,
     occurredAt: syntheticReview.createdAt,
-    payload: { reviewId: syntheticReview.id, decision: syntheticReview.decision },
+    payload: {
+      reviewId: syntheticReview.id,
+      decision: syntheticReview.decision,
+    },
   },
   {
     id: "audit-version-1-approved",
