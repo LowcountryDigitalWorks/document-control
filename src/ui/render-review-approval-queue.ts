@@ -105,7 +105,9 @@ function statusLabel(status: string): string {
 
 function formatTimestamp(value: string): string {
   const date = new Date(value);
-  return Number.isNaN(date.valueOf()) ? value : date.toISOString().replace("T", " ").slice(0, 16) + " UTC";
+  return Number.isNaN(date.valueOf())
+    ? value
+    : date.toISOString().replace("T", " ").slice(0, 16) + " UTC";
 }
 
 function shortHash(hash: string): string {

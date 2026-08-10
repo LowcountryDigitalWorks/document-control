@@ -39,10 +39,16 @@ export class AuthorizedReviewApprovalQueueReadService {
       workspaceId: context.workspaceId,
       permission: "document.approve",
     });
-    return this.read.listQueue(context.tenantId, context.workspaceId, "approval");
+    return this.read.listQueue(
+      context.tenantId,
+      context.workspaceId,
+      "approval",
+    );
   }
 
-  private async assertDocumentRead(context: WorkQueueReadContext): Promise<void> {
+  private async assertDocumentRead(
+    context: WorkQueueReadContext,
+  ): Promise<void> {
     await this.authorization.assertAllowed({
       subjectId: context.subjectId,
       tenantId: context.tenantId,

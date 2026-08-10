@@ -20,7 +20,9 @@ test("moves the exact current version through reviewer and approver queues", asy
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(
     "Reviewer queue",
   );
-  await expect(page.getByText("0 items awaiting review.", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("0 items awaiting review.", { exact: true }),
+  ).toBeVisible();
 
   await createAndSubmitForReview(page);
   await page.goto("/demo/app/reviews");
@@ -29,9 +31,15 @@ test("moves the exact current version through reviewer and approver queues", asy
     has: page.getByRole("heading", { name: "Harbor Opening Checklist" }),
   });
   await expect(reviewCard).toBeVisible();
-  await expect(reviewCard.getByText("Awaiting review", { exact: true })).toBeVisible();
-  await expect(reviewCard.getByText("Version 1", { exact: true })).toBeVisible();
-  await expect(reviewCard.getByText(/Standard review and approval · v1/)).toBeVisible();
+  await expect(
+    reviewCard.getByText("Awaiting review", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    reviewCard.getByText("Version 1", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    reviewCard.getByText(/Standard review and approval · v1/),
+  ).toBeVisible();
 
   const reviewAxe = await new AxeBuilder({ page }).analyze();
   expect(reviewAxe.violations).toEqual([]);
@@ -44,7 +52,9 @@ test("moves the exact current version through reviewer and approver queues", asy
   );
 
   await page.getByRole("link", { name: "Approver queue" }).click();
-  await expect(page.getByText("0 items awaiting approval.", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("0 items awaiting approval.", { exact: true }),
+  ).toBeVisible();
 
   await page.goto("/demo/workflow");
   await page
@@ -52,7 +62,9 @@ test("moves the exact current version through reviewer and approver queues", asy
     .click();
 
   await page.goto("/demo/app/reviews");
-  await expect(page.getByText("0 items awaiting review.", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("0 items awaiting review.", { exact: true }),
+  ).toBeVisible();
   await page.getByRole("link", { name: "Approver queue" }).click();
 
   const approvalCard = page.locator(".queue-card").filter({
@@ -62,22 +74,32 @@ test("moves the exact current version through reviewer and approver queues", asy
   await expect(
     approvalCard.getByText("Awaiting approval", { exact: true }),
   ).toBeVisible();
-  await expect(approvalCard.getByText("Version 1", { exact: true })).toBeVisible();
+  await expect(
+    approvalCard.getByText("Version 1", { exact: true }),
+  ).toBeVisible();
 
   await page.goto("/demo/workflow");
   await page.getByRole("button", { name: "Approve exact version 1" }).click();
   await page.goto("/demo/app/approvals");
-  await expect(page.getByText("0 items awaiting approval.", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("0 items awaiting approval.", { exact: true }),
+  ).toBeVisible();
 
   await page.goto("/demo/workflow");
   await page.getByRole("button", { name: "Create changed version 2" }).click();
   await page.goto("/demo/app/reviews");
-  await expect(page.getByText("0 items awaiting review.", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("0 items awaiting review.", { exact: true }),
+  ).toBeVisible();
   await page.goto("/demo/app/approvals");
-  await expect(page.getByText("0 items awaiting approval.", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("0 items awaiting approval.", { exact: true }),
+  ).toBeVisible();
 });
 
-test("keeps review work isolated between synthetic sessions", async ({ browser }) => {
+test("keeps review work isolated between synthetic sessions", async ({
+  browser,
+}) => {
   const firstContext = await browser.newContext();
   const secondContext = await browser.newContext();
   try {

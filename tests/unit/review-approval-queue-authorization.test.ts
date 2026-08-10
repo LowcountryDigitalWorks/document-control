@@ -84,9 +84,9 @@ describe("AuthorizedReviewApprovalQueueReadService", () => {
   it("does not query queue data when document.read is denied", async () => {
     const harness = createHarness("document.read");
 
-    await expect(harness.service.listReviewQueue(context)).rejects.toBeInstanceOf(
-      AuthorizationDeniedError,
-    );
+    await expect(
+      harness.service.listReviewQueue(context),
+    ).rejects.toBeInstanceOf(AuthorizationDeniedError);
     expect(harness.assertions).toHaveLength(1);
     expect(harness.listQueue).not.toHaveBeenCalled();
   });
