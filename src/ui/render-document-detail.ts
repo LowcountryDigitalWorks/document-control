@@ -194,7 +194,9 @@ function renderAudit(events: readonly DocumentAuditEvidence[]): string {
     .join("")}</ol>`;
 }
 
-function renderAuditPayload(payload: Readonly<Record<string, unknown>>): string {
+function renderAuditPayload(
+  payload: Readonly<Record<string, unknown>>,
+): string {
   const entries = Object.entries(payload).filter(([, value]) =>
     ["string", "number", "boolean"].includes(typeof value),
   );
@@ -204,7 +206,8 @@ function renderAuditPayload(payload: Readonly<Record<string, unknown>>): string 
   return `<dl class="payload">${entries
     .slice(0, 6)
     .map(
-      ([key, value]) => `<div><dt>${escapeHtml(labelFromKey(key))}</dt><dd>${escapeHtml(String(value))}</dd></div>`,
+      ([key, value]) =>
+        `<div><dt>${escapeHtml(labelFromKey(key))}</dt><dd>${escapeHtml(String(value))}</dd></div>`,
     )
     .join("")}</dl>`;
 }
@@ -216,10 +219,7 @@ function currentApprovalApplies(detail: DocumentDetailEvidence): boolean {
 }
 
 function eventLabel(eventType: string): string {
-  return eventType
-    .split(".")
-    .map(labelFromKey)
-    .join(" · ");
+  return eventType.split(".").map(labelFromKey).join(" · ");
 }
 
 function labelFromKey(value: string): string {
@@ -237,7 +237,9 @@ function lifecycleLabel(value: string): string {
 
 function formatTimestamp(value: string): string {
   const date = new Date(value);
-  return Number.isNaN(date.valueOf()) ? value : date.toISOString().replace("T", " ").slice(0, 19) + " UTC";
+  return Number.isNaN(date.valueOf())
+    ? value
+    : date.toISOString().replace("T", " ").slice(0, 19) + " UTC";
 }
 
 function shortHash(hash: string): string {

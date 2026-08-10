@@ -9,9 +9,7 @@ import {
 } from "./application/document-detail-read-service";
 import { serializeExport } from "./application/export";
 import { WorkspaceReadService } from "./application/workspace-read-service";
-import {
-  ensureGuidedEvidenceReader,
-} from "./demo/evidence-context";
+import { ensureGuidedEvidenceReader } from "./demo/evidence-context";
 import { createSyntheticExport } from "./demo/fixtures";
 import {
   createGuidedDemoContext,

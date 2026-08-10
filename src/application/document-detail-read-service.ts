@@ -443,7 +443,9 @@ function mapApproval(row: ApprovalRow): DocumentApprovalEvidence {
   };
 }
 
-function parseAuditPayload(serialized: string): Readonly<Record<string, unknown>> {
+function parseAuditPayload(
+  serialized: string,
+): Readonly<Record<string, unknown>> {
   const parsed: unknown = JSON.parse(serialized);
   if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
     throw new Error("Audit event payload must be a JSON object.");
