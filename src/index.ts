@@ -1,6 +1,12 @@
 import { Hono } from "hono";
 import { secureHeaders } from "hono/secure-headers";
+import {
+  AuditLogFilterValidationError,
+  parseAuditLogFilters,
+} from "./application/audit-log-filter-input";
+import { AuditLogReadService } from "./application/audit-log-read-service";
 import { AuthorizationDeniedError } from "./application/authorization";
+import { AuthorizedAuditLogReadService } from "./application/authorized-audit-log-read-service";
 import { AuthorizedDocumentDetailReadService } from "./application/authorized-document-detail-read-service";
 import { AuthorizedPortableExportService } from "./application/authorized-portable-export-service";
 import { AuthorizedReviewApprovalQueueReadService } from "./application/authorized-review-approval-queue-read-service";
@@ -18,6 +24,7 @@ import {
   WorkspaceFilterValidationError,
 } from "./application/workspace-filter-input";
 import { WorkspaceReadService } from "./application/workspace-read-service";
+import { ensureGuidedAuditor } from "./demo/audit-context";
 import { ensureGuidedBackupAdmin } from "./demo/backup-context";
 import { ensureGuidedEvidenceReader } from "./demo/evidence-context";
 import { createSyntheticExport } from "./demo/fixtures";
@@ -31,6 +38,7 @@ import {
 } from "./demo/workflow-demo";
 import { DatabaseAuthorizationPolicy } from "./infrastructure/database-authorization-policy";
 import { D1DatabaseProvider } from "./infrastructure/d1-database-provider";
+import { renderAuditLog } from "./ui/render-audit-log";
 import { renderBackupPortability } from "./ui/render-backup-portability";
 import { renderDocumentDetail } from "./ui/render-document-detail";
 import { renderGuidedDemo } from "./ui/render-guided-demo";
@@ -352,6 +360,52 @@ app.get("/demo/app/approvals", async (context) => {
   );
 });
 
+app.get("/demo/app/audit", async (context) => {
+  if (!guidedDemoEnabled(context.env)) {
+    return context.html(renderNotFound(createTheme(context.env)), 404);
+  }
+
+  let filters;
+  try {
+    filters = parseAuditLogFilters(new URL(context.req.url).searchParams);
+  } catch (error) {
+    if (error instanceof AuditLogFilterValidationError) {
+      return context.text(error.message, 400);
+    }
+    throw error;
+  }
+
+  const session = resolveGuidedDemoSession(
+    context.req.header("Cookie"),
+    context.req.url,
+  );
+  if (session.setCookie) {
+    context.header("Set-Cookie", session.setCookie);
+  }
+  const database = new D1DatabaseProvider(context.env.DOCUMENT_CONTROL_DB);
+  const demo = createGuidedDemoContext(session.sessionId);
+  await ensureGuidedDemoSeed(database, session.sessionId);
+  const auditor = await ensureGuidedAuditor(database, session.sessionId);
+  const items = await createAuthorizedAuditLogReadService(
+    database,
+  ).listAuditEvents(
+    {
+      subjectId: auditor.subjectId,
+      tenantId: demo.tenantId,
+      workspaceId: demo.workspaceId,
+    },
+    filters,
+  );
+  return context.html(
+    renderAuditLog(
+      createTheme(context.env),
+      demo.workspaceName,
+      items,
+      filters,
+    ),
+  );
+});
+
 app.get("/demo/app/admin/backup", async (context) => {
   if (!guidedDemoEnabled(context.env)) {
     return context.html(renderNotFound(createTheme(context.env)), 404);
@@ -458,6 +512,15 @@ function createAuthorizedReviewApprovalQueueReadService(
 ): AuthorizedReviewApprovalQueueReadService {
   return new AuthorizedReviewApprovalQueueReadService(
     new ReviewApprovalQueueReadService(database),
+    new DatabaseAuthorizationPolicy(database),
+  );
+}
+
+function createAuthorizedAuditLogReadService(
+  database: D1DatabaseProvider,
+): AuthorizedAuditLogReadService {
+  return new AuthorizedAuditLogReadService(
+    new AuditLogReadService(database),
     new DatabaseAuthorizationPolicy(database),
   );
 }

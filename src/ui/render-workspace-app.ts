@@ -238,6 +238,7 @@ function renderWorkspacePage(
       ${navLink("/demo/app/documents", "Documents", active === "documents")}
       ${navLink("/demo/app/templates", "Templates", active === "templates")}
       <a href="/demo/app/reviews">Reviews &amp; Approvals</a>
+      <a href="/demo/app/audit">Audit Log</a>
       <hr>
       <a href="/demo/workflow">Guided workflow</a>
       <a href="/">Product overview</a>

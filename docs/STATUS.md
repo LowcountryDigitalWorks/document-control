@@ -203,6 +203,28 @@ Turnstile/abuse controls, and operational cleanup are implemented and validated.
 - This slice is not production backup scheduling, disaster recovery, retention, deletion, legal
   hold, restore orchestration, or a claim that external content has been backed up.
 
+### Authorized workspace Audit Log (synthetic/test only)
+
+- `AuditLogReadService` reads the existing append-only `audit_events` table; it does not introduce a
+  second activity or logging store.
+- Every ledger query requires both the current tenant ID and workspace ID. Results are newest-first
+  and capped at 100 records with no client-controlled SQL sort or limit.
+- `AuthorizedAuditLogReadService` requires `audit.read` at workspace scope before the ledger query
+  runs. The synthetic route uses a server-controlled Auditor role rather than broadening an Author,
+  Reviewer, or Approver role for convenience.
+- `/demo/app/audit` is linked from ordinary workspace navigation and renders event type, entity
+  type/ID, actor display name, timestamp, and at most four primitive payload key/value summaries.
+  It does not expose unrestricted raw payload JSON in the list view.
+- Audit search is a bounded literal match across event type, entity type, entity ID, and actor display
+  name. Search text is trimmed/capped at 100 characters, SQL remains parameterized, and backslash,
+  `%`, and `_` are escaped so they do not become wildcard operators.
+- The Audit Log is read-only. Append-only database triggers remain authoritative for immutability;
+  the UI neither creates nor mutates audit rows.
+- Browser coverage generates events through the real document lifecycle, verifies the resulting
+  create/workflow/review/approval/change events newest-first, validates bounded filtering and
+  wildcard escaping, checks axe accessibility/responsive overflow, and proves separate synthetic
+  sessions cannot read one another's workspace audit history.
+
 All app-shaped `/demo` screens remain product-shape proofs, not an authenticated production tenant
 application. They remain behind the synthetic/test demo flag and must not be represented as
 production authentication or public-demo hardening.
@@ -213,7 +235,7 @@ production authentication or public-demo hardening.
 - Package metadata remains `private: true` only to prevent accidental package-registry publication.
 - Milestones include bootstrap PR #1, persisted-workflow PR #7, authorization PR #8, guided-workflow
   UI PR #9, workspace navigation PR #10, document evidence PR #11, Reviews & Approvals PR #12,
-  workspace search/filter PR #13, and Backup & Portability PR #14.
+  workspace search/filter PR #13, Backup & Portability PR #14, and workspace Audit Log PR #15.
 - `main` is the authoritative integration branch after reviewed/validated pull requests are merged.
 - No production Cloudflare resources, custom domains, customer data, analytics, paid services, or
   public-upload capability have been introduced.
@@ -235,6 +257,7 @@ production authentication or public-demo hardening.
 - PostgreSQL and SharePoint adapters; the provider boundaries remain the extension points.
 - Bundled R2/SharePoint binaries in portable exports.
 - Production backup scheduling, restore orchestration, disaster recovery, or retention automation.
+- External audit/SIEM export, long-term audit archival, or production log-retention policy.
 
 ## Decisions pending approval
 
@@ -242,6 +265,6 @@ production authentication or public-demo hardening.
   name; Bear Necessities remains a candidate low-cost/non-subscription deployment offering.
 - Production identity provider and role-provisioning/mapping model.
 - Malware scanning, allowed content types, and upload limits before customer uploads.
-- Record retention, deletion, legal hold, backup, and recovery requirements.
+- Record retention, deletion, legal hold, backup, recovery, and audit-retention requirements.
 - Production Cloudflare account resources and deployment naming.
 - Final LDW brand palette/assets; current theme values remain provisional configuration.
