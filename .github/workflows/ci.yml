@@ -150,20 +150,19 @@ jobs:
           status_text = status_text.replace(old_milestone, new_milestone, 1)
           status.write_text(status_text)
           PY
+          rm -f .github/portability-polish-trigger
           pnpm exec prettier --write \
             src/ui/render-workspace-app.ts \
             tests/e2e/backup-portability.spec.ts \
             docs/STATUS.md
-          if ! git diff --quiet -- \
-            src/ui/render-workspace-app.ts \
-            tests/e2e/backup-portability.spec.ts \
-            docs/STATUS.md; then
+          if ! git diff --quiet; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add \
               src/ui/render-workspace-app.ts \
               tests/e2e/backup-portability.spec.ts \
-              docs/STATUS.md
+              docs/STATUS.md \
+              .github/portability-polish-trigger
             git commit -m "Document and link Backup and Portability"
             git push origin "HEAD:${GITHUB_HEAD_REF}"
           fi
