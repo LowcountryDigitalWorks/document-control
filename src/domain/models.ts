@@ -13,24 +13,70 @@ export interface Workspace {
   name: string;
 }
 
-export type WorkspaceRole =
-  "owner" | "administrator" | "author" | "reviewer" | "approver" | "reader";
+export type IdentityProvider = "local" | "oidc" | "saml" | "entra" | "external";
 
-export interface RoleAssignment {
+export interface IdentitySubject {
+  id: Identifier;
+  displayName: string;
+  email?: string;
+  provider: IdentityProvider;
+  providerSubject?: string;
+  createdAt: IsoTimestamp;
+}
+
+export interface TenantMembership {
   id: Identifier;
   tenantId: Identifier;
-  workspaceId: Identifier;
-  actorId: Identifier;
-  role: WorkspaceRole;
+  subjectId: Identifier;
+  status: "active" | "suspended" | "invited";
+  createdAt: IsoTimestamp;
 }
+
+export type RoleScope = "platform" | "tenant" | "workspace";
+
+export interface RoleDefinition {
+  id: Identifier;
+  tenantId?: Identifier;
+  key: string;
+  name: string;
+  scope: RoleScope;
+  permissions: readonly string[];
+  isSystem: boolean;
+  createdAt: IsoTimestamp;
+}
+
+export interface RoleBinding {
+  id: Identifier;
+  roleDefinitionId: Identifier;
+  subjectId: Identifier;
+  tenantId?: Identifier;
+  workspaceId?: Identifier;
+  createdAt: IsoTimestamp;
+}
+
+export type DocumentStatus =
+  | "draft"
+  | "in_review"
+  | "approved"
+  | "superseded"
+  | "retired";
+
+export type TemplateProvenance =
+  | "approved_template"
+  | "exception_no_approved_template"
+  | "none";
 
 export interface Document {
   id: Identifier;
   tenantId: Identifier;
   workspaceId: Identifier;
   title: string;
-  status: "draft" | "in_review" | "approved" | "retired";
-  currentVersionId: Identifier;
+  status: DocumentStatus;
+  currentVersionId?: Identifier;
+  sourceTemplateId?: Identifier;
+  sourceTemplateVersion?: number;
+  sourceTemplateHash?: string;
+  templateProvenance: TemplateProvenance;
 }
 
 export interface DocumentVersion {
@@ -39,18 +85,47 @@ export interface DocumentVersion {
   documentId: Identifier;
   versionNumber: number;
   contentHash: string;
+  contentProvider: string;
   contentKey: string;
-  createdBy: Identifier;
+  createdBySubjectId: Identifier;
   createdAt: IsoTimestamp;
 }
+
+export type TemplateLifecycleState =
+  | "draft"
+  | "review"
+  | "approved"
+  | "published"
+  | "superseded"
+  | "retired";
 
 export interface Template {
   id: Identifier;
   tenantId: Identifier;
   workspaceId: Identifier;
   name: string;
-  status: "draft" | "approved" | "retired";
-  currentVersion: number;
+  currentVersion?: number;
+}
+
+export interface TemplateVersion {
+  id: Identifier;
+  tenantId: Identifier;
+  templateId: Identifier;
+  versionNumber: number;
+  lifecycleState: TemplateLifecycleState;
+  contentHash: string;
+  contentProvider: string;
+  contentKey: string;
+  createdBySubjectId: Identifier;
+  provenance: string;
+  createdAt: IsoTimestamp;
+  publishedAt?: IsoTimestamp;
+  supersededAt?: IsoTimestamp;
+}
+
+export interface WorkflowTransition {
+  from: string;
+  to: string;
 }
 
 export interface WorkflowDefinition {
@@ -58,11 +133,9 @@ export interface WorkflowDefinition {
   tenantId: Identifier;
   name: string;
   version: number;
-  states: readonly WorkflowState[];
+  states: readonly string[];
+  transitions: readonly WorkflowTransition[];
 }
-
-export type WorkflowState =
-  "draft" | "review" | "approval" | "approved" | "rejected";
 
 export interface WorkflowInstance {
   id: Identifier;
@@ -71,7 +144,7 @@ export interface WorkflowInstance {
   documentVersionId: Identifier;
   workflowDefinitionId: Identifier;
   workflowDefinitionVersion: number;
-  state: WorkflowState;
+  state: string;
 }
 
 export interface Review {
@@ -79,8 +152,9 @@ export interface Review {
   tenantId: Identifier;
   workflowInstanceId: Identifier;
   documentVersionId: Identifier;
-  actorId: Identifier;
+  actorSubjectId: Identifier;
   decision: "commented" | "accepted" | "changes_requested";
+  comment?: string;
   createdAt: IsoTimestamp;
 }
 
@@ -90,17 +164,29 @@ export interface Approval {
   documentId: Identifier;
   documentVersionId: Identifier;
   contentHash: string;
-  actorId: Identifier;
+  actorSubjectId: Identifier;
+  workflowInstanceId: Identifier;
   workflowDefinitionId: Identifier;
   workflowDefinitionVersion: number;
   approvedAt: IsoTimestamp;
+}
+
+export interface TenantConfiguration {
+  tenantId: Identifier;
+  permittedDataProfile:
+    | "ordinary_business"
+    | "regulated_approved"
+    | "demo_synthetic";
+  branding: Readonly<Record<string, string>>;
+  terminology: Readonly<Record<string, string>>;
+  updatedAt: IsoTimestamp;
 }
 
 export interface AuditEvent {
   id: Identifier;
   tenantId: Identifier;
   workspaceId: Identifier;
-  actorId: Identifier;
+  actorSubjectId: Identifier;
   eventType: string;
   entityType: string;
   entityId: Identifier;
