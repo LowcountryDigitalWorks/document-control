@@ -125,7 +125,10 @@ function parseGuidedDemoAction(value: string): GuidedDemoAction | null {
   return null;
 }
 
-function hasSameOrigin(requestUrl: string, origin: string | undefined): boolean {
+function hasSameOrigin(
+  requestUrl: string,
+  origin: string | undefined,
+): boolean {
   if (!origin) {
     return false;
   }

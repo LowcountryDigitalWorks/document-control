@@ -20,9 +20,15 @@ interface TestPreparedStatement {
 export async function createE2eD1Database(): Promise<D1Database> {
   const database = new DatabaseSync(":memory:");
   const migrations = await Promise.all([
-    readFile(new URL("../migrations/0001_initial.sql", import.meta.url), "utf8"),
     readFile(
-      new URL("../migrations/0002_system_role_permissions.sql", import.meta.url),
+      new URL("../migrations/0001_initial.sql", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL(
+        "../migrations/0002_system_role_permissions.sql",
+        import.meta.url,
+      ),
       "utf8",
     ),
   ]);
@@ -36,7 +42,9 @@ export async function createE2eD1Database(): Promise<D1Database> {
   ): TestPreparedStatement => ({
     bind: (...nextValues: unknown[]) => createPrepared(sql, nextValues),
     all: async <Row>() => {
-      const results = database.prepare(sql).all(...toSqlValues(values)) as Row[];
+      const results = database
+        .prepare(sql)
+        .all(...toSqlValues(values)) as Row[];
       return {
         success: true,
         results,

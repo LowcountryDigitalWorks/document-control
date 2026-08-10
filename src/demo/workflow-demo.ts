@@ -23,19 +23,10 @@ export const guidedDemo = {
 } as const;
 
 export type GuidedDemoAction =
-  | "create"
-  | "submit"
-  | "review"
-  | "approve"
-  | "change";
+  "create" | "submit" | "review" | "approve" | "change";
 
 export type GuidedDemoPhase =
-  | "ready"
-  | "created"
-  | "review"
-  | "approval"
-  | "approved"
-  | "changed";
+  "ready" | "created" | "review" | "approval" | "approved" | "changed";
 
 export interface GuidedDemoVersion {
   id: string;
@@ -106,7 +97,12 @@ export async function ensureGuidedDemoSeed(
     ),
     statement(
       "INSERT OR IGNORE INTO tenants (id, name, slug, created_at) VALUES (?, ?, ?, ?)",
-      [guidedDemo.tenantId, guidedDemo.tenantName, "guided-demo", seedTimestamp],
+      [
+        guidedDemo.tenantId,
+        guidedDemo.tenantName,
+        "guided-demo",
+        seedTimestamp,
+      ],
     ),
     statement(
       "INSERT OR IGNORE INTO workspaces (id, tenant_id, name, created_at) VALUES (?, ?, ?, ?)",
@@ -288,7 +284,9 @@ export async function runGuidedDemoAction(
 ): Promise<GuidedDemoState> {
   const current = await loadGuidedDemoState(database);
   if (current.nextAction !== action) {
-    throw new Error("That demo action is not valid for the current document state.");
+    throw new Error(
+      "That demo action is not valid for the current document state.",
+    );
   }
 
   const service = createAuthorizedService(database);
