@@ -56,9 +56,7 @@ app.get("/demo/workflow", async (context) => {
     return context.html(renderNotFound(createTheme(context.env)), 404);
   }
 
-  const existingSessionId = readGuidedDemoSession(
-    context.req.header("Cookie"),
-  );
+  const existingSessionId = readGuidedDemoSession(context.req.header("Cookie"));
   const sessionId = existingSessionId ?? crypto.randomUUID();
   if (!existingSessionId) {
     context.header(
@@ -154,7 +152,9 @@ function parseGuidedDemoAction(value: string): GuidedDemoAction | null {
   return null;
 }
 
-function readGuidedDemoSession(cookieHeader: string | undefined): string | null {
+function readGuidedDemoSession(
+  cookieHeader: string | undefined,
+): string | null {
   if (!cookieHeader) {
     return null;
   }

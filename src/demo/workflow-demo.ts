@@ -5,19 +5,10 @@ import { buildDocumentVersionContentKey } from "../infrastructure/content-key";
 import { DatabaseAuthorizationPolicy } from "../infrastructure/database-authorization-policy";
 
 export type GuidedDemoAction =
-  | "create"
-  | "submit"
-  | "review"
-  | "approve"
-  | "change";
+  "create" | "submit" | "review" | "approve" | "change";
 
 export type GuidedDemoPhase =
-  | "ready"
-  | "created"
-  | "review"
-  | "approval"
-  | "approved"
-  | "changed";
+  "ready" | "created" | "review" | "approval" | "approved" | "changed";
 
 export interface GuidedDemoContext {
   sessionId: string;
@@ -131,7 +122,12 @@ export async function ensureGuidedDemoSeed(
   await database.executeBatch([
     statement(
       "INSERT OR IGNORE INTO identity_subjects (id, display_name, provider, provider_subject, created_at) VALUES (?, ?, 'external', ?, ?)",
-      [demo.authorSubjectId, "Avery Author", demo.authorSubjectId, seedTimestamp],
+      [
+        demo.authorSubjectId,
+        "Avery Author",
+        demo.authorSubjectId,
+        seedTimestamp,
+      ],
     ),
     statement(
       "INSERT OR IGNORE INTO identity_subjects (id, display_name, provider, provider_subject, created_at) VALUES (?, ?, 'external', ?, ?)",
@@ -340,7 +336,8 @@ export async function runGuidedDemoAction(
   }
 
   const service = createAuthorizedService(database);
-  const id = (suffix: string) => `demo-${sessionId.replaceAll("-", "")}-${suffix}`;
+  const id = (suffix: string) =>
+    `demo-${sessionId.replaceAll("-", "")}-${suffix}`;
 
   if (action === "create") {
     await service.createDocumentFromTemplate({
