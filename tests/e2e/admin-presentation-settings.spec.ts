@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 const updatedValues = {
   workspaceName: "Client Library",
@@ -13,9 +13,7 @@ const updatedValues = {
   approvalTerm: "Sign-off",
 };
 
-async function updatePresentationSettings(
-  page: import("@playwright/test").Page,
-): Promise<void> {
+async function updatePresentationSettings(page: Page): Promise<void> {
   await page.goto("/demo/app/admin/settings");
   for (const [name, value] of Object.entries(updatedValues)) {
     await page.locator(`[name="${name}"]`).fill(value);
