@@ -225,6 +225,39 @@ Turnstile/abuse controls, and operational cleanup are implemented and validated.
   wildcard escaping, checks axe accessibility/responsive overflow, and proves separate synthetic
   sessions cannot read one another's workspace audit history.
 
+### Authorized tenant presentation administration (synthetic/test only)
+
+- `/demo/app/admin/settings` provides the first persisted Administration & Configuration surface over
+  the existing `tenant_configurations` and `workspaces` tables; it does not introduce a parallel
+  settings store.
+- The synthetic route always evaluates a server-controlled Tenant Administrator and requires both
+  `tenant.manage` at tenant scope and `workspace.manage` for the current workspace before reading or
+  changing settings.
+- Administrators can change the current workspace name, application/company presentation names,
+  primary/secondary/accent colors, and tenant terminology for workspace/document/approval concepts.
+  Stable tenant/workspace identifiers and the underlying domain model are not renamed.
+- The permitted-data profile is displayed but intentionally read-only. This UI cannot authorize a
+  regulated-data posture or silently change a deployment's data-handling boundary.
+- User-supplied presentation text is trimmed, length-bounded, and rejects control characters. Brand
+  colors must be exactly six-digit hexadecimal values, and persisted theme values are validated again
+  before entering server-rendered CSS.
+- Supported edits merge into existing branding/terminology objects so unknown future configuration
+  keys are preserved rather than silently deleted by the MVP form.
+- Successful changes are written transactionally through the existing database abstraction and emit
+  `tenant.presentation_settings.updated` into the existing append-only audit stream with the changed
+  field names; a no-op update does not create a change event.
+- Administration POSTs require the existing validated synthetic session and same-origin request
+  enforcement. The browser never selects the subject, tenant, workspace, role, or permission scope.
+- Persisted application/company names, colors, and workspace/document/approval terminology are applied
+  back to ordinary synthetic tenant screens at runtime, while malformed stored values fall back to
+  known-safe defaults.
+- Browser coverage verifies persistence, runtime presentation changes, invalid color rejection,
+  cross-origin mutation denial, accessibility/responsive behavior, audit evidence, and independent
+  synthetic-session isolation.
+- This slice deliberately does not accept logo/favicon uploads or external branding URLs and does not
+  add production authentication, tenant provisioning, role management UI, workflow/template mutation
+  UI, production Cloudflare resources, customer data, analytics, or paid services.
+
 All app-shaped `/demo` screens remain product-shape proofs, not an authenticated production tenant
 application. They remain behind the synthetic/test demo flag and must not be represented as
 production authentication or public-demo hardening.
@@ -235,7 +268,8 @@ production authentication or public-demo hardening.
 - Package metadata remains `private: true` only to prevent accidental package-registry publication.
 - Milestones include bootstrap PR #1, persisted-workflow PR #7, authorization PR #8, guided-workflow
   UI PR #9, workspace navigation PR #10, document evidence PR #11, Reviews & Approvals PR #12,
-  workspace search/filter PR #13, Backup & Portability PR #14, and workspace Audit Log PR #15.
+  workspace search/filter PR #13, Backup & Portability PR #14, workspace Audit Log PR #15, and
+  tenant presentation administration PR #16.
 - `main` is the authoritative integration branch after reviewed/validated pull requests are merged.
 - No production Cloudflare resources, custom domains, customer data, analytics, paid services, or
   public-upload capability have been introduced.
@@ -251,8 +285,10 @@ production authentication or public-demo hardening.
   Turnstile, rate limiting, quotas, and abuse telemetry/controls.
 - Full-text/content-body search or an external/indexed search service; current search is bounded
   metadata filtering only.
-- Administration/configuration UI for tenant/workspace/roles/branding/workflows/templates beyond the
-  Backup & Portability proof.
+- Administration UI for role/binding management, workflow-definition management, or controlled
+  template lifecycle mutation; presentation settings are the only persisted configuration edits so
+  far.
+- Logo/favicon upload or external branding-asset URL management.
 - Rich document authoring, retention automation, legal hold, GRC frameworks, or AI functions.
 - PostgreSQL and SharePoint adapters; the provider boundaries remain the extension points.
 - Bundled R2/SharePoint binaries in portable exports.
