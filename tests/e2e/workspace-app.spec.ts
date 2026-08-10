@@ -20,18 +20,14 @@ test("navigates authorized workspace overview, templates, and documents", async 
   expect(overviewAxe.violations).toEqual([]);
 
   await page.getByRole("link", { name: "Templates" }).click();
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText(
-    "Templates",
-  );
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Templates");
   await expect(
     page.getByRole("heading", { name: "Standard Operating Procedure" }),
   ).toBeVisible();
   await expect(page.getByText("Published", { exact: true })).toBeVisible();
 
   await page.getByRole("link", { name: "Documents" }).click();
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText(
-    "Documents",
-  );
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Documents");
   await expect(
     page.getByRole("heading", {
       name: "The workspace is ready for its first controlled document.",
