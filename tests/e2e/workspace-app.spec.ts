@@ -19,14 +19,18 @@ test("navigates authorized workspace overview, templates, and documents", async 
   const overviewAxe = await new AxeBuilder({ page }).analyze();
   expect(overviewAxe.violations).toEqual([]);
 
-  await page.getByRole("link", { name: "Templates" }).click();
+  await page
+    .getByRole("link", { name: "Templates", exact: true })
+    .click();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Templates");
   await expect(
     page.getByRole("heading", { name: "Standard Operating Procedure" }),
   ).toBeVisible();
   await expect(page.getByText("Published", { exact: true })).toBeVisible();
 
-  await page.getByRole("link", { name: "Documents" }).click();
+  await page
+    .getByRole("link", { name: "Documents", exact: true })
+    .click();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Documents");
   await expect(
     page.getByRole("heading", {
