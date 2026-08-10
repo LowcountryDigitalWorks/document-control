@@ -21,6 +21,6 @@ export interface ContentObject {
 }
 
 export interface ContentStore {
-  get(key: string): Promise<ContentObject | null>;
-  put(key: string, object: ContentObject): Promise<void>;
+  get(key: string, expectedHash: string): Promise<ContentObject | null>;
+  create(key: string, object: ContentObject): Promise<void>;
 }
