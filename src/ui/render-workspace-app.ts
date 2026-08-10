@@ -263,7 +263,11 @@ function metric(label: string, value: string, detail: string): string {
   return `<article class="metric"><p>${escapeHtml(label)}</p><strong>${escapeHtml(value)}</strong><span>${escapeHtml(detail)}</span></article>`;
 }
 
-function option(value: string, label: string, selectedValue: string | undefined): string {
+function option(
+  value: string,
+  label: string,
+  selectedValue: string | undefined,
+): string {
   return `<option value="${escapeHtml(value)}"${selectedValue === value ? " selected" : ""}>${escapeHtml(label)}</option>`;
 }
 

@@ -153,10 +153,7 @@ export class WorkspaceReadService {
     workspaceId: string,
     filters: WorkspaceDocumentFilters = {},
   ): Promise<readonly WorkspaceDocumentListItem[]> {
-    const conditions = [
-      "document.tenant_id = ?",
-      "document.workspace_id = ?",
-    ];
+    const conditions = ["document.tenant_id = ?", "document.workspace_id = ?"];
     const parameters: unknown[] = [tenantId, workspaceId];
 
     if (filters.query) {
@@ -226,10 +223,7 @@ export class WorkspaceReadService {
     workspaceId: string,
     filters: WorkspaceTemplateFilters = {},
   ): Promise<readonly WorkspaceTemplateListItem[]> {
-    const conditions = [
-      "template.tenant_id = ?",
-      "template.workspace_id = ?",
-    ];
+    const conditions = ["template.tenant_id = ?", "template.workspace_id = ?"];
     const parameters: unknown[] = [tenantId, workspaceId];
 
     if (filters.query) {
