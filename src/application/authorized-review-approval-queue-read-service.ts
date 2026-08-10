@@ -19,6 +19,7 @@ export class AuthorizedReviewApprovalQueueReadService {
   public async listReviewQueue(
     context: WorkQueueReadContext,
   ): Promise<readonly WorkQueueItem[]> {
+    await this.assertDocumentRead(context);
     await this.authorization.assertAllowed({
       subjectId: context.subjectId,
       tenantId: context.tenantId,
@@ -31,6 +32,7 @@ export class AuthorizedReviewApprovalQueueReadService {
   public async listApprovalQueue(
     context: WorkQueueReadContext,
   ): Promise<readonly WorkQueueItem[]> {
+    await this.assertDocumentRead(context);
     await this.authorization.assertAllowed({
       subjectId: context.subjectId,
       tenantId: context.tenantId,
@@ -38,5 +40,14 @@ export class AuthorizedReviewApprovalQueueReadService {
       permission: "document.approve",
     });
     return this.read.listQueue(context.tenantId, context.workspaceId, "approval");
+  }
+
+  private async assertDocumentRead(context: WorkQueueReadContext): Promise<void> {
+    await this.authorization.assertAllowed({
+      subjectId: context.subjectId,
+      tenantId: context.tenantId,
+      workspaceId: context.workspaceId,
+      permission: "document.read",
+    });
   }
 }
