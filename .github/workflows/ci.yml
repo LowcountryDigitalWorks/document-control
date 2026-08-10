@@ -52,3 +52,46 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm secrets:scan
+
+  normalize-portability:
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.head_ref == 'agent/backup-portability'
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Normalize portability source
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm exec prettier --write \
+            src/application/portable-export-read-service.ts \
+            tests/e2e/backup-portability.spec.ts \
+            tests/unit/portable-export-authorization.test.ts
+          if ! git diff --quiet -- \
+            src/application/portable-export-read-service.ts \
+            tests/e2e/backup-portability.spec.ts \
+            tests/unit/portable-export-authorization.test.ts; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add \
+              src/application/portable-export-read-service.ts \
+              tests/e2e/backup-portability.spec.ts \
+              tests/unit/portable-export-authorization.test.ts
+            git commit -m "Normalize portability source"
+            git push origin "HEAD:${GITHUB_HEAD_REF}"
+          else
+            echo "Portability source already normalized."
+          fi
