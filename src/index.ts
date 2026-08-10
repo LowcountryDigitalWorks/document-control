@@ -10,6 +10,11 @@ import {
 } from "./application/document-detail-read-service";
 import { serializeExport } from "./application/export";
 import { ReviewApprovalQueueReadService } from "./application/review-approval-queue-read-service";
+import {
+  parseDocumentFilters,
+  parseTemplateFilters,
+  WorkspaceFilterValidationError,
+} from "./application/workspace-filter-input";
 import { WorkspaceReadService } from "./application/workspace-read-service";
 import { ensureGuidedEvidenceReader } from "./demo/evidence-context";
 import { createSyntheticExport } from "./demo/fixtures";
@@ -159,6 +164,16 @@ app.get("/demo/app/documents", async (context) => {
     return context.html(renderNotFound(createTheme(context.env)), 404);
   }
 
+  let filters;
+  try {
+    filters = parseDocumentFilters(new URL(context.req.url).searchParams);
+  } catch (error) {
+    if (error instanceof WorkspaceFilterValidationError) {
+      return context.text(error.message, 400);
+    }
+    throw error;
+  }
+
   const session = resolveGuidedDemoSession(
     context.req.header("Cookie"),
     context.req.url,
@@ -170,16 +185,20 @@ app.get("/demo/app/documents", async (context) => {
   const demo = createGuidedDemoContext(session.sessionId);
   await ensureGuidedDemoSeed(database, session.sessionId);
   const read = createAuthorizedWorkspaceReadService(database);
-  const documents = await read.listDocuments({
-    subjectId: demo.authorSubjectId,
-    tenantId: demo.tenantId,
-    workspaceId: demo.workspaceId,
-  });
+  const documents = await read.listDocuments(
+    {
+      subjectId: demo.authorSubjectId,
+      tenantId: demo.tenantId,
+      workspaceId: demo.workspaceId,
+    },
+    filters,
+  );
   return context.html(
     renderWorkspaceDocuments(
       createTheme(context.env),
       demo.workspaceName,
       documents,
+      filters,
     ),
   );
 });
@@ -228,6 +247,16 @@ app.get("/demo/app/templates", async (context) => {
     return context.html(renderNotFound(createTheme(context.env)), 404);
   }
 
+  let filters;
+  try {
+    filters = parseTemplateFilters(new URL(context.req.url).searchParams);
+  } catch (error) {
+    if (error instanceof WorkspaceFilterValidationError) {
+      return context.text(error.message, 400);
+    }
+    throw error;
+  }
+
   const session = resolveGuidedDemoSession(
     context.req.header("Cookie"),
     context.req.url,
@@ -239,16 +268,20 @@ app.get("/demo/app/templates", async (context) => {
   const demo = createGuidedDemoContext(session.sessionId);
   await ensureGuidedDemoSeed(database, session.sessionId);
   const read = createAuthorizedWorkspaceReadService(database);
-  const templates = await read.listTemplates({
-    subjectId: demo.authorSubjectId,
-    tenantId: demo.tenantId,
-    workspaceId: demo.workspaceId,
-  });
+  const templates = await read.listTemplates(
+    {
+      subjectId: demo.authorSubjectId,
+      tenantId: demo.tenantId,
+      workspaceId: demo.workspaceId,
+    },
+    filters,
+  );
   return context.html(
     renderWorkspaceTemplates(
       createTheme(context.env),
       demo.workspaceName,
       templates,
+      filters,
     ),
   );
 });
