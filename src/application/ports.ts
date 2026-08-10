@@ -3,6 +3,11 @@ export interface DatabaseResult {
   lastRowId?: number;
 }
 
+export interface DatabaseStatement {
+  sql: string;
+  parameters?: readonly unknown[];
+}
+
 export interface DatabaseProvider {
   query<Row>(
     sql: string,
@@ -12,6 +17,9 @@ export interface DatabaseProvider {
     sql: string,
     parameters?: readonly unknown[],
   ): Promise<DatabaseResult>;
+  executeBatch(
+    statements: readonly DatabaseStatement[],
+  ): Promise<readonly DatabaseResult[]>;
 }
 
 export interface ContentObject {
