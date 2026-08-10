@@ -13,6 +13,15 @@ test("runs the authorized persisted document lifecycle without browser-selected 
   await expect(page.locator('input[type="file"]')).toHaveCount(0);
   await expect(page.locator("input")).toHaveCount(0);
 
+  const [sessionCookie] = (await page.context().cookies()).filter(
+    (cookie) => cookie.name === "ldw_guided_demo_session",
+  );
+  expect(sessionCookie).toMatchObject({
+    httpOnly: true,
+    sameSite: "Strict",
+    path: "/demo/workflow",
+  });
+
   await page
     .getByRole("button", { name: "Create from approved template" })
     .click();
@@ -70,6 +79,53 @@ test("runs the authorized persisted document lifecycle without browser-selected 
     scrollWidth: document.documentElement.scrollWidth,
   }));
   expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth);
+});
+
+test("isolates synthetic workflow state between independent browser contexts", async ({
+  browser,
+}) => {
+  const firstContext = await browser.newContext();
+  const secondContext = await browser.newContext();
+  try {
+    const firstPage = await firstContext.newPage();
+    const secondPage = await secondContext.newPage();
+    await Promise.all([
+      firstPage.goto("http://127.0.0.1:8787/demo/workflow"),
+      secondPage.goto("http://127.0.0.1:8787/demo/workflow"),
+    ]);
+
+    await expect(
+      firstPage.getByText("Template ready", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      secondPage.getByText("Template ready", { exact: true }),
+    ).toBeVisible();
+
+    const firstCookie = (await firstContext.cookies()).find(
+      (cookie) => cookie.name === "ldw_guided_demo_session",
+    );
+    const secondCookie = (await secondContext.cookies()).find(
+      (cookie) => cookie.name === "ldw_guided_demo_session",
+    );
+    expect(firstCookie?.value).toBeTruthy();
+    expect(secondCookie?.value).toBeTruthy();
+    expect(firstCookie?.value).not.toBe(secondCookie?.value);
+
+    await firstPage
+      .getByRole("button", { name: "Create from approved template" })
+      .click();
+    await expect(
+      firstPage.getByText("Draft created", { exact: true }),
+    ).toBeVisible();
+
+    await secondPage.reload();
+    await expect(
+      secondPage.getByText("Template ready", { exact: true }),
+    ).toBeVisible();
+  } finally {
+    await firstContext.close();
+    await secondContext.close();
+  }
 });
 
 test("rejects cross-origin guided demo mutations", async ({ request }) => {
