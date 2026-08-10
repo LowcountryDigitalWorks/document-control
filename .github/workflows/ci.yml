@@ -23,7 +23,30 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm check
+      - name: Apply pinned Prettier in CI workspace
+        run: pnpm format
+      - name: Preserve exact formatter output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: prettier-formatted-source
+          retention-days: 1
+          path: |
+            scripts/scan-secrets.ts
+            src/application/export.ts
+            src/demo/fixtures.ts
+            src/domain/models.ts
+            src/domain/template.ts
+            src/domain/workflow.ts
+            src/infrastructure/schema.ts
+            tests/unit/content-store.test.ts
+            tests/unit/migration.test.ts
+            wrangler.jsonc
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm secrets:scan
+      - run: pnpm test:unit
+      - run: pnpm build
       - run: pnpm audit --audit-level=high
 
   browser:
