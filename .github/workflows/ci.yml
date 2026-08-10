@@ -1,25 +1,49 @@
-name: Workflow Definition Maintenance
+name: CI
 
 on:
+  pull_request:
   push:
-    branches: [agent/workflow-definition-admin]
+    branches: [main]
 
 permissions:
   contents: read
 
 concurrency:
-  group: workflow-definition-maintenance-${{ github.ref }}
+  group: document-control-ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  wire-workflow-definitions:
-    permissions:
-      contents: write
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check
+      - run: pnpm audit --audit-level=high
+
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:e2e
+
+  secrets:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: agent/workflow-definition-admin
           fetch-depth: 0
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
@@ -27,27 +51,4 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Wire and normalize workflow definition administration
-        shell: bash
-        run: |
-          set -euo pipefail
-          python .github/maintenance/wire_workflow_definitions.py
-          pnpm exec prettier --write \
-            src/index.ts \
-            src/application/workflow-definition-input.ts \
-            src/application/workflow-definition-admin-service.ts \
-            src/application/authorized-workflow-definition-admin-service.ts \
-            src/ui/render-workflow-definition-admin.ts \
-            src/ui/render-admin-settings.ts \
-            scripts/e2e-d1.ts \
-            tests/unit/workflow-definition-admin-service.test.ts \
-            tests/unit/workflow-definition-authorization.test.ts \
-            tests/unit/workflow-definition-input.test.ts \
-            tests/e2e/workflow-definition-admin.spec.ts
-          if ! git diff --quiet -- src scripts tests; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add src scripts tests
-            git commit -m "Wire immutable workflow definition administration"
-            git push origin HEAD:agent/workflow-definition-admin
-          fi
+      - run: pnpm secrets:scan
