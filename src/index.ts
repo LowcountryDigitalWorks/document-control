@@ -2,6 +2,13 @@ import { Hono } from "hono";
 import { secureHeaders } from "hono/secure-headers";
 import { serializeExport } from "./application/export";
 import { createSyntheticExport } from "./demo/fixtures";
+import {
+  loadGuidedDemoState,
+  runGuidedDemoAction,
+  type GuidedDemoAction,
+} from "./demo/workflow-demo";
+import { D1DatabaseProvider } from "./infrastructure/d1-database-provider";
+import { renderGuidedDemo } from "./ui/render-guided-demo";
 import { renderHome, renderNotFound } from "./ui/render";
 import { createTheme } from "./ui/theme";
 
@@ -13,6 +20,7 @@ export interface Bindings {
   BRAND_PRIMARY?: string;
   BRAND_SECONDARY?: string;
   BRAND_ACCENT?: string;
+  DEMO_MUTATIONS_ENABLED?: string;
 }
 
 const app = new Hono<{ Bindings: Bindings }>();
@@ -41,6 +49,41 @@ app.get("/health", (context) =>
   context.json({ status: "ok", service: "document-control" }),
 );
 
+app.get("/demo/workflow", async (context) => {
+  if (!guidedDemoEnabled(context.env)) {
+    return context.html(renderNotFound(createTheme(context.env)), 404);
+  }
+
+  const database = new D1DatabaseProvider(context.env.DOCUMENT_CONTROL_DB);
+  const state = await loadGuidedDemoState(database);
+  return context.html(renderGuidedDemo(createTheme(context.env), state));
+});
+
+app.post("/demo/workflow/actions/:action", async (context) => {
+  if (!guidedDemoEnabled(context.env)) {
+    return context.notFound();
+  }
+  if (!hasSameOrigin(context.req.url, context.req.header("Origin"))) {
+    return context.json({ error: "Same-origin demo request required." }, 403);
+  }
+
+  const action = parseGuidedDemoAction(context.req.param("action"));
+  if (!action) {
+    return context.notFound();
+  }
+
+  const database = new D1DatabaseProvider(context.env.DOCUMENT_CONTROL_DB);
+  try {
+    await runGuidedDemoAction(database, action, new Date().toISOString());
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "The guided demo action failed.";
+    return context.json({ error: message }, 409);
+  }
+
+  return context.redirect("/demo/workflow", 303);
+});
+
 app.get("/demo/export", (context) => {
   const exportedAt = new Date().toISOString();
   return context.body(serializeExport(createSyntheticExport(exportedAt)), 200, {
@@ -64,5 +107,29 @@ app.get("/favicon.svg", (context) =>
 app.notFound((context) =>
   context.html(renderNotFound(createTheme(context.env)), 404),
 );
+
+function guidedDemoEnabled(bindings: Bindings): boolean {
+  return bindings.DEMO_MUTATIONS_ENABLED === "true";
+}
+
+function parseGuidedDemoAction(value: string): GuidedDemoAction | null {
+  if (
+    value === "create" ||
+    value === "submit" ||
+    value === "review" ||
+    value === "approve" ||
+    value === "change"
+  ) {
+    return value;
+  }
+  return null;
+}
+
+function hasSameOrigin(requestUrl: string, origin: string | undefined): boolean {
+  if (!origin) {
+    return false;
+  }
+  return origin === new URL(requestUrl).origin;
+}
 
 export default app;
