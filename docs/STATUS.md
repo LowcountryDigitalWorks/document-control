@@ -176,6 +176,33 @@ Turnstile/abuse controls, and operational cleanup are implemented and validated.
   status/lifecycle filters, approval-state transitions, accessibility, responsive layout, and invalid
   filter rejection.
 
+### Authorized Backup & Portability export (synthetic/test only)
+
+- `PortableExportReadService` assembles the current tenant's persisted D1-compatible application
+  state into the existing versioned `PortableExportV1` contract and validates the package before
+  serialization.
+- Export scope is deliberately tenant-wide and requires `export.create` at tenant scope. The
+  synthetic route uses a server-controlled Tenant Administrator; a workspace-scoped role binding is
+  not treated as authority to export an entire tenant.
+- The package includes tenant configuration, identity subjects, memberships, role definitions and
+  bindings, workspaces, documents and immutable versions, templates and provenance, workflow
+  definitions/instances, reviews, approvals, append-only audit events, and external content
+  provider/key references.
+- `/demo/app/admin/backup` previews live package counts and the permitted-data profile from persisted
+  tenant state.
+- `/demo/app/admin/backup/export` returns the validated live tenant package as JSON with
+  `Cache-Control: no-store` and a sanitized tenant-derived filename.
+- Content binaries are intentionally not bundled yet. R2/SharePoint objects remain external and are
+  represented by provider/content-key references; the export must not be described as a complete
+  binary backup until bundled-content support is deliberately implemented and validated.
+- The original `/demo/export` static fixture remains only as a reference/compatibility artifact; the
+  Backup & Portability route exports the current isolated synthetic session's persisted state.
+- Browser coverage creates, reviews, approves, and changes a document, downloads the live export,
+  parses it through the existing import/validation contract, verifies historical approval/current
+  version semantics, and proves separate synthetic sessions cannot export one another's records.
+- This slice is not production backup scheduling, disaster recovery, retention, deletion, legal
+  hold, restore orchestration, or a claim that external content has been backed up.
+
 All app-shaped `/demo` screens remain product-shape proofs, not an authenticated production tenant
 application. They remain behind the synthetic/test demo flag and must not be represented as
 production authentication or public-demo hardening.
@@ -185,8 +212,8 @@ production authentication or public-demo hardening.
 - GitHub repository visibility: **public by explicit owner decision**.
 - Package metadata remains `private: true` only to prevent accidental package-registry publication.
 - Milestones include bootstrap PR #1, persisted-workflow PR #7, authorization PR #8, guided-workflow
-  UI PR #9, workspace navigation PR #10, document evidence PR #11, Reviews & Approvals PR #12, and
-  workspace search/filter PR #13.
+  UI PR #9, workspace navigation PR #10, document evidence PR #11, Reviews & Approvals PR #12,
+  workspace search/filter PR #13, and Backup & Portability PR #14.
 - `main` is the authoritative integration branch after reviewed/validated pull requests are merged.
 - No production Cloudflare resources, custom domains, customer data, analytics, paid services, or
   public-upload capability have been introduced.
@@ -202,10 +229,12 @@ production authentication or public-demo hardening.
   Turnstile, rate limiting, quotas, and abuse telemetry/controls.
 - Full-text/content-body search or an external/indexed search service; current search is bounded
   metadata filtering only.
-- Administration/configuration UI for tenant/workspace/roles/branding/workflows/templates.
+- Administration/configuration UI for tenant/workspace/roles/branding/workflows/templates beyond the
+  Backup & Portability proof.
 - Rich document authoring, retention automation, legal hold, GRC frameworks, or AI functions.
 - PostgreSQL and SharePoint adapters; the provider boundaries remain the extension points.
 - Bundled R2/SharePoint binaries in portable exports.
+- Production backup scheduling, restore orchestration, disaster recovery, or retention automation.
 
 ## Decisions pending approval
 
