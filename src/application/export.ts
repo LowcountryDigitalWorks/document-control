@@ -74,7 +74,9 @@ export function validatePortableExport(data: PortableExportV1): void {
   requireString(data.tenant.slug, "tenant.slug");
 
   if (data.tenantConfiguration.tenantId !== tenantId) {
-    throw new Error("Tenant configuration crosses the exported tenant boundary.");
+    throw new Error(
+      "Tenant configuration crosses the exported tenant boundary.",
+    );
   }
 
   const subjects = indexById(data.identitySubjects, "identitySubjects");
@@ -118,7 +120,9 @@ export function validatePortableExport(data: PortableExportV1): void {
 
     if (role.scope === "platform") {
       if (binding.tenantId !== undefined || binding.workspaceId !== undefined) {
-        throw new Error(`Platform role binding ${binding.id} must be unscoped.`);
+        throw new Error(
+          `Platform role binding ${binding.id} must be unscoped.`,
+        );
       }
       continue;
     }
@@ -128,12 +132,16 @@ export function validatePortableExport(data: PortableExportV1): void {
     }
     assertTenant(binding.tenantId, tenantId, `role binding ${binding.id}`);
     if (!activeMembershipKeys.has(`${tenantId}:${binding.subjectId}`)) {
-      throw new Error(`Role binding ${binding.id} targets a non-member subject.`);
+      throw new Error(
+        `Role binding ${binding.id} targets a non-member subject.`,
+      );
     }
 
     if (role.scope === "workspace") {
       if (!binding.workspaceId) {
-        throw new Error(`Workspace role binding ${binding.id} lacks a workspace.`);
+        throw new Error(
+          `Workspace role binding ${binding.id} lacks a workspace.`,
+        );
       }
       const workspace = assertReferenced(
         workspaces,
@@ -142,7 +150,9 @@ export function validatePortableExport(data: PortableExportV1): void {
       ) as Workspace;
       assertTenant(workspace.tenantId, tenantId, `workspace ${workspace.id}`);
     } else if (binding.workspaceId !== undefined) {
-      throw new Error(`Tenant role binding ${binding.id} must not name a workspace.`);
+      throw new Error(
+        `Tenant role binding ${binding.id} must not name a workspace.`,
+      );
     }
   }
 
@@ -155,7 +165,11 @@ export function validatePortableExport(data: PortableExportV1): void {
   for (const version of data.templateVersions) {
     assertTenant(version.tenantId, tenantId, `template version ${version.id}`);
     assertCanonicalHash(version.contentHash, `template version ${version.id}`);
-    assertReferenced(templates, version.templateId, "template version template");
+    assertReferenced(
+      templates,
+      version.templateId,
+      "template version template",
+    );
     assertReferenced(subjects, version.createdBySubjectId, "template creator");
     templateVersionByKey.set(
       `${version.templateId}:${version.versionNumber}`,
@@ -173,27 +187,37 @@ export function validatePortableExport(data: PortableExportV1): void {
         document.sourceTemplateVersion === undefined ||
         !document.sourceTemplateHash
       ) {
-        throw new Error(`Document ${document.id} has incomplete template provenance.`);
+        throw new Error(
+          `Document ${document.id} has incomplete template provenance.`,
+        );
       }
       const source = templateVersionByKey.get(
         `${document.sourceTemplateId}:${document.sourceTemplateVersion}`,
       );
       if (!source || source.contentHash !== document.sourceTemplateHash) {
-        throw new Error(`Document ${document.id} template provenance does not match.`);
+        throw new Error(
+          `Document ${document.id} template provenance does not match.`,
+        );
       }
     } else if (
       document.sourceTemplateId !== undefined ||
       document.sourceTemplateVersion !== undefined ||
       document.sourceTemplateHash !== undefined
     ) {
-      throw new Error(`Document ${document.id} carries unexpected template references.`);
+      throw new Error(
+        `Document ${document.id} carries unexpected template references.`,
+      );
     }
   }
 
   for (const version of data.documentVersions) {
     assertTenant(version.tenantId, tenantId, `document version ${version.id}`);
     assertCanonicalHash(version.contentHash, `document version ${version.id}`);
-    assertReferenced(documents, version.documentId, "document version document");
+    assertReferenced(
+      documents,
+      version.documentId,
+      "document version document",
+    );
     assertReferenced(subjects, version.createdBySubjectId, "document creator");
   }
 
@@ -205,7 +229,9 @@ export function validatePortableExport(data: PortableExportV1): void {
         "current document version",
       ) as DocumentVersion;
       if (version.documentId !== document.id || version.tenantId !== tenantId) {
-        throw new Error(`Document ${document.id} current version crosses a boundary.`);
+        throw new Error(
+          `Document ${document.id} current version crosses a boundary.`,
+        );
       }
     }
   }
@@ -218,11 +244,15 @@ export function validatePortableExport(data: PortableExportV1): void {
       `workflow definition ${definition.id}`,
     );
     if (definition.version < 1 || definition.states.length === 0) {
-      throw new Error(`Workflow definition ${definition.id} is structurally invalid.`);
+      throw new Error(
+        `Workflow definition ${definition.id} is structurally invalid.`,
+      );
     }
     const states = new Set(definition.states);
     if (states.size !== definition.states.length) {
-      throw new Error(`Workflow definition ${definition.id} has duplicate states.`);
+      throw new Error(
+        `Workflow definition ${definition.id} has duplicate states.`,
+      );
     }
     for (const transition of definition.transitions) {
       if (!states.has(transition.from) || !states.has(transition.to)) {
@@ -231,24 +261,35 @@ export function validatePortableExport(data: PortableExportV1): void {
         );
       }
     }
-    workflowDefinitions.set(`${definition.id}:${definition.version}`, definition);
+    workflowDefinitions.set(
+      `${definition.id}:${definition.version}`,
+      definition,
+    );
   }
 
   for (const instance of data.workflowInstances) {
-    assertTenant(instance.tenantId, tenantId, `workflow instance ${instance.id}`);
+    assertTenant(
+      instance.tenantId,
+      tenantId,
+      `workflow instance ${instance.id}`,
+    );
     const version = assertReferenced(
       documentVersions,
       instance.documentVersionId,
       "workflow document version",
     ) as DocumentVersion;
     if (version.documentId !== instance.documentId) {
-      throw new Error(`Workflow instance ${instance.id} references mismatched document data.`);
+      throw new Error(
+        `Workflow instance ${instance.id} references mismatched document data.`,
+      );
     }
     const definition = workflowDefinitions.get(
       `${instance.workflowDefinitionId}:${instance.workflowDefinitionVersion}`,
     );
     if (!definition || !definition.states.includes(instance.state)) {
-      throw new Error(`Workflow instance ${instance.id} is not bound to a valid definition state.`);
+      throw new Error(
+        `Workflow instance ${instance.id} is not bound to a valid definition state.`,
+      );
     }
   }
 
@@ -260,7 +301,9 @@ export function validatePortableExport(data: PortableExportV1): void {
       "review workflow instance",
     ) as WorkflowInstance;
     if (instance.documentVersionId !== review.documentVersionId) {
-      throw new Error(`Review ${review.id} references the wrong document version.`);
+      throw new Error(
+        `Review ${review.id} references the wrong document version.`,
+      );
     }
     assertReferenced(subjects, review.actorSubjectId, "review actor");
   }
@@ -354,10 +397,7 @@ function assertCanonicalHash(hash: string, label: string): void {
   }
 }
 
-function requireRecord(
-  value: unknown,
-  label: string,
-): Record<string, unknown> {
+function requireRecord(value: unknown, label: string): Record<string, unknown> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     throw new Error(`${label} must be an object.`);
   }
