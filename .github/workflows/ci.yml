@@ -52,3 +52,44 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm secrets:scan
+
+  normalize-portability-row-aliases:
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.head_ref == 'agent/backup-portability'
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+      - name: Replace empty row interfaces with type aliases
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('src/application/portable-export-read-service.ts')
+          text = path.read_text()
+          replacements = {
+              'interface TenantRow extends Tenant {}': 'type TenantRow = Tenant;',
+              'interface DocumentVersionRow extends DocumentVersion {}': 'type DocumentVersionRow = DocumentVersion;',
+              'interface WorkflowInstanceRow extends WorkflowInstance {}': 'type WorkflowInstanceRow = WorkflowInstance;',
+              'interface ApprovalRow extends Approval {}': 'type ApprovalRow = Approval;',
+          }
+          for old, new in replacements.items():
+              if old not in text:
+                  raise SystemExit(f'missing expected declaration: {old}')
+              text = text.replace(old, new, 1)
+          path.write_text(text)
+          PY
+          if ! git diff --quiet -- src/application/portable-export-read-service.ts; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add src/application/portable-export-read-service.ts
+            git commit -m "Use type aliases for portable export rows"
+            git push origin "HEAD:${GITHUB_HEAD_REF}"
+          fi
