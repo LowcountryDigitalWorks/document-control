@@ -13,12 +13,18 @@ test("tenant administrator assigns and removes a workspace role with audit evide
 }) => {
   await openAccess(page);
 
+  const membersPanel = page
+    .getByRole("heading", { level: 2, name: "Members" })
+    .locator("..");
+  const rolesPanel = page
+    .getByRole("heading", { level: 2, name: "Eligible workspace roles" })
+    .locator("..");
   await expect(
-    page.getByText("Avery Author", { exact: true }).first(),
+    membersPanel.getByText("Avery Author", { exact: true }),
   ).toBeVisible();
-  await expect(page.getByText("Author", { exact: true }).first()).toBeVisible();
+  await expect(rolesPanel.getByText("Author", { exact: true })).toBeVisible();
   await expect(
-    page.getByText("Tenant Administrator", { exact: true }),
+    rolesPanel.getByText("Tenant Administrator", { exact: true }),
   ).toHaveCount(0);
 
   await page
