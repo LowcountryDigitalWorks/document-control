@@ -538,6 +538,30 @@ Turnstile/abuse controls, and operational cleanup are implemented and validated.
   authoring, malware scanning, storage orchestration, production authentication, production Cloudflare
   resources, customer data, or paid services.
 
+### Workflow authoring improvements (synthetic/test only)
+
+- Workflow Definition administration can use any exact existing definition version as the starting
+  point for a new editable draft. Selecting a source only prefills the authoring form; the source
+  definition/version remains immutable and saving continues to insert the next version in that family.
+- Both new-family and next-version forms support a server-side **Analyze draft** action that performs
+  no persistence and reports the initial state, reachable-state count, terminal states, branching
+  states, and whether the directed graph contains a cycle.
+- Newly submitted workflow drafts now reject states that cannot be reached from the first/initial
+  state. This is an authoring-time safeguard only; historical workflow-definition versions are not
+  rewritten or retroactively revalidated under the new rule.
+- Source selection is tenant-catalog bounded and exact-version validated. The browser cannot use the
+  authoring query or analysis action to cross tenant/workspace authorization boundaries.
+- Analysis and authoring POSTs retain the existing same-origin and synthetic-session protections.
+  Successful creation/versioning continues to use the existing dual `tenant.manage` plus
+  current-workspace `workflow.manage` authorization and existing append-only audit events.
+- Unit coverage verifies graph reachability, terminal/branch/cycle analysis, source-query validation,
+  and authoring mode validation. Browser coverage verifies exact-version prefill, analyze-without-save,
+  immutable next-version creation, unreachable-state rejection, same-origin protection, and axe
+  accessibility.
+- This slice does **not** add drag-and-drop/graphical authoring, conditional expressions, timers,
+  scripting, automatic migration of running instances, production authentication, customer uploads,
+  production Cloudflare resources, or paid services.
+
 All app-shaped `/demo` screens remain product-shape proofs, not an authenticated production tenant
 application. They remain behind the synthetic/test demo flag and must not be represented as
 production authentication or public-demo hardening.
@@ -554,7 +578,7 @@ production authentication or public-demo hardening.
   PR #19, Template Lifecycle integration reconciliation PR #20, workspace Workflow Selection
   administration PR #21, controlled Workflow Definition lifecycle administration PR #27,
   provider-neutral custom workspace roles PR #29, provider-neutral tenant member lifecycle PR #30,
-  and terminal custom role retirement PR #31.
+  terminal custom role retirement PR #31, and workflow authoring improvements PR #32.
 - `main` is the authoritative integration branch after reviewed/validated pull requests are merged.
 - No production Cloudflare resources, custom domains, customer data, analytics, paid services, or
   public-upload capability have been introduced.
@@ -573,7 +597,7 @@ production authentication or public-demo hardening.
 - Built-in/system role-definition editing; tenant/platform role assignment administration;
   custom-role hard deletion; member deletion; production invitation delivery; external identity
   provisioning; or identity-provider/group mapping/synchronization.
-- Richer workflow authoring beyond immutable versions, workspace selection, and controlled lifecycle.
+- Drag-and-drop/graphical workflow authoring, conditional expressions, timers, scripting, or automatic migration beyond the current immutable versioning, exact-version draft cloning/analysis, workspace selection, and controlled lifecycle.
 - Template content upload/new-version authoring, new-template creation, or storage/scanning
   orchestration.
 - Logo/favicon upload or external branding-asset URL management.

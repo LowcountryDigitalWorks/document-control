@@ -57,7 +57,7 @@ The synthetic/test-only application now covers:
 - workspace Roles & Access assignment administration;
 - tenant-owned custom workspace role creation/editing with bounded operational permissions,
   tenant-wide assignment-impact acknowledgement, and terminal non-destructive retirement;
-- immutable Workflow Definition administration;
+- immutable Workflow Definition administration with exact-version draft cloning, server-side graph analysis, and unreachable-state rejection for newly submitted drafts;
 - controlled Template Lifecycle administration;
 - workspace Workflow Selection/default-version administration; and
 - controlled Workflow Definition lifecycle administration.
@@ -117,6 +117,22 @@ Do **not** couple custom roles to Microsoft-specific group names or claims. A fu
 SAML provisioning or mapping adapter should resolve immutable external subject/group identifiers to
 these application roles. Small customers can use the same roles directly without an external IdP.
 
+## Workflow authoring boundary
+
+Workflow authoring remains version-oriented and server controlled.
+
+- An administrator may choose an exact historical workflow-definition version as a starting point for
+  a new draft. This is a copy-for-editing operation only; it never mutates or reactivates the source.
+- Saving a next-version draft still inserts the next immutable version in the selected workflow family.
+- **Analyze draft** is read-only and reports graph structure without creating audit evidence or
+  persistence because no product state changes.
+- Newly submitted drafts reject unreachable states from the first/initial state. Keep this safeguard at
+  the authoring boundary rather than retroactively invalidating historical definitions.
+- Cycles and workflows without terminal states are reported by analysis but are not categorically
+  forbidden because continuous/rework workflows may intentionally use them.
+- Do not silently add automatic running-instance migration, graphical scripting, conditions, timers,
+  or external automation semantics without a separate design decision and invariant review.
+
 ## Workflow Definition lifecycle terminology
 
 User-facing administration uses three distinct lifecycle labels:
@@ -164,7 +180,7 @@ Do not imply these are implemented or approved:
 - malware scanning, file-type/size policy, quarantine, or failure compensation;
 - production D1/R2/Worker provisioning or custom-domain attachment;
 - complete binary backup/restore, retention automation, legal hold, or disaster recovery;
-- richer workflow authoring beyond current immutable definitions/version/lifecycle controls;
+- drag-and-drop/graphical workflow authoring, conditional expressions, timers, scripting, or automatic migration beyond the current immutable versioning, exact-version draft cloning/analysis, and lifecycle controls;
 - template content upload/new-version authoring or new-template upload flows;
 - full-text/content-body search or external search infrastructure;
 - PostgreSQL/SharePoint production adapters;

@@ -55,6 +55,7 @@ import {
   WorkspaceFilterValidationError,
 } from "./application/workspace-filter-input";
 import { WorkspaceReadService } from "./application/workspace-read-service";
+import { analyzeWorkflowGraph } from "./application/workflow-authoring";
 import { WorkflowDefinitionAdminService } from "./application/workflow-definition-admin-service";
 import { WorkspaceWorkflowSelectionService } from "./application/workspace-workflow-selection-service";
 import {
@@ -67,7 +68,10 @@ import {
 } from "./application/workflow-lifecycle-input";
 import {
   parseExistingWorkflowId,
+  parseOptionalWorkflowSourceVersion,
+  parseWorkflowAuthoringMode,
   parseWorkflowDefinitionInput,
+  parseWorkflowSourceQuery,
   WorkflowDefinitionInputValidationError,
 } from "./application/workflow-definition-input";
 import { ensureGuidedAuditor } from "./demo/audit-context";
@@ -1117,7 +1121,38 @@ app.get("/demo/app/admin/workflows", async (context) => {
       tenantId: demo.tenantId,
       workspaceId: demo.workspaceId,
     });
-    const noticeValue = new URL(context.req.url).searchParams.get("notice");
+    const url = new URL(context.req.url);
+    const sourceQuery = parseWorkflowSourceQuery(url.searchParams);
+    const sourceDefinition = sourceQuery
+      ? catalog.definitions.find(
+          (definition) =>
+            definition.id === sourceQuery.workflowDefinitionId &&
+            definition.version === sourceQuery.workflowDefinitionVersion,
+        )
+      : undefined;
+    if (sourceQuery && !sourceDefinition) {
+      return context.text(
+        "The requested workflow source version does not exist in this tenant.",
+        400,
+      );
+    }
+    const authoring = sourceDefinition
+      ? {
+          mode: "version" as const,
+          workflowDefinitionId: sourceDefinition.id,
+          sourceDefinition,
+          draft: {
+            name: sourceDefinition.name,
+            states: sourceDefinition.states,
+            transitions: sourceDefinition.transitions,
+          },
+          analysis: analyzeWorkflowGraph(
+            sourceDefinition.states,
+            sourceDefinition.transitions,
+          ),
+        }
+      : undefined;
+    const noticeValue = url.searchParams.get("notice");
     const notice =
       noticeValue === "created"
         ? "Workflow definition created."
@@ -1132,9 +1167,104 @@ app.get("/demo/app/admin/workflows", async (context) => {
         await createPersistedTenantTheme(database, context.env, demo.tenantId),
         catalog,
         notice,
+        authoring,
       ),
     );
   } catch (error) {
+    if (error instanceof AuthorizationDeniedError) {
+      return context.html(renderNotFound(createTheme(context.env)), 404);
+    }
+    throw error;
+  }
+});
+
+app.post("/demo/app/admin/workflows/analyze", async (context) => {
+  if (!guidedDemoEnabled(context.env)) return context.notFound();
+  if (!hasSameOrigin(context.req.url, context.req.header("Origin"))) {
+    return context.json({ error: "Same-origin demo request required." }, 403);
+  }
+  const sessionId = readGuidedDemoSession(context.req.header("Cookie"));
+  if (!sessionId) {
+    return context.json(
+      {
+        error:
+          "Synthetic administration session missing. Reload Workflow Definitions.",
+      },
+      409,
+    );
+  }
+
+  try {
+    const values = await readWorkflowFormValues(context.req.raw, [
+      "mode",
+      "workflowDefinitionId",
+      "sourceVersion",
+      "name",
+      "states",
+      "transitions",
+    ]);
+    const mode = parseWorkflowAuthoringMode(values);
+    const input = parseWorkflowDefinitionInput(values);
+    const database = new D1DatabaseProvider(context.env.DOCUMENT_CONTROL_DB);
+    const demo = createGuidedDemoContext(sessionId);
+    await ensureGuidedDemoSeed(database, sessionId);
+    const admin = await ensureGuidedTenantAdmin(database, sessionId);
+    const service = createAuthorizedWorkflowDefinitionAdminService(database);
+    const catalog = await service.getCatalog({
+      subjectId: admin.subjectId,
+      tenantId: demo.tenantId,
+      workspaceId: demo.workspaceId,
+    });
+
+    let workflowDefinitionId: string | undefined;
+    let sourceDefinition;
+    if (mode === "version") {
+      workflowDefinitionId = parseExistingWorkflowId(values);
+      if (
+        !catalog.definitions.some(
+          (definition) => definition.id === workflowDefinitionId,
+        )
+      ) {
+        return context.text(
+          "The requested workflow definition does not exist in this tenant.",
+          400,
+        );
+      }
+      const sourceVersion = parseOptionalWorkflowSourceVersion(values);
+      if (sourceVersion !== undefined) {
+        sourceDefinition = catalog.definitions.find(
+          (definition) =>
+            definition.id === workflowDefinitionId &&
+            definition.version === sourceVersion,
+        );
+        if (!sourceDefinition) {
+          return context.text(
+            "The requested workflow source version does not exist in this tenant.",
+            400,
+          );
+        }
+      }
+    }
+
+    context.header("Cache-Control", "no-store");
+    return context.html(
+      renderWorkflowDefinitionAdmin(
+        await createPersistedTenantTheme(database, context.env, demo.tenantId),
+        catalog,
+        undefined,
+        {
+          mode,
+          workflowDefinitionId,
+          sourceDefinition,
+          draft: input,
+          analysis: analyzeWorkflowGraph(input.states, input.transitions),
+        },
+      ),
+    );
+  } catch (error) {
+    if (error instanceof WorkflowDefinitionInputValidationError) {
+      return context.text(error.message, 400);
+    }
     if (error instanceof AuthorizationDeniedError) {
       return context.html(renderNotFound(createTheme(context.env)), 404);
     }
