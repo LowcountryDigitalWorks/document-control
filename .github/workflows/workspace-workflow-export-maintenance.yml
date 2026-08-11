@@ -1,0 +1,38 @@
+name: Workspace Workflow Export Maintenance
+
+on:
+  push:
+    branches: [agent/workspace-workflow-selection-v2]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: workspace-workflow-export-maintenance-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/workspace-workflow-selection-v2
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Add portable workflow selection configuration
+        run: |
+          python .github/maintenance/add_workspace_workflow_export.py
+          pnpm exec prettier --write src/application/export.ts src/application/portable-export-read-service.ts tests/unit/export-roundtrip.test.ts
+          if ! git diff --quiet -- src/application/export.ts src/application/portable-export-read-service.ts tests/unit/export-roundtrip.test.ts; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add src/application/export.ts src/application/portable-export-read-service.ts tests/unit/export-roundtrip.test.ts
+            git commit -m "Include workspace workflow selection in portable exports"
+            git push origin HEAD:agent/workspace-workflow-selection-v2
+          fi
