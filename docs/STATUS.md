@@ -364,13 +364,14 @@ Turnstile/abuse controls, and operational cleanup are implemented and validated.
 
 ### Controlled Workflow Definition lifecycle administration (synthetic/test only)
 
-- Exact immutable workflow-definition versions now have separate lifecycle state: `active`,
-  `deprecated`, or `retired`; lifecycle changes never rewrite definition content.
+- Exact immutable workflow-definition versions use the user-facing lifecycle labels **Active**,
+  **Legacy**, and **Retired**; lifecycle changes never rewrite definition content. The canonical
+  persisted/exported machine value behind **Legacy** remains `deprecated`.
 - New versions begin Active. Active versions may be newly assigned to a workspace and selected as a
   new workspace default.
-- Deprecated versions may remain where already configured, including as an existing default so
+- Legacy versions may remain where already configured, including as an existing default so
   administrators can migrate deliberately, but cannot be newly assigned or newly selected as a
-  default. Deprecated versions can be reactivated.
+  default. Legacy versions can be returned to Active.
 - Retirement is terminal and requires the exact version to be removed from every workspace first.
   Running workflow instances, reviews, approvals, and audit history remain pinned to their original
   exact definition version after retirement.
@@ -435,8 +436,8 @@ production authentication or public-demo hardening.
   workspace search/filter PR #13, Backup & Portability PR #14, workspace Audit Log PR #15,
   tenant presentation administration PR #16, workspace Roles & Access administration PR #17,
   immutable Workflow Definition administration PR #18, controlled Template Lifecycle administration
-  PR #19, Template Lifecycle integration reconciliation PR #20, and workspace Workflow Selection
-  administration PR #21.
+  PR #19, Template Lifecycle integration reconciliation PR #20, workspace Workflow Selection
+  administration PR #21, and controlled Workflow Definition lifecycle administration PR #27.
 - `main` is the authoritative integration branch after reviewed/validated pull requests are merged.
 - No production Cloudflare resources, custom domains, customer data, analytics, paid services, or
   public-upload capability have been introduced.
