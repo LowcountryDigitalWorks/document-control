@@ -40,8 +40,7 @@ describe("portable export", () => {
     };
 
     expect(
-      parseExport(serializeExport(lifecycleExport))
-        .workflowDefinitionLifecycles,
+      parseExport(serializeExport(lifecycleExport)).workflowDefinitionLifecycles,
     ).toEqual(lifecycleExport.workflowDefinitionLifecycles);
   });
 
@@ -70,18 +69,29 @@ describe("portable export", () => {
 
   it("rejects a workspace assignment to an exported retired workflow version", () => {
     const source = createSyntheticExport();
-    const assignment = source.workspaceWorkflowAssignments?.[0];
-    expect(assignment).toBeDefined();
+    const definition = source.workflowDefinitions[0]!;
+    const assignment = {
+      tenantId: source.tenant.id,
+      workspaceId: source.workspaces[0]!.id,
+      workflowDefinitionId: definition.id,
+      workflowDefinitionVersion: definition.version,
+      isDefault: true,
+      createdBySubjectId: source.identitySubjects[0]!.id,
+      createdAt: source.exportedAt,
+      updatedBySubjectId: source.identitySubjects[0]!.id,
+      updatedAt: source.exportedAt,
+    };
     const lifecycleExport = {
       ...source,
+      workspaceWorkflowAssignments: [assignment],
       workflowDefinitionLifecycles: source.workflowDefinitions.map(
-        (definition) => ({
+        (candidate) => ({
           tenantId: source.tenant.id,
-          workflowDefinitionId: definition.id,
-          workflowDefinitionVersion: definition.version,
+          workflowDefinitionId: candidate.id,
+          workflowDefinitionVersion: candidate.version,
           lifecycleState:
-            definition.id === assignment!.workflowDefinitionId &&
-            definition.version === assignment!.workflowDefinitionVersion
+            candidate.id === assignment.workflowDefinitionId &&
+            candidate.version === assignment.workflowDefinitionVersion
               ? ("retired" as const)
               : ("active" as const),
           changedAt: source.exportedAt,
