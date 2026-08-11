@@ -908,7 +908,10 @@ app.get("/demo/app/admin/templates", async (context) => {
   const database = new D1DatabaseProvider(context.env.DOCUMENT_CONTROL_DB);
   const demo = createGuidedDemoContext(session.sessionId);
   await ensureGuidedDemoSeed(database, session.sessionId);
-  const manager = await ensureGuidedTemplateManager(database, session.sessionId);
+  const manager = await ensureGuidedTemplateManager(
+    database,
+    session.sessionId,
+  );
   const service = createAuthorizedTemplateLifecycleAdminService(database);
 
   try {
@@ -961,7 +964,9 @@ app.post("/demo/app/admin/templates/transition", async (context) => {
     const demo = createGuidedDemoContext(sessionId);
     await ensureGuidedDemoSeed(database, sessionId);
     const manager = await ensureGuidedTemplateManager(database, sessionId);
-    await createAuthorizedTemplateLifecycleAdminService(database).transitionVersion(
+    await createAuthorizedTemplateLifecycleAdminService(
+      database,
+    ).transitionVersion(
       {
         subjectId: manager.subjectId,
         tenantId: demo.tenantId,
@@ -974,7 +979,10 @@ app.post("/demo/app/admin/templates/transition", async (context) => {
         occurredAt: new Date().toISOString(),
       },
     );
-    return context.redirect("/demo/app/admin/templates?notice=transitioned", 303);
+    return context.redirect(
+      "/demo/app/admin/templates?notice=transitioned",
+      303,
+    );
   } catch (error) {
     if (error instanceof TemplateLifecycleInputValidationError) {
       return context.text(error.message, 400);
@@ -983,7 +991,9 @@ app.post("/demo/app/admin/templates/transition", async (context) => {
       return context.html(renderNotFound(createTheme(context.env)), 404);
     }
     const message =
-      error instanceof Error ? error.message : "Template lifecycle transition failed.";
+      error instanceof Error
+        ? error.message
+        : "Template lifecycle transition failed.";
     return context.text(message, 409);
   }
 });

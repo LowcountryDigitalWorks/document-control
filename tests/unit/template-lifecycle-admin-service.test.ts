@@ -68,7 +68,10 @@ async function createHarness(): Promise<{
     "0004_template_version_lifecycle_integrity.sql",
   ]) {
     database.exec(
-      await readFile(new URL(`../../migrations/${file}`, import.meta.url), "utf8"),
+      await readFile(
+        new URL(`../../migrations/${file}`, import.meta.url),
+        "utf8",
+      ),
     );
   }
   database.exec(`
@@ -171,9 +174,7 @@ describe("TemplateLifecycleAdminService", () => {
       source_template_hash: hash,
     });
     expect(
-      database
-        .prepare("SELECT COUNT(*) AS count FROM audit_events")
-        .get(),
+      database.prepare("SELECT COUNT(*) AS count FROM audit_events").get(),
     ).toEqual({ count: 4 });
   });
 
@@ -186,7 +187,9 @@ describe("TemplateLifecycleAdminService", () => {
     ).toThrow(/content identity and provenance are immutable/u);
     expect(() =>
       database
-        .prepare("UPDATE template_versions SET lifecycle_state = 'published' WHERE id = ?")
+        .prepare(
+          "UPDATE template_versions SET lifecycle_state = 'published' WHERE id = ?",
+        )
         .run("template-version-1"),
     ).toThrow(/invalid template lifecycle transition/u);
     expect(() =>

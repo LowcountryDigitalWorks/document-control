@@ -1,7 +1,4 @@
-import type {
-  TemplateLifecycleState,
-  TemplateVersion,
-} from "../domain/models";
+import type { TemplateLifecycleState, TemplateVersion } from "../domain/models";
 import {
   availableTemplateTransitions,
   transitionTemplateVersion,
@@ -231,7 +228,9 @@ function templateVersionSelect(whereAndOrder: string): string {
           ${orderClause}`;
 }
 
-function mapVersionRow(row: TemplateVersionRow): TemplateLifecycleVersionRecord {
+function mapVersionRow(
+  row: TemplateVersionRow,
+): TemplateLifecycleVersionRecord {
   const version = mapTemplateVersion(row);
   return {
     ...version,

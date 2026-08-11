@@ -38,12 +38,16 @@ test("Template Manager supersedes a published version without changing existing 
   await expect(templateCard).toContainText("Source documents");
   await expect(templateCard).toContainText("1");
 
-  await templateCard.locator('select[name="targetState"]').selectOption("superseded");
+  await templateCard
+    .locator('select[name="targetState"]')
+    .selectOption("superseded");
   await templateCard
     .getByRole("button", { name: "Apply lifecycle transition" })
     .click();
 
-  await expect(page).toHaveURL(/\/demo\/app\/admin\/templates\?notice=transitioned$/u);
+  await expect(page).toHaveURL(
+    /\/demo\/app\/admin\/templates\?notice=transitioned$/u,
+  );
   await expect(page.getByRole("status")).toHaveText(
     "Template lifecycle transition recorded.",
   );
@@ -57,11 +61,15 @@ test("Template Manager supersedes a published version without changing existing 
 
   await page.goto("/demo/app/audit?q=template.version.lifecycle_transitioned");
   await expect(
-    page.getByText("Template · Version · Lifecycle transitioned", { exact: true }),
+    page.getByText("Template · Version · Lifecycle transitioned", {
+      exact: true,
+    }),
   ).toBeVisible();
 
   await page.goto(evidenceHref ?? "/demo/app/documents");
-  await expect(page.getByText("Harbor opening checklist", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("Harbor opening checklist", { exact: true }),
+  ).toBeVisible();
   await expect(page.locator("main")).toContainText("Version 1");
   await expect(page.locator("main")).toContainText(contentHash);
   await expect(page.locator("main")).toContainText("superseded");
@@ -83,7 +91,9 @@ test("retired current template version cannot create a new document", async ({
     .locator(".version-card")
     .filter({ hasText: "Harbor opening checklist" })
     .filter({ hasText: "Published" });
-  await publishedCard.locator('select[name="targetState"]').selectOption("retired");
+  await publishedCard
+    .locator('select[name="targetState"]')
+    .selectOption("retired");
   await publishedCard
     .getByRole("button", { name: "Apply lifecycle transition" })
     .click();
@@ -115,7 +125,9 @@ test("rejects invalid and cross-origin template lifecycle requests", async ({
     },
   );
   expect(invalid.status()).toBe(400);
-  expect(await invalid.text()).toContain("Template lifecycle target is invalid.");
+  expect(await invalid.text()).toContain(
+    "Template lifecycle target is invalid.",
+  );
 
   const crossOrigin = await page.request.post(
     "/demo/app/admin/templates/transition",
