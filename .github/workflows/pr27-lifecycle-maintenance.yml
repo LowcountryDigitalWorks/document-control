@@ -1,0 +1,545 @@
+name: PR27 Lifecycle Maintenance
+
+on:
+  push:
+    branches: [feature/workflow-retirement-deprecation]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pr27-lifecycle-maintenance-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  integrate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feature/workflow-retirement-deprecation
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Integrate lifecycle routes, portability, fixtures, and documentation
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path_name: str, old: str, new: str) -> None:
+              path = Path(path_name)
+              text = path.read_text()
+              if old not in text:
+                  raise SystemExit(f"marker missing in {path_name}: {old[:80]!r}")
+              path.write_text(text.replace(old, new, 1))
+
+          # Routes and request parsing.
+          replace_once(
+              "src/index.ts",
+              '''import {
+            parseWorkspaceWorkflowSelectionInput,
+            WorkspaceWorkflowSelectionInputValidationError,
+          } from "./application/workspace-workflow-selection-input";
+          ''',
+              '''import {
+            parseWorkspaceWorkflowSelectionInput,
+            WorkspaceWorkflowSelectionInputValidationError,
+          } from "./application/workspace-workflow-selection-input";
+          import {
+            parseWorkflowLifecycleInput,
+            WorkflowLifecycleInputValidationError,
+          } from "./application/workflow-lifecycle-input";
+          ''',
+          )
+          replace_once(
+              "src/index.ts",
+              '''    const notice =
+                noticeValue === "created"
+                  ? "Workflow definition created."
+                  : noticeValue === "versioned"
+                    ? "Workflow version created."
+                    : undefined;
+          ''',
+              '''    const notice =
+                noticeValue === "created"
+                  ? "Workflow definition created."
+                  : noticeValue === "versioned"
+                    ? "Workflow version created."
+                    : noticeValue === "lifecycle"
+                      ? "Workflow lifecycle transition recorded."
+                      : undefined;
+          ''',
+          )
+          lifecycle_route = r'''
+          app.post("/demo/app/admin/workflows/lifecycle", async (context) => {
+            if (!guidedDemoEnabled(context.env)) return context.notFound();
+            if (!hasSameOrigin(context.req.url, context.req.header("Origin"))) {
+              return context.json({ error: "Same-origin demo request required." }, 403);
+            }
+            const sessionId = readGuidedDemoSession(context.req.header("Cookie"));
+            if (!sessionId) {
+              return context.json(
+                {
+                  error:
+                    "Synthetic administration session missing. Reload Workflow Definitions.",
+                },
+                409,
+              );
+            }
+
+            try {
+              const input = parseWorkflowLifecycleInput(
+                await readWorkflowLifecycleFormValues(context.req.raw),
+              );
+              const database = new D1DatabaseProvider(context.env.DOCUMENT_CONTROL_DB);
+              const demo = createGuidedDemoContext(sessionId);
+              await ensureGuidedDemoSeed(database, sessionId);
+              const admin = await ensureGuidedTenantAdmin(database, sessionId);
+              await createAuthorizedWorkflowDefinitionAdminService(
+                database,
+              ).transitionLifecycle(
+                {
+                  subjectId: admin.subjectId,
+                  tenantId: demo.tenantId,
+                  workspaceId: demo.workspaceId,
+                },
+                {
+                  workflowDefinitionId: input.workflowDefinitionId,
+                  workflowDefinitionVersion: input.workflowDefinitionVersion,
+                  targetState: input.targetState,
+                  auditEventId: `workflow-lifecycle-audit-${crypto.randomUUID()}`,
+                  occurredAt: new Date().toISOString(),
+                },
+              );
+              return context.redirect(
+                "/demo/app/admin/workflows?notice=lifecycle",
+                303,
+              );
+            } catch (error) {
+              if (error instanceof WorkflowLifecycleInputValidationError) {
+                return context.text(error.message, 400);
+              }
+              if (error instanceof AuthorizationDeniedError) {
+                return context.html(renderNotFound(createTheme(context.env)), 404);
+              }
+              const message =
+                error instanceof Error
+                  ? error.message
+                  : "Workflow lifecycle transition failed.";
+              return context.text(message, 409);
+            }
+          });
+
+          '''
+          replace_once(
+              "src/index.ts",
+              'app.get("/demo/app/admin/workflow-selection", async (context) => {',
+              lifecycle_route + 'app.get("/demo/app/admin/workflow-selection", async (context) => {',
+          )
+          lifecycle_helper = r'''
+          async function readWorkflowLifecycleFormValues(
+            request: Request,
+          ): Promise<URLSearchParams> {
+            let formData: FormData;
+            try {
+              formData = await request.formData();
+            } catch {
+              throw new WorkflowLifecycleInputValidationError(
+                "A valid form body is required.",
+              );
+            }
+            const values = new URLSearchParams();
+            for (const key of [
+              "workflowDefinitionId",
+              "workflowDefinitionVersion",
+              "targetState",
+            ]) {
+              const value = formData.get(key);
+              if (typeof value === "string") values.set(key, value);
+            }
+            return values;
+          }
+
+          '''
+          replace_once(
+              "src/index.ts",
+              'async function readWorkflowSelectionFormValues(\n',
+              lifecycle_helper + 'async function readWorkflowSelectionFormValues(\n',
+          )
+
+          # Portable export contract and validation.
+          replace_once(
+              "src/application/export.ts",
+              '''export interface WorkspaceWorkflowAssignmentExport {
+          ''',
+              '''export interface WorkflowDefinitionLifecycleExport {
+            tenantId: string;
+            workflowDefinitionId: string;
+            workflowDefinitionVersion: number;
+            lifecycleState: "active" | "deprecated" | "retired";
+            changedBySubjectId?: string;
+            changedAt: string;
+          }
+
+          export interface WorkspaceWorkflowAssignmentExport {
+          ''',
+          )
+          replace_once(
+              "src/application/export.ts",
+              '''  workflowDefinitions: WorkflowDefinition[];
+            workspaceWorkflowAssignments?: WorkspaceWorkflowAssignmentExport[];
+          ''',
+              '''  workflowDefinitions: WorkflowDefinition[];
+            workflowDefinitionLifecycles?: WorkflowDefinitionLifecycleExport[];
+            workspaceWorkflowAssignments?: WorkspaceWorkflowAssignmentExport[];
+          ''',
+          )
+          replace_once(
+              "src/application/export.ts",
+              '''  for (const field of arrayFields) {
+              requireArray(root[field], field);
+            }
+
+            const data = candidate as unknown as PortableExportV1;
+          ''',
+              '''  for (const field of arrayFields) {
+              requireArray(root[field], field);
+            }
+            if (root.workflowDefinitionLifecycles !== undefined) {
+              requireArray(root.workflowDefinitionLifecycles, "workflowDefinitionLifecycles");
+            }
+            if (root.workspaceWorkflowAssignments !== undefined) {
+              requireArray(root.workspaceWorkflowAssignments, "workspaceWorkflowAssignments");
+            }
+
+            const data = candidate as unknown as PortableExportV1;
+          ''',
+          )
+          lifecycle_validation = r'''
+            const workflowLifecycleByKey = new Map<
+              string,
+              WorkflowDefinitionLifecycleExport
+            >();
+            if (data.workflowDefinitionLifecycles !== undefined) {
+              for (const lifecycle of data.workflowDefinitionLifecycles) {
+                assertTenant(
+                  lifecycle.tenantId,
+                  tenantId,
+                  `workflow lifecycle ${lifecycle.workflowDefinitionId}`,
+                );
+                const key = `${lifecycle.workflowDefinitionId}:${lifecycle.workflowDefinitionVersion}`;
+                if (!workflowDefinitions.has(key)) {
+                  throw new Error(
+                    `Workflow lifecycle ${key} references a missing workflow definition version.`,
+                  );
+                }
+                if (workflowLifecycleByKey.has(key)) {
+                  throw new Error(`Workflow lifecycle contains duplicate version ${key}.`);
+                }
+                if (
+                  !["active", "deprecated", "retired"].includes(
+                    lifecycle.lifecycleState,
+                  )
+                ) {
+                  throw new Error(`Workflow lifecycle ${key} has an invalid state.`);
+                }
+                requireString(lifecycle.changedAt, `workflow lifecycle ${key} changedAt`);
+                if (lifecycle.changedBySubjectId !== undefined) {
+                  assertReferenced(
+                    subjects,
+                    lifecycle.changedBySubjectId,
+                    "workflow lifecycle actor",
+                  );
+                }
+                workflowLifecycleByKey.set(key, lifecycle);
+              }
+              if (workflowLifecycleByKey.size !== workflowDefinitions.size) {
+                throw new Error(
+                  "Workflow lifecycle export must contain exactly one record per workflow definition version.",
+                );
+              }
+            }
+
+          '''
+          replace_once(
+              "src/application/export.ts",
+              '''  for (const assignment of data.workspaceWorkflowAssignments ?? []) {
+          ''',
+              lifecycle_validation + '''  for (const assignment of data.workspaceWorkflowAssignments ?? []) {
+          ''',
+          )
+          replace_once(
+              "src/application/export.ts",
+              '''    if (
+                !workflowDefinitions.has(
+                  `${assignment.workflowDefinitionId}:${assignment.workflowDefinitionVersion}`,
+                )
+              ) {
+                throw new Error(
+                  `Workspace workflow assignment ${assignment.workspaceId} references a missing workflow definition version.`,
+                );
+              }
+          ''',
+              '''    const assignmentWorkflowKey = `${assignment.workflowDefinitionId}:${assignment.workflowDefinitionVersion}`;
+              if (!workflowDefinitions.has(assignmentWorkflowKey)) {
+                throw new Error(
+                  `Workspace workflow assignment ${assignment.workspaceId} references a missing workflow definition version.`,
+                );
+              }
+              if (
+                workflowLifecycleByKey.get(assignmentWorkflowKey)?.lifecycleState ===
+                "retired"
+              ) {
+                throw new Error(
+                  `Workspace workflow assignment ${assignment.workspaceId} references a retired workflow version.`,
+                );
+              }
+          ''',
+          )
+
+          # Read lifecycle state into new exports and include lifecycle actors.
+          replace_once(
+              "src/application/portable-export-read-service.ts",
+              '''  type PortableExportV1,
+            type WorkspaceWorkflowAssignmentExport,
+          ''',
+              '''  type PortableExportV1,
+            type WorkflowDefinitionLifecycleExport,
+            type WorkspaceWorkflowAssignmentExport,
+          ''',
+          )
+          replace_once(
+              "src/application/portable-export-read-service.ts",
+              '''interface WorkspaceWorkflowAssignmentRow {
+          ''',
+              '''interface WorkflowDefinitionLifecycleRow {
+            tenantId: string;
+            workflowDefinitionId: string;
+            workflowDefinitionVersion: number;
+            lifecycleState: "active" | "deprecated" | "retired";
+            changedBySubjectId: string | null;
+            changedAt: string;
+          }
+          interface WorkspaceWorkflowAssignmentRow {
+          ''',
+          )
+          replace_once(
+              "src/application/portable-export-read-service.ts",
+              '''      workflowDefinitions,
+              workspaceWorkflowAssignments,
+              workflowInstances,
+          ''',
+              '''      workflowDefinitions,
+              workflowDefinitionLifecycles,
+              workspaceWorkflowAssignments,
+              workflowInstances,
+          ''',
+          )
+          replace_once(
+              "src/application/portable-export-read-service.ts",
+              '''      this.readWorkflowDefinitions(tenantId),
+              this.readWorkspaceWorkflowAssignments(tenantId),
+              this.readWorkflowInstances(tenantId),
+          ''',
+              '''      this.readWorkflowDefinitions(tenantId),
+              this.readWorkflowDefinitionLifecycles(tenantId),
+              this.readWorkspaceWorkflowAssignments(tenantId),
+              this.readWorkflowInstances(tenantId),
+          ''',
+          )
+          replace_once(
+              "src/application/portable-export-read-service.ts",
+              '''      workflowDefinitions,
+              workspaceWorkflowAssignments,
+              workflowInstances,
+          ''',
+              '''      workflowDefinitions,
+              workflowDefinitionLifecycles,
+              workspaceWorkflowAssignments,
+              workflowInstances,
+          ''',
+          )
+          replace_once(
+              "src/application/portable-export-read-service.ts",
+              '''         UNION SELECT actor_subject_id FROM audit_events WHERE tenant_id = ?
+               )
+               ORDER BY subject.id`,
+              [tenantId, tenantId, tenantId, tenantId, tenantId, tenantId],
+          ''',
+              '''         UNION SELECT actor_subject_id FROM audit_events WHERE tenant_id = ?
+                 UNION SELECT changed_by_subject_id FROM workflow_definition_lifecycle
+                   WHERE tenant_id = ? AND changed_by_subject_id IS NOT NULL
+               )
+               ORDER BY subject.id`,
+              [tenantId, tenantId, tenantId, tenantId, tenantId, tenantId, tenantId],
+          ''',
+          )
+          lifecycle_reader = r'''
+            private async readWorkflowDefinitionLifecycles(
+              tenantId: string,
+            ): Promise<WorkflowDefinitionLifecycleExport[]> {
+              const rows = await this.database.query<WorkflowDefinitionLifecycleRow>(
+                `SELECT tenant_id AS tenantId,
+                        workflow_definition_id AS workflowDefinitionId,
+                        workflow_definition_version AS workflowDefinitionVersion,
+                        lifecycle_state AS lifecycleState,
+                        changed_by_subject_id AS changedBySubjectId,
+                        changed_at AS changedAt
+                 FROM workflow_definition_lifecycle
+                 WHERE tenant_id = ?
+                 ORDER BY workflow_definition_id, workflow_definition_version`,
+                [tenantId],
+              );
+              return rows.map((row) => ({
+                tenantId: row.tenantId,
+                workflowDefinitionId: row.workflowDefinitionId,
+                workflowDefinitionVersion: Number(row.workflowDefinitionVersion),
+                lifecycleState: row.lifecycleState,
+                changedBySubjectId: row.changedBySubjectId ?? undefined,
+                changedAt: row.changedAt,
+              }));
+            }
+
+          '''
+          replace_once(
+              "src/application/portable-export-read-service.ts",
+              '''  private async readWorkspaceWorkflowAssignments(
+          ''',
+              lifecycle_reader + '''  private async readWorkspaceWorkflowAssignments(
+          ''',
+          )
+
+          # Existing SQLite fixtures must apply the new lifecycle migration.
+          replace_once(
+              "tests/unit/workflow-definition-admin-service.test.ts",
+              '''  const migrationFiles = [
+              "0001_initial.sql",
+              "0002_system_role_permissions.sql",
+              "0003_workflow_definition_immutability.sql",
+            ];
+          ''',
+              '''  const migrationFiles = [
+              "0001_initial.sql",
+              "0002_system_role_permissions.sql",
+              "0003_workflow_definition_immutability.sql",
+              "0004_template_version_lifecycle_integrity.sql",
+              "0005_workspace_workflow_selection.sql",
+              "0006_workflow_definition_lifecycle.sql",
+            ];
+          ''',
+          )
+          replace_once(
+              "tests/unit/workspace-workflow-selection-service.test.ts",
+              '''    "0005_workspace_workflow_selection.sql",
+            ]) {
+          ''',
+              '''    "0005_workspace_workflow_selection.sql",
+              "0006_workflow_definition_lifecycle.sql",
+            ]) {
+          ''',
+          )
+
+          # Durable release status.
+          replace_once(
+              "docs/STATUS.md",
+              '''- Workflow retirement/deprecation semantics or richer workflow authoring.
+          ''',
+              '''- Richer workflow authoring beyond immutable versions, workspace selection, and controlled lifecycle.
+          ''',
+          )
+          status_marker = '''### Authorized controlled Template Lifecycle administration (synthetic/test only)
+          '''
+          lifecycle_status = '''### Controlled Workflow Definition lifecycle administration (synthetic/test only)
+
+          - Exact immutable workflow-definition versions now have separate lifecycle state: `active`,
+            `deprecated`, or `retired`; lifecycle changes never rewrite definition content.
+          - New workflow-definition versions begin Active. Active versions may be newly assigned to a workspace
+            and selected as a new workspace default.
+          - Deprecated versions may remain where already configured, including as an existing default so
+            administrators can migrate deliberately, but they cannot be newly assigned or newly selected as a
+            default. Deprecated versions can be reactivated.
+          - Retirement is terminal and requires the exact version to be removed from every workspace first.
+            Running workflow instances, reviews, approvals, and audit history remain pinned to their original
+            exact definition version after retirement.
+          - Migration `0006_workflow_definition_lifecycle.sql` keeps definition rows immutable, creates lifecycle
+            records for existing and future definition versions, enforces legal lifecycle transitions, blocks
+            new assignment/default promotion for non-Active versions, and prevents retirement while workspace
+            assignments remain.
+          - Lifecycle administration uses the existing tenant-wide Workflow Definitions authority boundary:
+            `tenant.manage` plus current-workspace `workflow.manage`. Successful changes append
+            `workflow.definition.lifecycle_transitioned` evidence to the immutable audit stream.
+          - Backup & Portability exports include lifecycle state and transition metadata while legacy v1 exports
+            without the additive lifecycle field remain accepted as Active for compatibility.
+          - This slice does not delete workflow history, migrate running instances, rewrite approvals, add
+            production authentication, create production Cloudflare resources, accept customer data/uploads,
+            or add paid services.
+
+          '''
+          replace_once(
+              "docs/STATUS.md",
+              status_marker,
+              lifecycle_status + status_marker,
+          )
+
+          # The schema authority is the ordered migration set, not only migration 0001.
+          replace_once(
+              "src/infrastructure/schema.ts",
+              '''// `migrations/0001_initial.sql` is the authoritative executable schema for the
+          // bootstrap. Keeping the relational constraints, triggers, and indexes in one
+          // executable source prevents a second schema declaration from silently drifting
+          // away from the database invariants. A typed query layer may be introduced later
+          // if it can be generated from, or mechanically verified against, the migration.
+          
+          export const authoritativeSchemaMigration =
+            "migrations/0001_initial.sql" as const;
+          ''',
+              '''// The ordered SQL files under `migrations/` are the authoritative executable D1
+          // schema. Keeping relational constraints, triggers, and indexes in executable
+          // migrations prevents a second schema declaration from silently drifting away from
+          // the database invariants. A typed query layer may be introduced later if it can be
+          // generated from, or mechanically verified against, the migration sequence.
+          
+          export const authoritativeSchemaMigrations = "migrations/*.sql" as const;
+          ''',
+          )
+          PY
+
+          pnpm exec prettier --write \
+            src/application/workflow-definition-admin-service.ts \
+            src/application/workflow-lifecycle-input.ts \
+            src/application/workspace-workflow-selection-service.ts \
+            src/application/authorized-workflow-definition-admin-service.ts \
+            src/application/export.ts \
+            src/application/portable-export-read-service.ts \
+            src/domain/workflow-lifecycle.ts \
+            src/index.ts \
+            src/infrastructure/schema.ts \
+            src/ui/render-workflow-definition-admin.ts \
+            src/ui/render-workspace-workflow-selection.ts \
+            tests/unit/workflow-definition-admin-service.test.ts \
+            tests/unit/workspace-workflow-selection-service.test.ts \
+            tests/unit/workflow-definition-lifecycle-service.test.ts \
+            tests/unit/workflow-lifecycle-input.test.ts \
+            tests/unit/workflow-lifecycle.test.ts \
+            docs/STATUS.md
+
+          if ! git diff --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add \
+              src/application \
+              src/domain/workflow-lifecycle.ts \
+              src/index.ts \
+              src/infrastructure/schema.ts \
+              src/ui/render-workflow-definition-admin.ts \
+              src/ui/render-workspace-workflow-selection.ts \
+              tests/unit \
+              docs/STATUS.md
+            git commit -m "Integrate workflow lifecycle release"
+            git push origin HEAD:feature/workflow-retirement-deprecation
+          fi
