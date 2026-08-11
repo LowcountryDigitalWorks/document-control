@@ -578,7 +578,7 @@ production authentication or public-demo hardening.
   PR #19, Template Lifecycle integration reconciliation PR #20, workspace Workflow Selection
   administration PR #21, controlled Workflow Definition lifecycle administration PR #27,
   provider-neutral custom workspace roles PR #29, provider-neutral tenant member lifecycle PR #30,
-  and terminal custom role retirement PR #31.
+  terminal custom role retirement PR #31, and workflow authoring improvements PR #32.
 - `main` is the authoritative integration branch after reviewed/validated pull requests are merged.
 - No production Cloudflare resources, custom domains, customer data, analytics, paid services, or
   public-upload capability have been introduced.
