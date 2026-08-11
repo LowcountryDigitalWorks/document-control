@@ -40,7 +40,8 @@ describe("portable export", () => {
     };
 
     expect(
-      parseExport(serializeExport(lifecycleExport)).workflowDefinitionLifecycles,
+      parseExport(serializeExport(lifecycleExport))
+        .workflowDefinitionLifecycles,
     ).toEqual(lifecycleExport.workflowDefinitionLifecycles);
   });
 
