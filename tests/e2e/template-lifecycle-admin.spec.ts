@@ -34,7 +34,7 @@ test("Template Manager supersedes a published version without changing existing 
   await expect(templateCard).toHaveCount(1);
   const contentHash =
     (await templateCard.locator("dd code").nth(1).textContent()) ?? "";
-  expect(contentHash).toMatch(/^[0-9a-f]{64}$/u);
+  expect(contentHash).toMatch(/^sha256:[0-9a-f]{64}$/u);
   await expect(templateCard).toContainText("Source documents");
   await expect(templateCard).toContainText("1");
 
