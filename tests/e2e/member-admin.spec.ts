@@ -70,7 +70,7 @@ test("tenant administrator stages, activates, assigns, and suspends a direct mem
   ).toBeVisible();
 });
 
-test("member lifecycle rejects cross-origin mutation and current-admin self suspension", async ({
+test("member lifecycle rejects cross-origin mutation and hides current-admin suspension", async ({
   page,
 }) => {
   await openMembers(page);
@@ -80,19 +80,9 @@ test("member lifecycle rejects cross-origin mutation and current-admin self susp
   await expect(
     selfCard.getByText(/cannot be suspended from this screen/u),
   ).toBeVisible();
-  const selfMembershipId =
-    (await selfCard.locator('input[name="membershipId"]').getAttribute("value")) ??
-    "";
-  if (selfMembershipId) {
-    const selfSuspend = await page.request.post(
-      "/demo/app/admin/members/status",
-      {
-        headers: { Origin: "http://127.0.0.1:8787" },
-        form: { membershipId: selfMembershipId, targetStatus: "suspended" },
-      },
-    );
-    expect(selfSuspend.status()).toBe(409);
-  }
+  await expect(
+    selfCard.getByRole("button", { name: "Suspend member" }),
+  ).toHaveCount(0);
 
   const crossOrigin = await page.request.post("/demo/app/admin/members/create", {
     headers: { Origin: "https://example.test" },
