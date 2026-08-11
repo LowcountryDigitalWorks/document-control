@@ -11,9 +11,9 @@ describe("custom role retirement input", () => {
   });
 
   it("rejects missing or unsafe identifiers", () => {
-    expect(() =>
-      parseCustomRoleRetirementInput(new URLSearchParams()),
-    ).toThrow("Custom role is required.");
+    expect(() => parseCustomRoleRetirementInput(new URLSearchParams())).toThrow(
+      "Custom role is required.",
+    );
     expect(() =>
       parseCustomRoleRetirementInput(
         new URLSearchParams({ roleDefinitionId: "role custom<script>" }),

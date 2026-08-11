@@ -66,7 +66,10 @@ async function createHarness(): Promise<{
     "0007_custom_role_retirement.sql",
   ]) {
     database.exec(
-      await readFile(new URL(`../../migrations/${migration}`, import.meta.url), "utf8"),
+      await readFile(
+        new URL(`../../migrations/${migration}`, import.meta.url),
+        "utf8",
+      ),
     );
   }
   database.exec(`

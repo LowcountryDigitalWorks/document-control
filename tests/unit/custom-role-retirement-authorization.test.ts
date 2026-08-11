@@ -15,8 +15,12 @@ const context = {
 
 function harness(denyAt: number | null = null) {
   const requests: AuthorizationRequest[] = [];
-  const retireCustomWorkspaceRole = vi.fn().mockResolvedValue({ changed: true });
-  const access = { retireCustomWorkspaceRole } as unknown as RolesAccessAdminService;
+  const retireCustomWorkspaceRole = vi
+    .fn()
+    .mockResolvedValue({ changed: true });
+  const access = {
+    retireCustomWorkspaceRole,
+  } as unknown as RolesAccessAdminService;
   const authorization: AuthorizationPolicy = {
     async assertAllowed(request) {
       requests.push(request);

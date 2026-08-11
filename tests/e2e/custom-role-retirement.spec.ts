@@ -56,7 +56,9 @@ test("tenant administrator removes assignments and terminally retires a custom r
   card = page
     .locator(".custom-role-card")
     .filter({ hasText: "Retirement Candidate" });
-  await expect(card.getByText("Retired custom role", { exact: true })).toBeVisible();
+  await expect(
+    card.getByText("Retired custom role", { exact: true }),
+  ).toBeVisible();
   await expect(card.getByText(/historical definition only/iu)).toBeVisible();
   await expect(
     card.locator('form[action="/demo/app/admin/access/roles/update"]'),
@@ -76,7 +78,9 @@ test("tenant administrator removes assignments and terminally retires a custom r
   expect(accessibility.violations).toEqual([]);
 });
 
-test("custom role retirement rejects cross-origin mutation", async ({ page }) => {
+test("custom role retirement rejects cross-origin mutation", async ({
+  page,
+}) => {
   await page.goto("/demo/app/admin/access");
   const response = await page.request.post(
     "/demo/app/admin/access/roles/retire",

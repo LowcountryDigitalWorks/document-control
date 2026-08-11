@@ -43,6 +43,7 @@ export interface RoleDefinition {
   permissions: readonly string[];
   isSystem: boolean;
   createdAt: IsoTimestamp;
+  retiredAt?: IsoTimestamp;
 }
 
 export interface RoleBinding {
