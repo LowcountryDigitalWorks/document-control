@@ -52,6 +52,13 @@ export async function createE2eD1Database(): Promise<D1Database> {
       ),
       "utf8",
     ),
+    readFile(
+      new URL(
+        "../migrations/0006_workflow_definition_lifecycle.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
   ]);
   for (const migration of migrations) {
     database.exec(migration);

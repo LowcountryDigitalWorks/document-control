@@ -1,3 +1,4 @@
+import type { WorkflowLifecycleState } from "../domain/workflow-lifecycle";
 import type { DatabaseProvider, DatabaseStatement } from "./ports";
 
 export interface WorkspaceWorkflowSelectionRecord {
@@ -8,6 +9,7 @@ export interface WorkspaceWorkflowSelectionRecord {
   transitions: readonly { from: string; to: string }[];
   createdAt: string;
   instanceCount: number;
+  lifecycleState: WorkflowLifecycleState;
   applicable: boolean;
   isDefault: boolean;
 }
@@ -60,6 +62,7 @@ interface CatalogRow {
   definitionJson: string;
   createdAt: string;
   instanceCount: number;
+  lifecycleState: WorkflowLifecycleState;
   applicable: number;
   isDefault: number;
 }
@@ -84,10 +87,15 @@ export class WorkspaceWorkflowSelectionService {
               definition.name,
               definition.definition_json AS definitionJson,
               definition.created_at AS createdAt,
+              lifecycle.lifecycle_state AS lifecycleState,
               COUNT(DISTINCT instance.id) AS instanceCount,
               CASE WHEN assignment.workflow_definition_id IS NULL THEN 0 ELSE 1 END AS applicable,
               COALESCE(assignment.is_default, 0) AS isDefault
        FROM workflow_definitions definition
+       JOIN workflow_definition_lifecycle lifecycle
+         ON lifecycle.tenant_id = definition.tenant_id
+        AND lifecycle.workflow_definition_id = definition.id
+        AND lifecycle.workflow_definition_version = definition.version
        LEFT JOIN workflow_instances instance
          ON instance.tenant_id = definition.tenant_id
         AND instance.workflow_definition_id = definition.id
@@ -100,6 +108,7 @@ export class WorkspaceWorkflowSelectionService {
        WHERE definition.tenant_id = ?
        GROUP BY definition.id, definition.version, definition.name,
                 definition.definition_json, definition.created_at,
+                lifecycle.lifecycle_state,
                 assignment.workflow_definition_id, assignment.is_default
        ORDER BY definition.id ASC, definition.version DESC`,
       [workspaceId, tenantId],
@@ -115,7 +124,7 @@ export class WorkspaceWorkflowSelectionService {
     command: SetWorkflowApplicabilityCommand,
   ): Promise<{ changed: boolean }> {
     await this.loadWorkspace(command.tenantId, command.workspaceId);
-    await this.assertDefinitionExists(
+    const lifecycleState = await this.loadDefinitionLifecycle(
       command.tenantId,
       command.workflowDefinitionId,
       command.workflowDefinitionVersion,
@@ -138,6 +147,11 @@ export class WorkspaceWorkflowSelectionService {
 
     if (command.applicable) {
       if (existing) return { changed: false };
+      if (lifecycleState !== "active") {
+        throw new Error(
+          "Only active workflow versions can be newly made available to a workspace.",
+        );
+      }
       await this.database.executeBatch([
         {
           sql: `INSERT INTO workspace_workflow_assignments
@@ -168,6 +182,7 @@ export class WorkspaceWorkflowSelectionService {
           payload: {
             workflowDefinitionId: command.workflowDefinitionId,
             workflowDefinitionVersion: command.workflowDefinitionVersion,
+            lifecycleState,
           },
         }),
       ]);
@@ -205,6 +220,7 @@ export class WorkspaceWorkflowSelectionService {
         payload: {
           workflowDefinitionId: command.workflowDefinitionId,
           workflowDefinitionVersion: command.workflowDefinitionVersion,
+          lifecycleState,
         },
       }),
     ]);
@@ -215,11 +231,16 @@ export class WorkspaceWorkflowSelectionService {
     command: SetDefaultWorkflowCommand,
   ): Promise<{ changed: boolean }> {
     await this.loadWorkspace(command.tenantId, command.workspaceId);
-    await this.assertDefinitionExists(
+    const lifecycleState = await this.loadDefinitionLifecycle(
       command.tenantId,
       command.workflowDefinitionId,
       command.workflowDefinitionVersion,
     );
+    if (lifecycleState !== "active") {
+      throw new Error(
+        "Only an active workflow version can be selected as a new workspace default.",
+      );
+    }
 
     const assignments = await this.database.query<AssignmentRow>(
       `SELECT workflow_definition_id AS workflowDefinitionId,
@@ -290,6 +311,7 @@ export class WorkspaceWorkflowSelectionService {
             previous?.workflowDefinitionVersion ?? null,
           workflowDefinitionId: command.workflowDefinitionId,
           workflowDefinitionVersion: command.workflowDefinitionVersion,
+          lifecycleState,
         },
       }),
     ]);
@@ -304,27 +326,50 @@ export class WorkspaceWorkflowSelectionService {
     const [row] = await this.database.query<{
       workflowDefinitionId: string;
       workflowDefinitionVersion: number;
+      lifecycleState: WorkflowLifecycleState;
     }>(
-      `SELECT workflow_definition_id AS workflowDefinitionId,
-              workflow_definition_version AS workflowDefinitionVersion
-       FROM workspace_workflow_assignments
-       WHERE tenant_id = ? AND workspace_id = ? AND is_default = 1`,
+      `SELECT assignment.workflow_definition_id AS workflowDefinitionId,
+              assignment.workflow_definition_version AS workflowDefinitionVersion,
+              lifecycle.lifecycle_state AS lifecycleState
+       FROM workspace_workflow_assignments assignment
+       JOIN workflow_definition_lifecycle lifecycle
+         ON lifecycle.tenant_id = assignment.tenant_id
+        AND lifecycle.workflow_definition_id = assignment.workflow_definition_id
+        AND lifecycle.workflow_definition_version = assignment.workflow_definition_version
+       WHERE assignment.tenant_id = ?
+         AND assignment.workspace_id = ?
+         AND assignment.is_default = 1`,
       [tenantId, workspaceId],
     );
     if (!row) {
       throw new Error("No default workflow is configured for this workspace.");
     }
-    return row;
+    if (row.lifecycleState === "retired") {
+      throw new Error(
+        "A retired workflow version cannot start a new workflow.",
+      );
+    }
+    return {
+      workflowDefinitionId: row.workflowDefinitionId,
+      workflowDefinitionVersion: Number(row.workflowDefinitionVersion),
+    };
   }
 
-  private async assertDefinitionExists(
+  private async loadDefinitionLifecycle(
     tenantId: string,
     definitionId: string,
     version: number,
-  ): Promise<void> {
-    const [definition] = await this.database.query<{ id: string }>(
-      `SELECT id FROM workflow_definitions
-       WHERE tenant_id = ? AND id = ? AND version = ?`,
+  ): Promise<WorkflowLifecycleState> {
+    const [definition] = await this.database.query<{
+      lifecycleState: WorkflowLifecycleState;
+    }>(
+      `SELECT lifecycle.lifecycle_state AS lifecycleState
+       FROM workflow_definitions definition
+       JOIN workflow_definition_lifecycle lifecycle
+         ON lifecycle.tenant_id = definition.tenant_id
+        AND lifecycle.workflow_definition_id = definition.id
+        AND lifecycle.workflow_definition_version = definition.version
+       WHERE definition.tenant_id = ? AND definition.id = ? AND definition.version = ?`,
       [tenantId, definitionId, version],
     );
     if (!definition) {
@@ -332,6 +377,7 @@ export class WorkspaceWorkflowSelectionService {
         "The requested workflow definition version does not exist in this tenant.",
       );
     }
+    return definition.lifecycleState;
   }
 
   private async loadWorkspace(
@@ -392,6 +438,7 @@ function mapCatalogRow(row: CatalogRow): WorkspaceWorkflowSelectionRecord {
     transitions,
     createdAt: row.createdAt,
     instanceCount: Number(row.instanceCount),
+    lifecycleState: row.lifecycleState,
     applicable: Number(row.applicable) === 1,
     isDefault: Number(row.isDefault) === 1,
   };

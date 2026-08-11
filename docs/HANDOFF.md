@@ -1,132 +1,143 @@
-# Handoff
+# Document Control Handoff
 
-## Authoritative state
+## Authority
 
-`main` is the authoritative product foundation.
+`main` is the authoritative product source after each approved pull request is merged. Before any new
+work, inspect current `main`, open/recent pull requests, `README.md`, `docs/STATUS.md`, migrations,
+workflow/tests, and the latest GitHub Actions results rather than relying on this file alone.
 
-Merged milestones before the workspace-read slice:
+Repository: `LowcountryDigitalWorks/document-control`
 
-- PR #1, bootstrap foundation → `e5902256cfbe1f36b67143cae8daf687fe684732`.
-- PR #7, persisted document workflow → `2c4d07c54738d59dcdceaa488d9deeafd39853d1`.
-- PR #8, provider-neutral authorization boundary → `119f6d8d29291662b5ec5c788706f1d093723bac`.
-- PR #9, authorized guided workflow UI → `bbc9e381b5e3b8ba93bad3a232bfbb716cdb0cf1`.
+The repository is intentionally public by owner decision. Package metadata remains `private: true`
+only to prevent accidental package-registry publication. No production customer deployment, customer
+data, arbitrary uploads, paid service, analytics, or production authentication is authorized by the
+current repository state.
 
-The repository is public by explicit owner decision. Package metadata remains `private: true` only to
-prevent accidental package-registry publication. No production Cloudflare resources, customer data,
-paid services, analytics, or public-upload capability exist.
+## Current architecture
 
-Normal development uses this repository, branches/pull requests, and GitHub Actions. Codex is not a
-routine development or release dependency.
-
-## Foundation decisions
-
-- TypeScript + Hono modular monolith on Cloudflare Workers.
-- D1/SQLite stores relational application metadata; R2 stores binaries.
-- SQL migrations are authoritative executable schema/data evolution.
-- Core code stays vendor-independent behind `DatabaseProvider` and `ContentStore` ports.
-- R2 version objects are create-once and their bytes are SHA-256 verified.
-- Content keys are built by application-owned tenant/workspace/version key builders.
-- Identity metadata is provider-neutral; production authentication remains undecided.
-- Roles are configurable definitions plus scoped bindings rather than a closed enum.
-- Workflow instances execute the exact versioned workflow definition they were created with.
-- Templates are controlled/versioned records with lifecycle and provenance.
-- Approvals bind exact version ID + SHA-256 + actor + workflow instance + workflow definition/version.
+- TypeScript + Hono modular monolith targeting Cloudflare Workers.
+- D1/SQLite for relational application metadata behind `DatabaseProvider`.
+- R2 as the initial binary-content provider behind `ContentStore`.
+- Ordered SQL files in `migrations/` are the authoritative executable schema/evolution source.
+- Application-owned content keys and SHA-256 content identity protect version/object integrity.
+- Provider-neutral identity subjects, memberships, configurable roles, scoped role bindings, and
+  permission evaluation keep authorization independent from future authentication/SSO.
+- Workflow definitions are immutable/versioned; workflow instances execute the exact version they
+  started with.
+- Controlled templates are versioned and preserve exact source provenance.
+- Approvals bind an actor and timestamp to exact document-version/hash/workflow evidence.
 - Audit records are append-only.
-- Export v1 validates structure, references, tenant boundaries, template provenance, workflows, and
-  approval evidence.
-- The LDW theme is a configurable reference theme; final colors/assets are not hard-coded decisions.
-- Bear Necessities is a candidate deployment/offering tier, not a domain/product architecture name.
+- Portable export is versioned and validates structure, references, tenant boundaries, provenance,
+  workflow evidence, approvals, workspace workflow selection, and workflow lifecycle information.
 
-## Persisted workflow capability
+## Implemented product slices
 
-The application-service layer supports:
+The synthetic/test-only application now covers:
 
-`published template -> document/version -> workflow -> review -> exact-version approval -> changed version -> prior approval does not apply to new version -> audit evidence`
+- persisted document workflow lifecycle;
+- provider-neutral authorization;
+- guided workflow execution;
+- workspace Overview, Documents, Templates, document evidence, Reviews, and Approvals;
+- bounded metadata search/filtering;
+- Backup & Portability export;
+- Audit Log;
+- tenant presentation administration;
+- workspace Roles & Access administration;
+- immutable Workflow Definition administration;
+- controlled Template Lifecycle administration;
+- workspace Workflow Selection/default-version administration; and
+- controlled Workflow Definition lifecycle administration.
 
-Related D1 metadata/state mutations use database batches. The application does not claim an atomic
-transaction across R2 binary creation and D1 metadata. Upload orchestration and compensation remain
-future work before customer uploads.
+See `docs/STATUS.md` and Git history for the detailed invariant/test record for each merged slice.
 
-## Authorization boundary
+## Workflow Definition lifecycle terminology
 
-Authorization is intentionally separate from authentication.
+User-facing administration uses three distinct lifecycle labels:
 
-- `AuthorizationPolicy` defines the provider-neutral enforcement boundary.
-- Built-in roles receive explicit permission defaults in `0002_system_role_permissions.sql`.
-- `DatabaseAuthorizationPolicy` evaluates configurable role definitions/bindings at platform, tenant,
-  and workspace scope.
-- Active tenant membership is required for tenant/workspace access; a platform administrator remains
-  a deliberate global role.
-- Workspace scope can be resolved through workspace, document, or workflow-instance resources while
-  preserving the requested tenant boundary.
-- `AuthorizedDocumentWorkflowService` gates workflow mutations and evidence reads.
-- `AuthorizedWorkspaceReadService` gates workspace overview, document-list, and template-list reads.
-- Authentication/SSO selection is still deferred; no production credentials or identity-provider
-  secrets are stored by these boundaries.
+- **Active** — available for new workspace assignment and new default selection.
+- **Legacy** — existing workspace use may continue, but the version cannot be newly assigned or newly
+  selected as a default. It may be returned to Active.
+- **Retired** — terminal historical-only state. The exact version must be removed from every workspace
+  before retirement.
 
-## Synthetic demo/app boundary
+The canonical persisted/exported machine value for **Legacy** is `deprecated`. Do not expose
+“Deprecated” as the normal product label; retain it only as the internal schema/domain/export value
+unless a deliberate migration changes that contract later.
 
-The repository includes synthetic HTTP/UI paths that exercise the real authorization and persistence
-services. They are intentionally disabled unless `DEMO_MUTATIONS_ENABLED=true`.
+Lifecycle changes never rewrite workflow-definition content. Existing workflow instances, reviews,
+approvals, and audit evidence remain pinned to their original exact workflow version.
 
-The browser supplies only navigation and the next allowed guided action. The server assigns all
-synthetic tenant, workspace, identity, role, workflow, template, and document context.
+## Synthetic application boundary
 
-Each browser context receives an opaque UUID through an HttpOnly, SameSite=Strict cookie scoped to
-`/demo`. The UUID is validated by the server and used only to namespace server-generated synthetic
-record IDs. It is not an identity credential and does not encode tenant/user/role authority.
-Independent browser contexts therefore receive independent synthetic tenants and application state.
+Interactive synthetic routes are disabled unless `DEMO_MUTATIONS_ENABLED=true`.
 
-Current synthetic routes include:
+The browser supplies navigation/form actions only. Tenant, workspace, identity, role, permission,
+workflow, template, and document authority remain server-controlled. Synthetic browser contexts use
+opaque HttpOnly, SameSite=Strict session namespaces and are independently isolated.
 
-- `/demo/workflow` for the guided exact-version lifecycle;
-- `/demo/app` for workspace overview;
-- `/demo/app/documents` for the authorized document list;
-- `/demo/app/templates` for the authorized controlled-template list.
+Same-origin mutation protection remains required.
 
-The ordinary workspace screens read the same isolated synthetic records as the guided workflow, so a
-synthetic document created through the guided path appears in that session's Documents screen while
-remaining invisible to another independent session.
+**Do not enable the interactive application on a shared public deployment yet.** A one-hour browser
+cookie does not purge D1 records. Public enablement requires deliberate server-side session
+expiration/purge, quotas, rate limiting, Turnstile or equivalent abuse controls, operational cleanup,
+and validation before it can be considered safe.
 
-POST workflow actions require a same-origin `Origin` header. There are no arbitrary input fields or
-file uploads in the guided flow.
+## Production boundaries still unresolved
 
-**Do not enable these interactive routes on a shared public deployment yet.** The cookie has a
-one-hour browser lifetime, but cookie expiration does not delete D1 rows. Public enablement requires a
-durable server-side demo-session lifecycle with expiration/purge, quotas, rate limiting,
-Turnstile/abuse controls, and operational cleanup first.
+Do not imply these are implemented or approved:
 
-## Continue locally
+- production authentication/SSO/provider configuration;
+- user/member invitation/provisioning or identity-provider/group mapping;
+- arbitrary/customer file uploads;
+- upload orchestration across D1 and binary storage;
+- malware scanning, file-type/size policy, quarantine, or failure compensation;
+- production D1/R2/Worker provisioning or custom-domain attachment;
+- complete binary backup/restore, retention automation, legal hold, or disaster recovery;
+- custom/system role-definition permission-authoring UI;
+- richer workflow authoring beyond current immutable definitions/version/lifecycle controls;
+- template content upload/new-version authoring or new-template upload flows;
+- full-text/content-body search or external search infrastructure;
+- PostgreSQL/SharePoint production adapters;
+- analytics, AI services, or paid SaaS dependencies.
 
-1. Install Node.js 22 or newer.
-2. Run `pnpm install --frozen-lockfile`.
-3. Run `pnpm db:migrate:local` so both migrations are applied.
-4. Run `pnpm dev` for the normal Worker; synthetic interactive routes remain disabled by default.
-5. Run `pnpm test:e2e` to exercise the isolated guided workflow and workspace read navigation through
-   the SQLite-backed D1 test binding.
-6. Run `pnpm check` and `pnpm test:e2e` before proposing changes.
+Any production infrastructure or recurring-cost change requires current-state inspection, proposed
+state, rollback, and Eddie's explicit approval.
 
-## Next product slice
+## Normal development and validation
 
-After the workspace-read navigation slice is merged, add an authorized **document detail/evidence
-view** before introducing editing or uploads.
+Use branches and pull requests for meaningful changes. Do not introduce temporary write-enabled CI
+workflows merely to patch repository documentation. Normal pull-request CI is intentionally
+read-only.
 
-Recommended detail view should show:
+Expected validation includes, as applicable:
 
-- document identity and current status;
-- version history;
-- exact approval applicability per version;
-- workflow/review evidence;
-- audit timeline;
-- source-template ID/version/hash/provenance where applicable.
+```bash
+pnpm install --frozen-lockfile
+pnpm format:check
+pnpm lint
+pnpm typecheck
+pnpm secrets:scan
+pnpm test:unit
+pnpm build
+pnpm test:e2e
+pnpm audit --audit-level=high
+```
 
-Keep it read-only and synthetic/test-only initially. This deepens the ordinary document-control user
-experience while preserving the current clean authorization boundary and avoiding production identity
-or upload decisions.
+The exact final pull-request head should pass the normal `quality`, `browser`, and `secrets` jobs
+before merge. Preserve existing accessibility, responsive, tenant-isolation, authorization,
+exact-version evidence, cross-origin, portability, and history-aware secret-scan coverage.
 
-A separate later slice should implement public-demo session persistence, expiry/purge, quotas, rate
-limits, Turnstile, and reset behavior before any shared public interactive deployment is approved.
+## Continuation procedure
 
-Keep arbitrary/customer uploads out of scope until permitted-data policy, content types, size limits,
-malware scanning, retention, authorization, backup/recovery, and failure/compensation behavior are
-explicitly approved.
+At the start of a replacement development chat:
+
+1. Confirm the connected GitHub identity is `Eddie-LowcountryDigitalWorks`.
+2. Inspect `LowcountryDigitalWorks/document-control` current `main` and all open/recent PRs.
+3. Read `README.md`, `docs/STATUS.md`, this handoff, migrations, package/lock files, CI, and tests.
+4. Confirm there are no failed or unfinished maintenance/dependency PRs that should be resolved first.
+5. Reconcile the roadmap against the actual merged product state before choosing the next slice.
+6. Keep production infrastructure, customer data, arbitrary uploads, authentication-provider
+   selection, and paid services outside scope unless Eddie explicitly approves the relevant design
+   and change-control boundary.
+
+Do not resume from old milestone numbers or old “next slice” text without live repository inspection.

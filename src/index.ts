@@ -52,6 +52,10 @@ import {
   WorkspaceWorkflowSelectionInputValidationError,
 } from "./application/workspace-workflow-selection-input";
 import {
+  parseWorkflowLifecycleInput,
+  WorkflowLifecycleInputValidationError,
+} from "./application/workflow-lifecycle-input";
+import {
   parseExistingWorkflowId,
   parseWorkflowDefinitionInput,
   WorkflowDefinitionInputValidationError,
@@ -764,7 +768,9 @@ app.get("/demo/app/admin/workflows", async (context) => {
         ? "Workflow definition created."
         : noticeValue === "versioned"
           ? "Workflow version created."
-          : undefined;
+          : noticeValue === "lifecycle"
+            ? "Workflow lifecycle transition recorded."
+            : undefined;
     context.header("Cache-Control", "no-store");
     return context.html(
       renderWorkflowDefinitionAdmin(
@@ -897,6 +903,63 @@ app.post("/demo/app/admin/workflows/version", async (context) => {
         ? error.message
         : "Workflow version creation failed.";
     return context.text(message, 409);
+  }
+});
+
+app.post("/demo/app/admin/workflows/lifecycle", async (context) => {
+  if (!guidedDemoEnabled(context.env)) return context.notFound();
+  if (!hasSameOrigin(context.req.url, context.req.header("Origin"))) {
+    return context.json({ error: "Same-origin demo request required." }, 403);
+  }
+  const sessionId = readGuidedDemoSession(context.req.header("Cookie"));
+  if (!sessionId) {
+    return context.json(
+      {
+        error:
+          "Synthetic administration session missing. Reload Workflow Definitions.",
+      },
+      409,
+    );
+  }
+
+  try {
+    const input = parseWorkflowLifecycleInput(
+      await readWorkflowLifecycleFormValues(context.req.raw),
+    );
+    const database = new D1DatabaseProvider(context.env.DOCUMENT_CONTROL_DB);
+    const demo = createGuidedDemoContext(sessionId);
+    await ensureGuidedDemoSeed(database, sessionId);
+    const admin = await ensureGuidedTenantAdmin(database, sessionId);
+    await createAuthorizedWorkflowDefinitionAdminService(
+      database,
+    ).transitionLifecycle(
+      {
+        subjectId: admin.subjectId,
+        tenantId: demo.tenantId,
+        workspaceId: demo.workspaceId,
+      },
+      {
+        workflowDefinitionId: input.workflowDefinitionId,
+        workflowDefinitionVersion: input.workflowDefinitionVersion,
+        targetState: input.targetState,
+        auditEventId: `workflow-lifecycle-audit-${crypto.randomUUID()}`,
+        occurredAt: new Date().toISOString(),
+      },
+    );
+    return context.redirect("/demo/app/admin/workflows?notice=lifecycle", 303);
+  } catch (error) {
+    if (error instanceof WorkflowLifecycleInputValidationError) {
+      return context.text(error.message, 400);
+    }
+    if (error instanceof AuthorizationDeniedError) {
+      return context.html(renderNotFound(createTheme(context.env)), 404);
+    }
+    return context.text(
+      error instanceof Error
+        ? error.message
+        : "Workflow lifecycle transition failed.",
+      409,
+    );
   }
 });
 
@@ -1412,6 +1475,29 @@ async function readWorkflowFormValues(
   }
   const values = new URLSearchParams();
   for (const key of keys) {
+    const value = formData.get(key);
+    if (typeof value === "string") values.set(key, value);
+  }
+  return values;
+}
+
+async function readWorkflowLifecycleFormValues(
+  request: Request,
+): Promise<URLSearchParams> {
+  let formData: FormData;
+  try {
+    formData = await request.formData();
+  } catch {
+    throw new WorkflowLifecycleInputValidationError(
+      "A valid form body is required.",
+    );
+  }
+  const values = new URLSearchParams();
+  for (const key of [
+    "workflowDefinitionId",
+    "workflowDefinitionVersion",
+    "targetState",
+  ]) {
     const value = formData.get(key);
     if (typeof value === "string") values.set(key, value);
   }

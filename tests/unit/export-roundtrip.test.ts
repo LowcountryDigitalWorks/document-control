@@ -8,16 +8,41 @@ describe("portable export", () => {
     expect(parseExport(serializeExport(source))).toEqual(source);
   });
 
-  it("accepts legacy v1 exports without workspace workflow assignments", () => {
+  it("accepts legacy v1 exports without additive workflow configuration fields", () => {
     const source = createSyntheticExport();
     const legacy = JSON.parse(JSON.stringify(source)) as Record<
       string,
       unknown
     >;
     delete legacy.workspaceWorkflowAssignments;
+    delete legacy.workflowDefinitionLifecycles;
+    const parsed = parseExport(JSON.stringify(legacy));
+    expect(parsed.workspaceWorkflowAssignments).toBeUndefined();
+    expect(parsed.workflowDefinitionLifecycles).toBeUndefined();
+  });
+
+  it("round-trips exact workflow lifecycle state and transition metadata", () => {
+    const source = createSyntheticExport();
+    const actor = source.identitySubjects[0]!.id;
+    const lifecycleExport = {
+      ...source,
+      workflowDefinitionLifecycles: source.workflowDefinitions.map(
+        (definition, index) => ({
+          tenantId: source.tenant.id,
+          workflowDefinitionId: definition.id,
+          workflowDefinitionVersion: definition.version,
+          lifecycleState:
+            index === 0 ? ("deprecated" as const) : ("active" as const),
+          changedBySubjectId: actor,
+          changedAt: source.exportedAt,
+        }),
+      ),
+    };
+
     expect(
-      parseExport(JSON.stringify(legacy)).workspaceWorkflowAssignments,
-    ).toBeUndefined();
+      parseExport(serializeExport(lifecycleExport))
+        .workflowDefinitionLifecycles,
+    ).toEqual(lifecycleExport.workflowDefinitionLifecycles);
   });
 
   it("rejects workspace workflow assignments that cross tenant or definition boundaries", () => {
@@ -40,6 +65,64 @@ describe("portable export", () => {
     };
     expect(() => parseExport(JSON.stringify(tampered))).toThrow(
       /missing workflow definition version/,
+    );
+  });
+
+  it("rejects a workspace assignment to an exported retired workflow version", () => {
+    const source = createSyntheticExport();
+    const definition = source.workflowDefinitions[0]!;
+    const assignment = {
+      tenantId: source.tenant.id,
+      workspaceId: source.workspaces[0]!.id,
+      workflowDefinitionId: definition.id,
+      workflowDefinitionVersion: definition.version,
+      isDefault: true,
+      createdBySubjectId: source.identitySubjects[0]!.id,
+      createdAt: source.exportedAt,
+      updatedBySubjectId: source.identitySubjects[0]!.id,
+      updatedAt: source.exportedAt,
+    };
+    const lifecycleExport = {
+      ...source,
+      workspaceWorkflowAssignments: [assignment],
+      workflowDefinitionLifecycles: source.workflowDefinitions.map(
+        (candidate) => ({
+          tenantId: source.tenant.id,
+          workflowDefinitionId: candidate.id,
+          workflowDefinitionVersion: candidate.version,
+          lifecycleState:
+            candidate.id === assignment.workflowDefinitionId &&
+            candidate.version === assignment.workflowDefinitionVersion
+              ? ("retired" as const)
+              : ("active" as const),
+          changedAt: source.exportedAt,
+        }),
+      ),
+    };
+
+    expect(() => parseExport(JSON.stringify(lifecycleExport))).toThrow(
+      /references a retired workflow version/,
+    );
+  });
+
+  it("rejects incomplete or cross-tenant workflow lifecycle records", () => {
+    const source = createSyntheticExport();
+    const definition = source.workflowDefinitions[0]!;
+    const tampered = {
+      ...source,
+      workflowDefinitionLifecycles: [
+        {
+          tenantId: "tenant-other",
+          workflowDefinitionId: definition.id,
+          workflowDefinitionVersion: definition.version,
+          lifecycleState: "active" as const,
+          changedAt: source.exportedAt,
+        },
+      ],
+    };
+
+    expect(() => parseExport(JSON.stringify(tampered))).toThrow(
+      /tenant boundary/,
     );
   });
 

@@ -2,6 +2,7 @@ import type { AuthorizationPolicy } from "./authorization";
 import type {
   CreateWorkflowDefinitionCommand,
   CreateWorkflowDefinitionVersionCommand,
+  TransitionWorkflowDefinitionLifecycleCommand,
   WorkflowDefinitionAdminService,
   WorkflowDefinitionCatalog,
   WorkflowDefinitionRecord,
@@ -51,6 +52,22 @@ export class AuthorizedWorkflowDefinitionAdminService {
   ): Promise<WorkflowDefinitionRecord> {
     await this.assertDefinitionAdministrationAllowed(context);
     return this.workflows.createVersion({
+      ...command,
+      tenantId: context.tenantId,
+      workspaceId: context.workspaceId,
+      actorSubjectId: context.subjectId,
+    });
+  }
+
+  public async transitionLifecycle(
+    context: WorkflowDefinitionAuthorizationContext,
+    command: Omit<
+      TransitionWorkflowDefinitionLifecycleCommand,
+      "tenantId" | "workspaceId" | "actorSubjectId"
+    >,
+  ): Promise<WorkflowDefinitionRecord> {
+    await this.assertDefinitionAdministrationAllowed(context);
+    return this.workflows.transitionLifecycle({
       ...command,
       tenantId: context.tenantId,
       workspaceId: context.workspaceId,
