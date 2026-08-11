@@ -265,21 +265,28 @@ export async function ensureGuidedDemoSeed(
       ],
     ),
     statement(
-      `INSERT OR IGNORE INTO workspace_workflow_assignments
-         (tenant_id, workspace_id, workflow_definition_id,
-          workflow_definition_version, is_default,
-          created_by_subject_id, created_at, updated_by_subject_id, updated_at)
-       VALUES (?, ?, ?, 1, 1, ?, ?, ?, ?)`,
-      [
-        demo.tenantId,
-        demo.workspaceId,
-        demo.workflowDefinitionId,
-        demo.authorSubjectId,
-        seedTimestamp,
-        demo.authorSubjectId,
-        seedTimestamp,
-      ],
-    ),
+    `INSERT OR IGNORE INTO workspace_workflow_assignments
+       (tenant_id, workspace_id, workflow_definition_id,
+        workflow_definition_version, is_default,
+        created_by_subject_id, created_at, updated_by_subject_id, updated_at)
+     SELECT ?, ?, ?, 1, 1, ?, ?, ?, ?
+     WHERE NOT EXISTS (
+       SELECT 1
+       FROM workspace_workflow_assignments
+       WHERE tenant_id = ? AND workspace_id = ?
+     )`,
+    [
+      demo.tenantId,
+      demo.workspaceId,
+      demo.workflowDefinitionId,
+      demo.authorSubjectId,
+      seedTimestamp,
+      demo.authorSubjectId,
+      seedTimestamp,
+      demo.tenantId,
+      demo.workspaceId,
+    ],
+  ),
   ]);
 }
 
