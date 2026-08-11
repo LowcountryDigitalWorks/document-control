@@ -199,5 +199,30 @@ helper_marker = "async function readWorkflowFormValues("
 if helper_marker not in text:
     raise SystemExit("form helper marker missing")
 text = text.replace(helper_marker, helper + "\n" + helper_marker, 1)
-
 path.write_text(text)
+
+spec_path = Path("tests/e2e/roles-access-admin.spec.ts")
+spec = spec_path.read_text()
+old_request = '''  const unsafe = await page.request.post(
+    "/demo/app/admin/access/roles/create",
+    {
+      headers: { Origin: "http://127.0.0.1:8787" },
+      form: {
+        name: "Unsafe Role",
+        permission: ["document.read", "role.manage"],
+      },
+    },
+  );'''
+new_request = '''  const unsafe = await page.request.post(
+    "/demo/app/admin/access/roles/create",
+    {
+      headers: {
+        Origin: "http://127.0.0.1:8787",
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      data: "name=Unsafe+Role&permission=document.read&permission=role.manage",
+    },
+  );'''
+if old_request not in spec:
+    raise SystemExit("unsafe custom-role request marker missing")
+spec_path.write_text(spec.replace(old_request, new_request, 1))
