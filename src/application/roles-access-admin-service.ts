@@ -663,7 +663,9 @@ function normalizeRoleName(value: string): string {
     throw new Error("Custom role name must contain 2 to 80 characters.");
   }
   if (/\p{C}/u.test(name)) {
-    throw new Error("Custom role name contains unsupported control characters.");
+    throw new Error(
+      "Custom role name contains unsupported control characters.",
+    );
   }
   return name;
 }

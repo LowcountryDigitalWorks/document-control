@@ -200,10 +200,7 @@ describe("RolesAccessAdminService", () => {
           id: "role-custom-records",
           name: "Records Lead",
           assignmentCount: 2,
-          assignedMembers: [
-            "Member One — Operations",
-            "Member Two — Records",
-          ],
+          assignedMembers: ["Member One — Operations", "Member Two — Records"],
         }),
       ]),
     );

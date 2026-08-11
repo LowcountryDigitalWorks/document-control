@@ -24,8 +24,12 @@ function createHarness(denyAt: number | null = null) {
     },
   };
   const getWorkspaceAccess = vi.fn().mockResolvedValue({});
-  const createCustomWorkspaceRole = vi.fn().mockResolvedValue({ changed: true });
-  const updateCustomWorkspaceRole = vi.fn().mockResolvedValue({ changed: true });
+  const createCustomWorkspaceRole = vi
+    .fn()
+    .mockResolvedValue({ changed: true });
+  const updateCustomWorkspaceRole = vi
+    .fn()
+    .mockResolvedValue({ changed: true });
   const assignWorkspaceRole = vi.fn().mockResolvedValue({ changed: true });
   const removeWorkspaceRole = vi.fn().mockResolvedValue({ changed: true });
   const access = {

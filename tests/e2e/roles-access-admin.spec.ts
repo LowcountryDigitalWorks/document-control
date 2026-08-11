@@ -12,7 +12,9 @@ test("tenant administrator creates, assigns, and safely updates a custom workspa
   page,
 }) => {
   await openAccess(page);
-  await expect(page.getByText(/Microsoft Entra ID \/ Active Directory/u)).toBeVisible();
+  await expect(
+    page.getByText(/Microsoft Entra ID \/ Active Directory/u),
+  ).toBeVisible();
 
   const createForm = page.locator(
     'form[action="/demo/app/admin/access/roles/create"]',
@@ -29,7 +31,9 @@ test("tenant administrator creates, assigns, and safely updates a custom workspa
     .check();
   await createForm.getByRole("button", { name: "Create custom role" }).click();
 
-  await expect(page).toHaveURL(/\/demo\/app\/admin\/access\?notice=role-created$/u);
+  await expect(page).toHaveURL(
+    /\/demo\/app\/admin\/access\?notice=role-created$/u,
+  );
   await expect(page.getByRole("status")).toHaveText(
     "Custom workspace role created.",
   );
@@ -53,7 +57,9 @@ test("tenant administrator creates, assigns, and safely updates a custom workspa
   customRoleCard = page
     .locator(".custom-role-card")
     .filter({ hasText: "Records Coordinator" });
-  await expect(customRoleCard.getByText(/1 current tenant assignment/u)).toBeVisible();
+  await expect(
+    customRoleCard.getByText(/1 current tenant assignment/u),
+  ).toBeVisible();
   await expect(customRoleCard.getByText(/Avery Author —/u)).toBeVisible();
 
   const updateForm = customRoleCard.locator(
@@ -66,7 +72,9 @@ test("tenant administrator creates, assigns, and safely updates a custom workspa
   await updateForm.locator('input[name="acknowledgeAssignments"]').check();
   await updateForm.getByRole("button", { name: "Save custom role" }).click();
 
-  await expect(page).toHaveURL(/\/demo\/app\/admin\/access\?notice=role-updated$/u);
+  await expect(page).toHaveURL(
+    /\/demo\/app\/admin\/access\?notice=role-updated$/u,
+  );
   await expect(page.getByRole("status")).toHaveText(
     "Custom workspace role updated.",
   );
@@ -90,11 +98,11 @@ test("custom role boundary rejects administrative grants and cross-origin mutati
   const unsafe = await page.request.post(
     "/demo/app/admin/access/roles/create",
     {
-      headers: { Origin: "http://127.0.0.1:8787" },
-      form: {
-        name: "Unsafe Role",
-        permission: ["document.read", "role.manage"],
+      headers: {
+        Origin: "http://127.0.0.1:8787",
+        "Content-Type": "application/x-www-form-urlencoded",
       },
+      data: "name=Unsafe+Role&permission=document.read&permission=role.manage",
     },
   );
   expect(unsafe.status()).toBe(400);
