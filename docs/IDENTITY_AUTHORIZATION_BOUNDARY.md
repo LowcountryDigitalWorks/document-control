@@ -68,9 +68,14 @@ The first custom-role administration slice intentionally excludes these grants:
 This prevents a custom operational role from becoming an access-administration privilege-escalation
 path. Built-in administrator roles remain the administrative authority.
 
-Creating or editing a tenant-owned custom role requires both tenant-level `tenant.manage` and
-workspace-level `role.manage`. Assigning an existing eligible workspace role remains a workspace
+Creating, editing, or retiring a tenant-owned custom role requires both tenant-level `tenant.manage`
+and workspace-level `role.manage`. Assigning an existing eligible workspace role remains a workspace
 `role.manage` operation.
+
+Custom-role retirement is application-owned and provider-neutral. It is allowed only after every role
+binding is removed, is terminal once recorded, preserves the definition for audit/export history, and
+prevents later editing or assignment. Hard deletion is intentionally not part of the authorization
+model.
 
 ## Future identity-provider requirements
 
@@ -94,6 +99,7 @@ Before production identity integration, explicitly decide and document:
 - Default deny when a subject or group mapping is unknown.
 - Never infer administrator privileges from an untrusted display name or email domain.
 - Use immutable provider subject/group identifiers for mappings.
+- Never create or retain an external group mapping that targets a retired application role.
 - Do not store passwords, MFA codes, refresh tokens, private keys, or provider client secrets in role
   definitions or portable exports.
 - Preserve tenant boundaries even when the external directory spans multiple business units.
