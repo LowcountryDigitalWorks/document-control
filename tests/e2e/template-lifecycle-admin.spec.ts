@@ -72,7 +72,7 @@ test("Template Manager supersedes a published version without changing existing 
   ).toBeVisible();
   await expect(page.locator("main")).toContainText("Version 1");
   await expect(page.locator("main")).toContainText(contentHash);
-  await expect(page.locator("main")).toContainText("superseded");
+  await expect(page.locator("main")).toContainText("Superseded");
 
   const accessibility = await new AxeBuilder({ page }).analyze();
   expect(accessibility.violations).toEqual([]);
