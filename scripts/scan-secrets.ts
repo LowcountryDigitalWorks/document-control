@@ -30,7 +30,7 @@ const findings: string[] = [];
 for (const file of files) {
   const bytes = readFileSync(file);
   if (bytes.includes(0)) continue;
-  scanText(file, bytes.toString("utf8"), findings);
+  scanText(file, bytes.toString(), findings);
 }
 
 const history = execFileSync(
