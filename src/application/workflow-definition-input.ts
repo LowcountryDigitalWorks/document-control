@@ -1,9 +1,17 @@
 import type { WorkflowTransition } from "../domain/models";
+import { unreachableWorkflowStates } from "./workflow-authoring";
 
 export interface WorkflowDefinitionInput {
   name: string;
   states: readonly string[];
   transitions: readonly WorkflowTransition[];
+}
+
+export type WorkflowAuthoringMode = "create" | "version";
+
+export interface WorkflowSourceQuery {
+  workflowDefinitionId: string;
+  workflowDefinitionVersion: number;
 }
 
 export class WorkflowDefinitionInputValidationError extends Error {
@@ -17,6 +25,7 @@ const maximumNameLength = 100;
 const maximumStateCount = 20;
 const maximumStateLength = 40;
 const maximumTransitionCount = 50;
+const maximumWorkflowVersion = 1_000_000;
 const statePattern = /^[a-z][a-z0-9_-]*$/u;
 
 export function parseWorkflowDefinitionInput(
@@ -29,7 +38,49 @@ export function parseWorkflowDefinitionInput(
   );
   const states = parseStates(values.get("states") ?? "");
   const transitions = parseTransitions(values.get("transitions") ?? "", states);
+  const unreachable = unreachableWorkflowStates(states, transitions);
+  if (unreachable.length > 0) {
+    throw new WorkflowDefinitionInputValidationError(
+      `Every workflow state must be reachable from the initial state "${states[0]}". Unreachable: ${unreachable.join(", ")}.`,
+    );
+  }
   return { name, states, transitions };
+}
+
+export function parseWorkflowAuthoringMode(
+  values: URLSearchParams,
+): WorkflowAuthoringMode {
+  const value = (values.get("mode") ?? "").trim();
+  if (value !== "create" && value !== "version") {
+    throw new WorkflowDefinitionInputValidationError(
+      "Workflow authoring mode is invalid.",
+    );
+  }
+  return value;
+}
+
+export function parseWorkflowSourceQuery(
+  values: URLSearchParams,
+): WorkflowSourceQuery | undefined {
+  const rawId = (values.get("sourceId") ?? "").trim();
+  const rawVersion = (values.get("sourceVersion") ?? "").trim();
+  if (!rawId && !rawVersion) return undefined;
+  if (!rawId || !rawVersion) {
+    throw new WorkflowDefinitionInputValidationError(
+      "Workflow source requires both an identifier and exact version.",
+    );
+  }
+  return {
+    workflowDefinitionId: validateWorkflowId(rawId),
+    workflowDefinitionVersion: parseWorkflowVersion(rawVersion),
+  };
+}
+
+export function parseOptionalWorkflowSourceVersion(
+  values: URLSearchParams,
+): number | undefined {
+  const rawVersion = (values.get("sourceVersion") ?? "").trim();
+  return rawVersion ? parseWorkflowVersion(rawVersion) : undefined;
 }
 
 export function parseExistingWorkflowId(values: URLSearchParams): string {
@@ -39,12 +90,30 @@ export function parseExistingWorkflowId(values: URLSearchParams): string {
       "Existing workflow definition is required.",
     );
   }
+  return validateWorkflowId(value);
+}
+
+function validateWorkflowId(value: string): string {
   if (value.length > 256 || !/^[A-Za-z0-9._:-]+$/u.test(value)) {
     throw new WorkflowDefinitionInputValidationError(
       "Existing workflow definition identifier is invalid.",
     );
   }
   return value;
+}
+
+function parseWorkflowVersion(value: string): number {
+  const version = Number(value);
+  if (
+    !Number.isInteger(version) ||
+    version < 1 ||
+    version > maximumWorkflowVersion
+  ) {
+    throw new WorkflowDefinitionInputValidationError(
+      "Workflow source version is invalid.",
+    );
+  }
+  return version;
 }
 
 function parseStates(serialized: string): readonly string[] {
