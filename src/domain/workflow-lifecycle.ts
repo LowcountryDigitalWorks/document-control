@@ -1,4 +1,4 @@
-import type { WorkflowLifecycleState } from "./models";
+export type WorkflowLifecycleState = "active" | "deprecated" | "retired";
 
 const allowedWorkflowLifecycleTransitions: Readonly<
   Record<WorkflowLifecycleState, readonly WorkflowLifecycleState[]>
