@@ -8,6 +8,7 @@ import { AuditLogReadService } from "./application/audit-log-read-service";
 import { AuthorizationDeniedError } from "./application/authorization";
 import { AuthorizedPresentationSettingsService } from "./application/authorized-presentation-settings-service";
 import { AuthorizedRolesAccessAdminService } from "./application/authorized-roles-access-admin-service";
+import { AuthorizedTemplateLifecycleAdminService } from "./application/authorized-template-lifecycle-admin-service";
 import { AuthorizedAuditLogReadService } from "./application/authorized-audit-log-read-service";
 import { AuthorizedDocumentDetailReadService } from "./application/authorized-document-detail-read-service";
 import { AuthorizedPortableExportService } from "./application/authorized-portable-export-service";
@@ -31,6 +32,11 @@ import {
   RolesAccessInputValidationError,
 } from "./application/roles-access-input";
 import { RolesAccessAdminService } from "./application/roles-access-admin-service";
+import { TemplateLifecycleAdminService } from "./application/template-lifecycle-admin-service";
+import {
+  parseTemplateLifecycleInput,
+  TemplateLifecycleInputValidationError,
+} from "./application/template-lifecycle-input";
 import { ReviewApprovalQueueReadService } from "./application/review-approval-queue-read-service";
 import {
   parseDocumentFilters,
@@ -48,6 +54,7 @@ import { ensureGuidedAuditor } from "./demo/audit-context";
 import { ensureGuidedBackupAdmin } from "./demo/backup-context";
 import { createPersistedTenantTheme } from "./demo/persisted-theme";
 import { ensureGuidedTenantAdmin } from "./demo/tenant-admin-context";
+import { ensureGuidedTemplateManager } from "./demo/template-manager-context";
 import { ensureGuidedEvidenceReader } from "./demo/evidence-context";
 import { createSyntheticExport } from "./demo/fixtures";
 import {
@@ -67,6 +74,7 @@ import { renderDocumentDetail } from "./ui/render-document-detail";
 import { renderGuidedDemo } from "./ui/render-guided-demo";
 import { renderReviewApprovalQueue } from "./ui/render-review-approval-queue";
 import { renderRolesAccessAdmin } from "./ui/render-roles-access-admin";
+import { renderTemplateLifecycleAdmin } from "./ui/render-template-lifecycle-admin";
 import { renderWorkflowDefinitionAdmin } from "./ui/render-workflow-definition-admin";
 import {
   renderWorkspaceDocuments,
@@ -885,6 +893,111 @@ app.post("/demo/app/admin/workflows/version", async (context) => {
   }
 });
 
+app.get("/demo/app/admin/templates", async (context) => {
+  if (!guidedDemoEnabled(context.env)) {
+    return context.html(renderNotFound(createTheme(context.env)), 404);
+  }
+
+  const session = resolveGuidedDemoSession(
+    context.req.header("Cookie"),
+    context.req.url,
+  );
+  if (session.setCookie) {
+    context.header("Set-Cookie", session.setCookie);
+  }
+  const database = new D1DatabaseProvider(context.env.DOCUMENT_CONTROL_DB);
+  const demo = createGuidedDemoContext(session.sessionId);
+  await ensureGuidedDemoSeed(database, session.sessionId);
+  const manager = await ensureGuidedTemplateManager(
+    database,
+    session.sessionId,
+  );
+  const service = createAuthorizedTemplateLifecycleAdminService(database);
+
+  try {
+    const catalog = await service.getCatalog({
+      subjectId: manager.subjectId,
+      tenantId: demo.tenantId,
+      workspaceId: demo.workspaceId,
+    });
+    const notice =
+      new URL(context.req.url).searchParams.get("notice") === "transitioned"
+        ? "Template lifecycle transition recorded."
+        : undefined;
+    context.header("Cache-Control", "no-store");
+    return context.html(
+      renderTemplateLifecycleAdmin(
+        await createPersistedTenantTheme(database, context.env, demo.tenantId),
+        catalog,
+        notice,
+      ),
+    );
+  } catch (error) {
+    if (error instanceof AuthorizationDeniedError) {
+      return context.html(renderNotFound(createTheme(context.env)), 404);
+    }
+    throw error;
+  }
+});
+
+app.post("/demo/app/admin/templates/transition", async (context) => {
+  if (!guidedDemoEnabled(context.env)) return context.notFound();
+  if (!hasSameOrigin(context.req.url, context.req.header("Origin"))) {
+    return context.json({ error: "Same-origin demo request required." }, 403);
+  }
+  const sessionId = readGuidedDemoSession(context.req.header("Cookie"));
+  if (!sessionId) {
+    return context.json(
+      {
+        error:
+          "Synthetic administration session missing. Reload Template Lifecycle.",
+      },
+      409,
+    );
+  }
+
+  try {
+    const input = parseTemplateLifecycleInput(
+      await readTemplateLifecycleFormValues(context.req.raw),
+    );
+    const database = new D1DatabaseProvider(context.env.DOCUMENT_CONTROL_DB);
+    const demo = createGuidedDemoContext(sessionId);
+    await ensureGuidedDemoSeed(database, sessionId);
+    const manager = await ensureGuidedTemplateManager(database, sessionId);
+    await createAuthorizedTemplateLifecycleAdminService(
+      database,
+    ).transitionVersion(
+      {
+        subjectId: manager.subjectId,
+        tenantId: demo.tenantId,
+        workspaceId: demo.workspaceId,
+      },
+      {
+        templateVersionId: input.templateVersionId,
+        targetState: input.targetState,
+        auditEventId: `template-audit-${crypto.randomUUID()}`,
+        occurredAt: new Date().toISOString(),
+      },
+    );
+    return context.redirect(
+      "/demo/app/admin/templates?notice=transitioned",
+      303,
+    );
+  } catch (error) {
+    if (error instanceof TemplateLifecycleInputValidationError) {
+      return context.text(error.message, 400);
+    }
+    if (error instanceof AuthorizationDeniedError) {
+      return context.html(renderNotFound(createTheme(context.env)), 404);
+    }
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Template lifecycle transition failed.";
+    return context.text(message, 409);
+  }
+});
+
 app.get("/demo/app/admin/backup", async (context) => {
   if (!guidedDemoEnabled(context.env)) {
     return context.html(renderNotFound(createTheme(context.env)), 404);
@@ -1034,6 +1147,15 @@ function createAuthorizedWorkflowDefinitionAdminService(
   );
 }
 
+function createAuthorizedTemplateLifecycleAdminService(
+  database: D1DatabaseProvider,
+): AuthorizedTemplateLifecycleAdminService {
+  return new AuthorizedTemplateLifecycleAdminService(
+    new TemplateLifecycleAdminService(database),
+    new DatabaseAuthorizationPolicy(database),
+  );
+}
+
 function createAuthorizedPortableExportService(
   database: D1DatabaseProvider,
 ): AuthorizedPortableExportService {
@@ -1151,6 +1273,25 @@ async function readWorkflowFormValues(
   }
   const values = new URLSearchParams();
   for (const key of keys) {
+    const value = formData.get(key);
+    if (typeof value === "string") values.set(key, value);
+  }
+  return values;
+}
+
+async function readTemplateLifecycleFormValues(
+  request: Request,
+): Promise<URLSearchParams> {
+  let formData: FormData;
+  try {
+    formData = await request.formData();
+  } catch {
+    throw new TemplateLifecycleInputValidationError(
+      "A valid form body is required.",
+    );
+  }
+  const values = new URLSearchParams();
+  for (const key of ["templateVersionId", "targetState"]) {
     const value = formData.get(key);
     if (typeof value === "string") values.set(key, value);
   }

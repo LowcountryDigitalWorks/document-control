@@ -1,6 +1,8 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 
+const seededTemplateName = "Standard Operating Procedure";
+
 async function openTemplateAdmin(page: Page): Promise<void> {
   await page.goto("/demo/app/admin/templates");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(
@@ -29,27 +31,31 @@ test("Template Manager supersedes a published version without changing existing 
   await openTemplateAdmin(page);
   const templateCard = page
     .locator(".version-card")
-    .filter({ hasText: "Harbor opening checklist" })
+    .filter({ hasText: seededTemplateName })
     .filter({ hasText: "Published" });
   await expect(templateCard).toHaveCount(1);
   const contentHash =
     (await templateCard.locator("dd code").nth(1).textContent()) ?? "";
-  expect(contentHash).toMatch(/^[0-9a-f]{64}$/u);
+  expect(contentHash).toMatch(/^sha256:[0-9a-f]{64}$/u);
   await expect(templateCard).toContainText("Source documents");
   await expect(templateCard).toContainText("1");
 
-  await templateCard.locator('select[name="targetState"]').selectOption("superseded");
+  await templateCard
+    .locator('select[name="targetState"]')
+    .selectOption("superseded");
   await templateCard
     .getByRole("button", { name: "Apply lifecycle transition" })
     .click();
 
-  await expect(page).toHaveURL(/\/demo\/app\/admin\/templates\?notice=transitioned$/u);
+  await expect(page).toHaveURL(
+    /\/demo\/app\/admin\/templates\?notice=transitioned$/u,
+  );
   await expect(page.getByRole("status")).toHaveText(
     "Template lifecycle transition recorded.",
   );
   const supersededCard = page
     .locator(".version-card")
-    .filter({ hasText: "Harbor opening checklist" })
+    .filter({ hasText: seededTemplateName })
     .filter({ hasText: "Superseded" });
   await expect(supersededCard).toHaveCount(1);
   await expect(supersededCard).toContainText(contentHash);
@@ -57,14 +63,18 @@ test("Template Manager supersedes a published version without changing existing 
 
   await page.goto("/demo/app/audit?q=template.version.lifecycle_transitioned");
   await expect(
-    page.getByText("Template · Version · Lifecycle transitioned", { exact: true }),
+    page.getByText("Template · Version · Lifecycle transitioned", {
+      exact: true,
+    }),
   ).toBeVisible();
 
   await page.goto(evidenceHref ?? "/demo/app/documents");
-  await expect(page.getByText("Harbor opening checklist", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText(seededTemplateName, { exact: true }),
+  ).toBeVisible();
   await expect(page.locator("main")).toContainText("Version 1");
   await expect(page.locator("main")).toContainText(contentHash);
-  await expect(page.locator("main")).toContainText("superseded");
+  await expect(page.locator("main")).toContainText("Superseded");
 
   const accessibility = await new AxeBuilder({ page }).analyze();
   expect(accessibility.violations).toEqual([]);
@@ -81,9 +91,11 @@ test("retired current template version cannot create a new document", async ({
   await openTemplateAdmin(page);
   const publishedCard = page
     .locator(".version-card")
-    .filter({ hasText: "Harbor opening checklist" })
+    .filter({ hasText: seededTemplateName })
     .filter({ hasText: "Published" });
-  await publishedCard.locator('select[name="targetState"]').selectOption("retired");
+  await publishedCard
+    .locator('select[name="targetState"]')
+    .selectOption("retired");
   await publishedCard
     .getByRole("button", { name: "Apply lifecycle transition" })
     .click();
@@ -115,7 +127,9 @@ test("rejects invalid and cross-origin template lifecycle requests", async ({
     },
   );
   expect(invalid.status()).toBe(400);
-  expect(await invalid.text()).toContain("Template lifecycle target is invalid.");
+  expect(await invalid.text()).toContain(
+    "Template lifecycle target is invalid.",
+  );
 
   const crossOrigin = await page.request.post(
     "/demo/app/admin/templates/transition",
@@ -139,7 +153,7 @@ test("keeps template lifecycle state isolated between synthetic sessions", async
     await firstPage.goto("http://127.0.0.1:8787/demo/app/admin/templates");
     const firstCard = firstPage
       .locator(".version-card")
-      .filter({ hasText: "Harbor opening checklist" });
+      .filter({ hasText: seededTemplateName });
     await firstCard
       .locator('select[name="targetState"]')
       .selectOption("superseded");
@@ -151,7 +165,7 @@ test("keeps template lifecycle state isolated between synthetic sessions", async
     await expect(
       secondPage
         .locator(".version-card")
-        .filter({ hasText: "Harbor opening checklist" })
+        .filter({ hasText: seededTemplateName })
         .filter({ hasText: "Published" }),
     ).toHaveCount(1);
   } finally {

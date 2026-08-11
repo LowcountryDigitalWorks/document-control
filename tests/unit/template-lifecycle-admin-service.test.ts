@@ -9,7 +9,7 @@ import type {
 import { TemplateLifecycleAdminService } from "../../src/application/template-lifecycle-admin-service";
 
 const timestamp = "2026-08-10T23:55:00.000Z";
-const hash = "a".repeat(64);
+const hash = `sha256:${"a".repeat(64)}`;
 type SqlValue = string | number | bigint | Uint8Array | null;
 
 class SqliteDatabaseProvider implements DatabaseProvider {
@@ -68,7 +68,10 @@ async function createHarness(): Promise<{
     "0004_template_version_lifecycle_integrity.sql",
   ]) {
     database.exec(
-      await readFile(new URL(`../../migrations/${file}`, import.meta.url), "utf8"),
+      await readFile(
+        new URL(`../../migrations/${file}`, import.meta.url),
+        "utf8",
+      ),
     );
   }
   database.exec(`
@@ -83,7 +86,7 @@ async function createHarness(): Promise<{
     INSERT INTO tenant_memberships (id, tenant_id, subject_id, status, created_at)
     VALUES ('membership-manager', 'tenant-1', 'manager-1', 'active', '${timestamp}');
     INSERT INTO templates (id, tenant_id, workspace_id, name, current_version, created_at)
-    VALUES ('template-1', 'tenant-1', 'workspace-1', 'Checklist', 1, '${timestamp}');
+    VALUES ('template-1', 'tenant-1', 'workspace-1', 'Checklist', NULL, '${timestamp}');
     INSERT INTO template_versions
       (id, tenant_id, template_id, version_number, lifecycle_state, content_hash,
        content_provider, content_key, created_by_subject_id, provenance, created_at)
@@ -91,6 +94,7 @@ async function createHarness(): Promise<{
       ('template-version-1', 'tenant-1', 'template-1', 1, 'draft', '${hash}',
        'r2', 'tenant-1/workspace-1/template/template-1/version/1/object',
        'creator-1', 'synthetic', '${timestamp}');
+    UPDATE templates SET current_version = 1 WHERE id = 'template-1';
   `);
   return {
     database,
@@ -114,7 +118,7 @@ describe("TemplateLifecycleAdminService", () => {
     });
     expect(version.lifecycleState).toBe("review");
 
-    version = await service.transitionVersion({
+    await service.transitionVersion({
       tenantId: "tenant-1",
       workspaceId: "workspace-1",
       templateVersionId: "template-version-1",
@@ -171,9 +175,7 @@ describe("TemplateLifecycleAdminService", () => {
       source_template_hash: hash,
     });
     expect(
-      database
-        .prepare("SELECT COUNT(*) AS count FROM audit_events")
-        .get(),
+      database.prepare("SELECT COUNT(*) AS count FROM audit_events").get(),
     ).toEqual({ count: 4 });
   });
 
@@ -182,13 +184,17 @@ describe("TemplateLifecycleAdminService", () => {
     expect(() =>
       database
         .prepare("UPDATE template_versions SET content_hash = ? WHERE id = ?")
-        .run("b".repeat(64), "template-version-1"),
+        .run(`sha256:${"b".repeat(64)}`, "template-version-1"),
     ).toThrow(/content identity and provenance are immutable/u);
     expect(() =>
       database
-        .prepare("UPDATE template_versions SET lifecycle_state = 'published' WHERE id = ?")
+        .prepare(
+          "UPDATE template_versions SET lifecycle_state = 'published' WHERE id = ?",
+        )
         .run("template-version-1"),
-    ).toThrow(/invalid template lifecycle transition/u);
+    ).toThrow(
+      /template lifecycle (timestamps must match the allowed transition|transition)/u,
+    );
     expect(() =>
       database
         .prepare("DELETE FROM template_versions WHERE id = ?")

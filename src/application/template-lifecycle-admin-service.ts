@@ -1,7 +1,4 @@
-import type {
-  TemplateLifecycleState,
-  TemplateVersion,
-} from "../domain/models";
+import type { TemplateLifecycleState, TemplateVersion } from "../domain/models";
 import {
   availableTemplateTransitions,
   transitionTemplateVersion,
@@ -183,6 +180,15 @@ export class TemplateLifecycleAdminService {
 }
 
 function templateVersionSelect(whereAndOrder: string): string {
+  const orderMarker = "ORDER BY";
+  const orderIndex = whereAndOrder.indexOf(orderMarker);
+  const whereClause =
+    orderIndex >= 0
+      ? whereAndOrder.slice(0, orderIndex).trimEnd()
+      : whereAndOrder.trimEnd();
+  const orderClause =
+    orderIndex >= 0 ? whereAndOrder.slice(orderIndex).trim() : "";
+
   return `SELECT version.id,
                  version.tenant_id AS tenantId,
                  template.workspace_id AS workspaceId,
@@ -212,22 +218,19 @@ function templateVersionSelect(whereAndOrder: string): string {
            AND document.source_template_id = version.template_id
            AND document.source_template_version = version.version_number
            AND document.source_template_hash = version.content_hash
-          ${whereAndOrder.includes("ORDER BY") ? whereAndOrder.replace("ORDER BY", `GROUP BY version.id, version.tenant_id, template.workspace_id,
-                 version.template_id, template.name, template.current_version,
-                 version.version_number, version.lifecycle_state, version.content_hash,
-                 version.content_provider, version.content_key, version.created_by_subject_id,
-                 creator.display_name, version.provenance, version.created_at,
-                 version.published_at, version.superseded_at
-          ORDER BY`) : `${whereAndOrder}
+          ${whereClause}
           GROUP BY version.id, version.tenant_id, template.workspace_id,
                    version.template_id, template.name, template.current_version,
                    version.version_number, version.lifecycle_state, version.content_hash,
                    version.content_provider, version.content_key, version.created_by_subject_id,
                    creator.display_name, version.provenance, version.created_at,
-                   version.published_at, version.superseded_at`}`}`;
+                   version.published_at, version.superseded_at
+          ${orderClause}`;
 }
 
-function mapVersionRow(row: TemplateVersionRow): TemplateLifecycleVersionRecord {
+function mapVersionRow(
+  row: TemplateVersionRow,
+): TemplateLifecycleVersionRecord {
   const version = mapTemplateVersion(row);
   return {
     ...version,

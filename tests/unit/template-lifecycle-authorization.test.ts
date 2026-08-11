@@ -22,7 +22,9 @@ function createHarness(allowed: boolean) {
     },
   };
   const getCatalog = vi.fn().mockResolvedValue({ versions: [] });
-  const transitionVersion = vi.fn().mockResolvedValue({ lifecycleState: "review" });
+  const transitionVersion = vi
+    .fn()
+    .mockResolvedValue({ lifecycleState: "review" });
   const templates = {
     getCatalog,
     transitionVersion,
