@@ -18,11 +18,35 @@ Implemented synthetic/test-only product capabilities include:
 - exact-version workflow instances, review evidence, approvals, and changed-version invalidation;
 - workspace overview, Documents, Templates, Reviews, Approvals, Audit Log, and bounded search/filtering;
 - Backup & Portability export of persisted application state and external content references;
-- tenant presentation settings and workspace Roles & Access administration;
+- tenant presentation settings, workspace Roles & Access, and tenant-owned custom workspace roles;
 - immutable Workflow Definition creation/versioning;
 - workspace Workflow Selection with exact default-version assignment;
 - controlled Template Lifecycle administration; and
 - controlled Workflow Definition lifecycle administration.
+
+### Identity and authorization
+
+Authentication source and application authorization are deliberately separate.
+
+A small customer can use directly provisioned/app-managed tenant membership plus built-in or custom
+application roles without an enterprise directory. A future enterprise deployment can authenticate or
+provision identities through Microsoft Entra ID, an Active Directory-connected identity service,
+OIDC, SAML, or another approved provider, then map those identities/groups into the same internal
+memberships and role definitions.
+
+The application schema already recognizes `local`, `oidc`, `saml`, `entra`, and `external` identity
+providers. Provider identity describes **where an identity came from**; it does not grant application
+permissions by itself.
+
+Tenant-owned custom workspace roles can combine the bounded operational permissions exposed by the
+application. They intentionally cannot grant wildcard `*`, `tenant.manage`, `workspace.manage`, or
+`role.manage`. Built-in administrator roles therefore remain the authority for access administration.
+Creating or editing a tenant-owned custom role requires both tenant-level `tenant.manage` and current
+workspace `role.manage`; assigning an existing eligible workspace role remains a `role.manage`
+operation.
+
+See [Identity and authorization boundary](docs/IDENTITY_AUTHORIZATION_BOUNDARY.md) for the future
+provider/group-mapping contract and security requirements.
 
 ### Workflow Definition lifecycle
 
@@ -46,6 +70,8 @@ workflow-definition version they originally used regardless of later lifecycle c
   boundary.
 - Ordered SQL files under `migrations/` are the authoritative executable schema/evolution source.
 - Tenant-owned relational references are constrained to prevent cross-tenant attachment.
+- Identity/provider integration is separate from application-owned membership, role bindings, and
+  permission evaluation.
 - Workflow definitions are immutable by version; workflow instances remain bound to the exact
   definition version they started with.
 - Templates are controlled/versioned records with lifecycle and provenance metadata.
@@ -57,9 +83,10 @@ workflow-definition version they originally used regardless of later lifecycle c
 - The synthetic demo contains no customer data and accepts no arbitrary file uploads.
 - LDW is a configurable reference theme rather than a hard-coded product identity.
 
-Production authentication/SSO, customer uploads, production Cloudflare D1/R2 provisioning, public
-interactive-demo hardening, malware scanning, retention/legal hold, backup of external binary
-content, and paid services remain deliberately out of scope until separately designed and approved.
+Production authentication/SSO, directory/group synchronization, customer uploads, production
+Cloudflare D1/R2 provisioning, public interactive-demo hardening, malware scanning, retention/legal
+hold, backup of external binary content, and paid services remain deliberately out of scope until
+separately designed and approved.
 
 ## Local development
 
@@ -102,7 +129,8 @@ responsive, dependency-audit, and independent secret-scan jobs.
 - `migrations/` — authoritative ordered D1/SQLite schema and integrity invariants.
 - `tests/` — executable migration, domain, authorization, portability, security, accessibility,
   browser, and responsive checks.
-- `docs/` — architecture, ADRs, status, contracts, and continuation notes.
+- `docs/` — architecture, ADRs, status, contracts, identity/authorization boundary, and continuation
+  notes.
 
 ## Deployment boundary
 
@@ -117,6 +145,7 @@ or a custom domain merely to exercise the synthetic application.
 - [Architecture](docs/ARCHITECTURE.md)
 - [Current status](docs/STATUS.md)
 - [Handoff](docs/HANDOFF.md)
+- [Identity and authorization boundary](docs/IDENTITY_AUTHORIZATION_BOUNDARY.md)
 - [Export contract](docs/contracts/export-v1.md)
 - [ADR 0001: Cloudflare-first modular monolith](docs/adr/0001-cloudflare-first-modular-monolith.md)
 - [Security policy](SECURITY.md)
