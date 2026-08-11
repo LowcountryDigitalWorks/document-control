@@ -242,7 +242,9 @@ export class WorkspaceWorkflowSelectionService {
     }
     if (target.isDefault === 1) return { changed: false };
 
-    const previous = assignments.find((assignment) => assignment.isDefault === 1);
+    const previous = assignments.find(
+      (assignment) => assignment.isDefault === 1,
+    );
     await this.database.executeBatch([
       {
         sql: `UPDATE workspace_workflow_assignments
@@ -360,10 +362,13 @@ function mapCatalogRow(row: CatalogRow): WorkspaceWorkflowSelectionRecord {
   }
   const object = parsed as Record<string, unknown>;
   if (!Array.isArray(object.states) || !Array.isArray(object.transitions)) {
-    throw new Error("Workflow definition JSON is missing states or transitions.");
+    throw new Error(
+      "Workflow definition JSON is missing states or transitions.",
+    );
   }
   const states = object.states.map((value) => {
-    if (typeof value !== "string") throw new Error("Workflow states must be strings.");
+    if (typeof value !== "string")
+      throw new Error("Workflow states must be strings.");
     return value;
   });
   const transitions = object.transitions.map((value) => {
@@ -371,7 +376,10 @@ function mapCatalogRow(row: CatalogRow): WorkspaceWorkflowSelectionRecord {
       throw new Error("Workflow transitions must be objects.");
     }
     const transition = value as Record<string, unknown>;
-    if (typeof transition.from !== "string" || typeof transition.to !== "string") {
+    if (
+      typeof transition.from !== "string" ||
+      typeof transition.to !== "string"
+    ) {
       throw new Error("Workflow transitions require string from/to states.");
     }
     return { from: transition.from, to: transition.to };

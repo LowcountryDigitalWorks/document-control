@@ -18,7 +18,9 @@ const identifierPattern = /^[A-Za-z0-9._:-]+$/u;
 export function parseWorkspaceWorkflowSelectionInput(
   values: URLSearchParams,
 ): WorkspaceWorkflowSelectionInput {
-  const workflowDefinitionId = (values.get("workflowDefinitionId") ?? "").trim();
+  const workflowDefinitionId = (
+    values.get("workflowDefinitionId") ?? ""
+  ).trim();
   if (
     !workflowDefinitionId ||
     workflowDefinitionId.length > 256 ||
@@ -29,14 +31,19 @@ export function parseWorkspaceWorkflowSelectionInput(
     );
   }
 
-  const serializedVersion = (values.get("workflowDefinitionVersion") ?? "").trim();
+  const serializedVersion = (
+    values.get("workflowDefinitionVersion") ?? ""
+  ).trim();
   if (!/^\d{1,9}$/u.test(serializedVersion)) {
     throw new WorkspaceWorkflowSelectionInputValidationError(
       "Workflow definition version is invalid.",
     );
   }
   const workflowDefinitionVersion = Number(serializedVersion);
-  if (!Number.isSafeInteger(workflowDefinitionVersion) || workflowDefinitionVersion < 1) {
+  if (
+    !Number.isSafeInteger(workflowDefinitionVersion) ||
+    workflowDefinitionVersion < 1
+  ) {
     throw new WorkspaceWorkflowSelectionInputValidationError(
       "Workflow definition version is invalid.",
     );

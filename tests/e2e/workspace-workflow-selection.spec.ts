@@ -18,7 +18,9 @@ async function createSeededWorkflowV2(page: Page): Promise<void> {
   await form.locator('[name="states"]').fill(states);
   await form.locator('[name="transitions"]').fill(transitions);
   await form.getByRole("button", { name: "Create next version" }).click();
-  await expect(page.getByRole("status")).toHaveText("Workflow version created.");
+  await expect(page.getByRole("status")).toHaveText(
+    "Workflow version created.",
+  );
 }
 
 async function openSelection(page: Page): Promise<void> {
@@ -42,8 +44,12 @@ test("workspace administrator selects an exact applicable default for future wor
     .locator(".definition-card")
     .filter({ hasText: "Standard review and approval v2" })
     .filter({ hasText: "v2" });
-  await expect(versionOne.getByText("Workspace default", { exact: true })).toBeVisible();
-  await expect(versionTwo.getByText("Not applicable", { exact: true })).toBeVisible();
+  await expect(
+    versionOne.getByText("Workspace default", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    versionTwo.getByText("Not applicable", { exact: true }),
+  ).toBeVisible();
 
   await versionTwo.getByRole("button", { name: "Make available" }).click();
   await expect(page.getByRole("status")).toHaveText(
@@ -53,7 +59,9 @@ test("workspace administrator selects an exact applicable default for future wor
     .locator(".definition-card")
     .filter({ hasText: "Standard review and approval v2" })
     .filter({ hasText: "v2" });
-  await enabledVersionTwo.getByRole("button", { name: "Set as default" }).click();
+  await enabledVersionTwo
+    .getByRole("button", { name: "Set as default" })
+    .click();
   await expect(page.getByRole("status")).toHaveText(
     "Workspace default workflow changed.",
   );
@@ -61,11 +69,17 @@ test("workspace administrator selects an exact applicable default for future wor
     .locator(".definition-card")
     .filter({ hasText: "Standard review and approval v2" })
     .filter({ hasText: "v2" });
-  await expect(defaultVersionTwo.getByText("Workspace default", { exact: true })).toBeVisible();
+  await expect(
+    defaultVersionTwo.getByText("Workspace default", { exact: true }),
+  ).toBeVisible();
 
   await page.goto("/demo/workflow");
-  await page.getByRole("button", { name: "Create from approved template" }).click();
-  await page.getByRole("button", { name: "Submit version 1 for review" }).click();
+  await page
+    .getByRole("button", { name: "Create from approved template" })
+    .click();
+  await page
+    .getByRole("button", { name: "Submit version 1 for review" })
+    .click();
   await page.goto("/demo/app/documents");
   const documentCard = page
     .locator(".record-card")
@@ -98,8 +112,12 @@ test("existing workflow instances remain pinned when the workspace default chang
   page,
 }) => {
   await page.goto("/demo/workflow");
-  await page.getByRole("button", { name: "Create from approved template" }).click();
-  await page.getByRole("button", { name: "Submit version 1 for review" }).click();
+  await page
+    .getByRole("button", { name: "Create from approved template" })
+    .click();
+  await page
+    .getByRole("button", { name: "Submit version 1 for review" })
+    .click();
 
   await createSeededWorkflowV2(page);
   await openSelection(page);
@@ -135,7 +153,9 @@ test("default workflow cannot be removed and cross-origin mutations are denied",
     .locator(".definition-card")
     .filter({ hasText: "Standard review and approval" })
     .filter({ hasText: "v1" });
-  await expect(defaultCard.getByText(/Select another applicable version/u)).toBeVisible();
+  await expect(
+    defaultCard.getByText(/Select another applicable version/u),
+  ).toBeVisible();
   await expect(
     defaultCard.getByRole("button", { name: "Remove from workspace" }),
   ).toHaveCount(0);
@@ -183,7 +203,9 @@ test("workspace workflow selection remains isolated between synthetic sessions",
       .filter({ hasText: "v2" });
     await versionTwo.getByRole("button", { name: "Make available" }).click();
 
-    await second.goto("http://127.0.0.1:8787/demo/app/admin/workflow-selection");
+    await second.goto(
+      "http://127.0.0.1:8787/demo/app/admin/workflow-selection",
+    );
     await expect(
       second.getByText("Standard review and approval v2", { exact: true }),
     ).toHaveCount(0);

@@ -142,7 +142,9 @@ describe("WorkspaceWorkflowSelectionService", () => {
     await service.setApplicability(applicabilityCommand(2, true, "enable-v2"));
     await service.setDefault(defaultCommand(2, "default-v2"));
 
-    await expect(service.resolveDefault("tenant-1", "workspace-1")).resolves.toEqual({
+    await expect(
+      service.resolveDefault("tenant-1", "workspace-1"),
+    ).resolves.toEqual({
       workflowDefinitionId: "workflow-standard",
       workflowDefinitionVersion: 2,
     });
@@ -173,9 +175,9 @@ describe("WorkspaceWorkflowSelectionService", () => {
   it("requires applicability before default selection and protects the current default", async () => {
     const { service } = await createHarness();
 
-    await expect(service.setDefault(defaultCommand(1, "missing"))).rejects.toThrow(
-      /must be applicable/u,
-    );
+    await expect(
+      service.setDefault(defaultCommand(1, "missing")),
+    ).rejects.toThrow(/must be applicable/u);
 
     await service.setApplicability(applicabilityCommand(1, true, "enable"));
     await service.setDefault(defaultCommand(1, "default"));
