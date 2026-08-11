@@ -1,36 +1,54 @@
-name: Template Lifecycle Integration Repair
+name: CI
 
 on:
+  pull_request:
   push:
-    branches: [hotfix/template-lifecycle-integration]
+    branches: [main]
 
 permissions:
   contents: read
 
 concurrency:
-  group: template-lifecycle-repair-${{ github.ref }}
+  group: document-control-ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  repair:
-    permissions:
-      contents: write
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check
+      - run: pnpm audit --audit-level=high
+
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:e2e
+
+  secrets:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: hotfix/template-lifecycle-integration
           fetch-depth: 0
-      - name: Apply promised PR 19 integration
-        shell: bash
-        run: |
-          set -euo pipefail
-          python .github/maintenance/wire_template_lifecycle.py
-          python .github/maintenance/update_template_lifecycle_status.py
-          if ! git diff --quiet -- src scripts docs/STATUS.md; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add src scripts docs/STATUS.md
-            git commit -m "Reconcile controlled template lifecycle integration"
-            git push origin HEAD:hotfix/template-lifecycle-integration
-          fi
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm secrets:scan
