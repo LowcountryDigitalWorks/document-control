@@ -52,6 +52,8 @@ The synthetic/test-only application now covers:
 - Backup & Portability export;
 - Audit Log;
 - tenant presentation administration;
+- provider-neutral tenant member administration with direct app-local provisioning and Staged / Active /
+  Suspended membership lifecycle;
 - workspace Roles & Access assignment administration;
 - tenant-owned custom workspace role creation/editing with bounded operational permissions and
   tenant-wide assignment-impact acknowledgement;
@@ -61,6 +63,29 @@ The synthetic/test-only application now covers:
 - controlled Workflow Definition lifecycle administration.
 
 See `docs/STATUS.md` and Git history for the detailed invariant/test record for each merged slice.
+
+## Tenant member lifecycle and provisioning boundary
+
+Tenant membership is application-owned and separate from the authentication provider.
+
+- The member administration surface requires tenant-level `tenant.manage`.
+- Directly provisioned members use the `local` provider marker and store identity metadata only; no
+  password, MFA secret, token, recovery code, or invitation credential is created.
+- User-facing membership states are **Staged**, **Active**, and **Suspended**. Staged is stored as
+  `invited`, but no invitation email is sent by the current slice.
+- Active is the authorization-eligible state. The existing authorization policy already denies
+  tenant/workspace access when membership is not active.
+- Suspension preserves tenant/workspace role bindings, provider attribution, and historical/audit
+  references rather than deleting them.
+- A tenant administrator cannot suspend their own current membership from this surface.
+- Direct provisioning rejects a duplicate email already represented by another member of the same
+  tenant.
+- Externally sourced subjects, including Entra-backed identities, use the same membership lifecycle;
+  changing application membership does not modify the external identity provider.
+- Member deletion is intentionally not implemented.
+
+Future production identity work must decide authentication, invitation delivery, Entra/AD/OIDC/SAML
+provisioning, JIT/SCIM synchronization, group mapping, and deprovisioning reconciliation separately.
 
 ## Custom role and identity boundary
 
@@ -124,8 +149,8 @@ Do not imply these are implemented or approved:
 
 - production authentication/SSO/provider configuration;
 - Entra ID/Active Directory/OIDC/SAML application registration or connection;
-- user/member invitation/provisioning, JIT/SCIM-style synchronization, or identity-provider/group
-  mapping;
+- production invitation delivery, external identity provisioning, JIT/SCIM-style synchronization,
+  or identity-provider/group mapping;
 - tenant/platform role-assignment administration or system-role editing;
 - custom-role deletion/retirement;
 - arbitrary/customer file uploads;

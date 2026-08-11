@@ -7,6 +7,7 @@ import {
 import { AuditLogReadService } from "./application/audit-log-read-service";
 import { AuthorizationDeniedError } from "./application/authorization";
 import { AuthorizedPresentationSettingsService } from "./application/authorized-presentation-settings-service";
+import { AuthorizedMemberAdminService } from "./application/authorized-member-admin-service";
 import { AuthorizedRolesAccessAdminService } from "./application/authorized-roles-access-admin-service";
 import { AuthorizedTemplateLifecycleAdminService } from "./application/authorized-template-lifecycle-admin-service";
 import { AuthorizedAuditLogReadService } from "./application/authorized-audit-log-read-service";
@@ -22,6 +23,12 @@ import {
 } from "./application/document-detail-read-service";
 import { serializeExport } from "./application/export";
 import { PortableExportReadService } from "./application/portable-export-read-service";
+import {
+  parseDirectMemberInput,
+  parseMembershipTransitionInput,
+  MemberAdminInputValidationError,
+} from "./application/member-admin-input";
+import { MemberAdminService } from "./application/member-admin-service";
 import {
   parsePresentationSettingsInput,
   PresentationSettingsValidationError,
@@ -84,6 +91,7 @@ import { renderAuditLog } from "./ui/render-audit-log";
 import { renderBackupPortability } from "./ui/render-backup-portability";
 import { renderDocumentDetail } from "./ui/render-document-detail";
 import { renderGuidedDemo } from "./ui/render-guided-demo";
+import { renderMemberAdmin } from "./ui/render-member-admin";
 import { renderReviewApprovalQueue } from "./ui/render-review-approval-queue";
 import { renderRolesAccessAdmin } from "./ui/render-roles-access-admin";
 import { renderTemplateLifecycleAdmin } from "./ui/render-template-lifecycle-admin";
@@ -577,6 +585,172 @@ app.post("/demo/app/admin/settings", async (context) => {
   }
 
   return context.redirect("/demo/app/admin/settings?saved=1", 303);
+});
+
+app.get("/demo/app/admin/members", async (context) => {
+  if (!guidedDemoEnabled(context.env)) {
+    return context.html(renderNotFound(createTheme(context.env)), 404);
+  }
+  const session = resolveGuidedDemoSession(
+    context.req.header("Cookie"),
+    context.req.url,
+  );
+  if (session.setCookie) context.header("Set-Cookie", session.setCookie);
+  const database = new D1DatabaseProvider(context.env.DOCUMENT_CONTROL_DB);
+  const demo = createGuidedDemoContext(session.sessionId);
+  await ensureGuidedDemoSeed(database, session.sessionId);
+  const admin = await ensureGuidedTenantAdmin(database, session.sessionId);
+  const service = createAuthorizedMemberAdminService(database);
+
+  try {
+    const directory = await service.getDirectory({
+      subjectId: admin.subjectId,
+      tenantId: demo.tenantId,
+      workspaceId: demo.workspaceId,
+    });
+    const noticeValue = new URL(context.req.url).searchParams.get("notice");
+    const notice =
+      noticeValue === "created"
+        ? "Tenant member added."
+        : noticeValue === "activated"
+          ? "Membership activated."
+          : noticeValue === "suspended"
+            ? "Membership suspended."
+            : undefined;
+    context.header("Cache-Control", "no-store");
+    return context.html(
+      renderMemberAdmin(
+        await createPersistedTenantTheme(database, context.env, demo.tenantId),
+        directory,
+        admin.subjectId,
+        notice,
+      ),
+    );
+  } catch (error) {
+    if (error instanceof AuthorizationDeniedError) {
+      return context.html(renderNotFound(createTheme(context.env)), 404);
+    }
+    throw error;
+  }
+});
+
+app.post("/demo/app/admin/members/create", async (context) => {
+  if (!guidedDemoEnabled(context.env)) return context.notFound();
+  if (!hasSameOrigin(context.req.url, context.req.header("Origin"))) {
+    return context.json({ error: "Same-origin demo request required." }, 403);
+  }
+  const sessionId = readGuidedDemoSession(context.req.header("Cookie"));
+  if (!sessionId) {
+    return context.json(
+      {
+        error: "Synthetic administration session missing. Reload Members.",
+      },
+      409,
+    );
+  }
+
+  try {
+    const input = parseDirectMemberInput(
+      await readMemberFormValues(context.req.raw, [
+        "displayName",
+        "email",
+        "initialStatus",
+      ]),
+    );
+    const database = new D1DatabaseProvider(context.env.DOCUMENT_CONTROL_DB);
+    const demo = createGuidedDemoContext(sessionId);
+    await ensureGuidedDemoSeed(database, sessionId);
+    const admin = await ensureGuidedTenantAdmin(database, sessionId);
+    const memberUuid = crypto.randomUUID();
+    await createAuthorizedMemberAdminService(database).createDirectMember(
+      {
+        subjectId: admin.subjectId,
+        tenantId: demo.tenantId,
+        workspaceId: demo.workspaceId,
+      },
+      {
+        membershipId: `membership-local-${memberUuid}`,
+        subjectId: `subject-local-${memberUuid}`,
+        providerSubject: `local-${memberUuid}`,
+        displayName: input.displayName,
+        email: input.email,
+        initialStatus: input.initialStatus,
+        auditEventId: `membership-audit-${crypto.randomUUID()}`,
+        occurredAt: new Date().toISOString(),
+      },
+    );
+    return context.redirect("/demo/app/admin/members?notice=created", 303);
+  } catch (error) {
+    if (error instanceof MemberAdminInputValidationError) {
+      return context.text(error.message, 400);
+    }
+    if (error instanceof AuthorizationDeniedError) {
+      return context.html(renderNotFound(createTheme(context.env)), 404);
+    }
+    return context.text(
+      error instanceof Error ? error.message : "Tenant member creation failed.",
+      409,
+    );
+  }
+});
+
+app.post("/demo/app/admin/members/status", async (context) => {
+  if (!guidedDemoEnabled(context.env)) return context.notFound();
+  if (!hasSameOrigin(context.req.url, context.req.header("Origin"))) {
+    return context.json({ error: "Same-origin demo request required." }, 403);
+  }
+  const sessionId = readGuidedDemoSession(context.req.header("Cookie"));
+  if (!sessionId) {
+    return context.json(
+      {
+        error: "Synthetic administration session missing. Reload Members.",
+      },
+      409,
+    );
+  }
+
+  try {
+    const input = parseMembershipTransitionInput(
+      await readMemberFormValues(context.req.raw, [
+        "membershipId",
+        "targetStatus",
+      ]),
+    );
+    const database = new D1DatabaseProvider(context.env.DOCUMENT_CONTROL_DB);
+    const demo = createGuidedDemoContext(sessionId);
+    await ensureGuidedDemoSeed(database, sessionId);
+    const admin = await ensureGuidedTenantAdmin(database, sessionId);
+    await createAuthorizedMemberAdminService(database).transitionMembership(
+      {
+        subjectId: admin.subjectId,
+        tenantId: demo.tenantId,
+        workspaceId: demo.workspaceId,
+      },
+      {
+        membershipId: input.membershipId,
+        targetStatus: input.targetStatus,
+        auditEventId: `membership-audit-${crypto.randomUUID()}`,
+        occurredAt: new Date().toISOString(),
+      },
+    );
+    return context.redirect(
+      `/demo/app/admin/members?notice=${input.targetStatus === "active" ? "activated" : "suspended"}`,
+      303,
+    );
+  } catch (error) {
+    if (error instanceof MemberAdminInputValidationError) {
+      return context.text(error.message, 400);
+    }
+    if (error instanceof AuthorizationDeniedError) {
+      return context.html(renderNotFound(createTheme(context.env)), 404);
+    }
+    return context.text(
+      error instanceof Error
+        ? error.message
+        : "Membership status change failed.",
+      409,
+    );
+  }
 });
 
 app.get("/demo/app/admin/access", async (context) => {
@@ -1444,6 +1618,15 @@ function createAuthorizedPresentationSettingsService(
   );
 }
 
+function createAuthorizedMemberAdminService(
+  database: D1DatabaseProvider,
+): AuthorizedMemberAdminService {
+  return new AuthorizedMemberAdminService(
+    new MemberAdminService(database),
+    new DatabaseAuthorizationPolicy(database),
+  );
+}
+
 function createAuthorizedRolesAccessAdminService(
   database: D1DatabaseProvider,
 ): AuthorizedRolesAccessAdminService {
@@ -1574,6 +1757,24 @@ async function readFormValues(
     formData = await request.formData();
   } catch {
     throw new RolesAccessInputValidationError("A valid form body is required.");
+  }
+  const values = new URLSearchParams();
+  for (const key of keys) {
+    const value = formData.get(key);
+    if (typeof value === "string") values.set(key, value);
+  }
+  return values;
+}
+
+async function readMemberFormValues(
+  request: Request,
+  keys: readonly string[],
+): Promise<URLSearchParams> {
+  let formData: FormData;
+  try {
+    formData = await request.formData();
+  } catch {
+    throw new MemberAdminInputValidationError("A valid form body is required.");
   }
   const values = new URLSearchParams();
   for (const key of keys) {
