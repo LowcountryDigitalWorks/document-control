@@ -1,16 +1,14 @@
 import { readFile } from "node:fs/promises";
 import { DatabaseSync } from "node:sqlite";
 import { describe, expect, it } from "vitest";
-import {
-  AuthorizationDeniedError,
-  DatabaseAuthorizationPolicy,
-} from "../../src/application/authorization";
+import { AuthorizationDeniedError } from "../../src/application/authorization";
 import { MemberAdminService } from "../../src/application/member-admin-service";
 import type {
   DatabaseProvider,
   DatabaseResult,
   DatabaseStatement,
 } from "../../src/application/ports";
+import { DatabaseAuthorizationPolicy } from "../../src/infrastructure/database-authorization-policy";
 
 const timestamp = "2026-08-11T22:30:00.000Z";
 type SqlValue = string | number | bigint | Uint8Array | null;
