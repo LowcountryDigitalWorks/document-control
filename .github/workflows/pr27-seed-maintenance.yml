@@ -1,0 +1,75 @@
+name: PR27 Demo Seed Maintenance
+
+on:
+  push:
+    branches: [feature/workflow-retirement-deprecation]
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feature/workflow-retirement-deprecation
+          fetch-depth: 0
+      - name: Preserve administrator workflow selection during reseed
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("src/demo/workflow-demo.ts")
+          text = path.read_text()
+          old = '''    statement(
+              `INSERT OR IGNORE INTO workspace_workflow_assignments
+                 (tenant_id, workspace_id, workflow_definition_id,
+                  workflow_definition_version, is_default,
+                  created_by_subject_id, created_at, updated_by_subject_id, updated_at)
+               VALUES (?, ?, ?, 1, 1, ?, ?, ?, ?)`,
+              [
+                demo.tenantId,
+                demo.workspaceId,
+                demo.workflowDefinitionId,
+                demo.authorSubjectId,
+                seedTimestamp,
+                demo.authorSubjectId,
+                seedTimestamp,
+              ],
+            ),
+          '''
+          new = '''    statement(
+              `INSERT OR IGNORE INTO workspace_workflow_assignments
+                 (tenant_id, workspace_id, workflow_definition_id,
+                  workflow_definition_version, is_default,
+                  created_by_subject_id, created_at, updated_by_subject_id, updated_at)
+               SELECT ?, ?, ?, 1, 1, ?, ?, ?, ?
+               WHERE NOT EXISTS (
+                 SELECT 1
+                 FROM workspace_workflow_assignments
+                 WHERE tenant_id = ? AND workspace_id = ?
+               )`,
+              [
+                demo.tenantId,
+                demo.workspaceId,
+                demo.workflowDefinitionId,
+                demo.authorSubjectId,
+                seedTimestamp,
+                demo.authorSubjectId,
+                seedTimestamp,
+                demo.tenantId,
+                demo.workspaceId,
+              ],
+            ),
+          '''
+          if old not in text:
+              raise SystemExit("guided workflow assignment seed marker missing")
+          path.write_text(text.replace(old, new, 1))
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/demo/workflow-demo.ts
+          git commit -m "Preserve workspace workflow selection during demo reseed"
+          git push origin HEAD:feature/workflow-retirement-deprecation
