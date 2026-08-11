@@ -1,5 +1,6 @@
 from pathlib import Path
 
+# Keep the pre-existing Roles & Access unit harness aligned with the current schema.
 path = Path("tests/unit/roles-access-admin-service.test.ts")
 text = path.read_text()
 marker = '''  const database = new DatabaseSync(":memory:");
