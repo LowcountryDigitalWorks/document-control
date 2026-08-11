@@ -1,10 +1,10 @@
-export type WorkflowLifecycleState = "active" | "deprecated" | "retired";
+export type WorkflowLifecycleState = "active" | "legacy" | "retired";
 
 const allowedWorkflowLifecycleTransitions: Readonly<
   Record<WorkflowLifecycleState, readonly WorkflowLifecycleState[]>
 > = {
-  active: ["deprecated"],
-  deprecated: ["active", "retired"],
+  active: ["legacy"],
+  legacy: ["active", "retired"],
   retired: [],
 };
 
