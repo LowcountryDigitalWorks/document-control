@@ -9,7 +9,7 @@ export class WorkflowLifecycleInputValidationError extends Error {
 
 const lifecycleStates: readonly WorkflowLifecycleState[] = [
   "active",
-  "deprecated",
+  "legacy",
   "retired",
 ];
 
