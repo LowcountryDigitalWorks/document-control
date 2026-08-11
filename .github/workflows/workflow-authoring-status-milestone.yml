@@ -1,0 +1,51 @@
+name: Workflow Authoring Status Milestone
+
+on:
+  workflow_dispatch:
+    inputs:
+      pull_request_number:
+        description: Pull request number to record
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  document:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feature/workflow-authoring-improvements
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Record release milestone
+        env:
+          PR_NUMBER: ${{ inputs.pull_request_number }}
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          path = Path('docs/STATUS.md')
+          text = path.read_text()
+          old = '  provider-neutral custom workspace roles PR #29, provider-neutral tenant member lifecycle PR #30,\n  and terminal custom role retirement PR #31.\n'
+          new = f'  provider-neutral custom workspace roles PR #29, provider-neutral tenant member lifecycle PR #30,\n  terminal custom role retirement PR #31, and workflow authoring improvements PR #{os.environ["PR_NUMBER"]}.\n'
+          if old not in text:
+              raise SystemExit('STATUS milestone marker not found')
+          path.write_text(text.replace(old, new, 1))
+          PY
+      - run: pnpm exec prettier --write docs/STATUS.md
+      - run: pnpm format:check
+      - name: Commit milestone
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/STATUS.md
+          git commit -m "Record workflow authoring release milestone"
+          git push origin HEAD:feature/workflow-authoring-improvements
