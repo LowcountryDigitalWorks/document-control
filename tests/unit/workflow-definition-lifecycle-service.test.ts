@@ -227,7 +227,7 @@ describe("workflow definition lifecycle", () => {
         auditEventId: "audit-retire-blocked",
         occurredAt: timestamp,
       }),
-    ).rejects.toThrow(/remove this workflow version from every workspace/u);
+    ).rejects.toThrow(/remove this workflow version from every workspace/iu);
 
     await selections.setApplicability(
       applicability("workspace-1", 2, true, "w1-v2-enable"),
