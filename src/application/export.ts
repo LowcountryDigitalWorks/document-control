@@ -20,6 +20,18 @@ import type {
 export const exportFormat = "ldw.document-control.export" as const;
 export const exportVersion = 1 as const;
 
+export interface WorkspaceWorkflowAssignmentExport {
+  tenantId: string;
+  workspaceId: string;
+  workflowDefinitionId: string;
+  workflowDefinitionVersion: number;
+  isDefault: boolean;
+  createdBySubjectId: string;
+  createdAt: string;
+  updatedBySubjectId: string;
+  updatedAt: string;
+}
+
 export interface PortableExportV1 {
   format: typeof exportFormat;
   version: typeof exportVersion;
@@ -36,6 +48,7 @@ export interface PortableExportV1 {
   templates: Template[];
   templateVersions: TemplateVersion[];
   workflowDefinitions: WorkflowDefinition[];
+  workspaceWorkflowAssignments?: WorkspaceWorkflowAssignmentExport[];
   workflowInstances: WorkflowInstance[];
   reviews: Review[];
   approvals: Approval[];
@@ -265,6 +278,54 @@ export function validatePortableExport(data: PortableExportV1): void {
       `${definition.id}:${definition.version}`,
       definition,
     );
+  }
+
+  for (const assignment of data.workspaceWorkflowAssignments ?? []) {
+    assertTenant(
+      assignment.tenantId,
+      tenantId,
+      `workspace workflow assignment ${assignment.workspaceId}`,
+    );
+    const workspace = assertReferenced(
+      workspaces,
+      assignment.workspaceId,
+      "workspace workflow assignment workspace",
+    ) as Workspace;
+    assertTenant(
+      workspace.tenantId,
+      tenantId,
+      `workspace workflow assignment ${assignment.workspaceId}`,
+    );
+    if (
+      !workflowDefinitions.has(
+        `${assignment.workflowDefinitionId}:${assignment.workflowDefinitionVersion}`,
+      )
+    ) {
+      throw new Error(
+        `Workspace workflow assignment ${assignment.workspaceId} references a missing workflow definition version.`,
+      );
+    }
+    assertReferenced(
+      subjects,
+      assignment.createdBySubjectId,
+      "workspace workflow assignment creator",
+    );
+    assertReferenced(
+      subjects,
+      assignment.updatedBySubjectId,
+      "workspace workflow assignment updater",
+    );
+  }
+
+  const workspaceDefaultKeys = new Set<string>();
+  for (const assignment of data.workspaceWorkflowAssignments ?? []) {
+    if (!assignment.isDefault) continue;
+    if (workspaceDefaultKeys.has(assignment.workspaceId)) {
+      throw new Error(
+        `Workspace ${assignment.workspaceId} has more than one default workflow in the export.`,
+      );
+    }
+    workspaceDefaultKeys.add(assignment.workspaceId);
   }
 
   for (const instance of data.workflowInstances) {

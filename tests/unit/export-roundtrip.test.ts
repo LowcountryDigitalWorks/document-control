@@ -8,6 +8,41 @@ describe("portable export", () => {
     expect(parseExport(serializeExport(source))).toEqual(source);
   });
 
+  it("accepts legacy v1 exports without workspace workflow assignments", () => {
+    const source = createSyntheticExport();
+    const legacy = JSON.parse(JSON.stringify(source)) as Record<
+      string,
+      unknown
+    >;
+    delete legacy.workspaceWorkflowAssignments;
+    expect(
+      parseExport(JSON.stringify(legacy)).workspaceWorkflowAssignments,
+    ).toBeUndefined();
+  });
+
+  it("rejects workspace workflow assignments that cross tenant or definition boundaries", () => {
+    const source = createSyntheticExport();
+    const tampered = {
+      ...source,
+      workspaceWorkflowAssignments: [
+        {
+          tenantId: source.tenant.id,
+          workspaceId: source.workspaces[0]!.id,
+          workflowDefinitionId: "missing-workflow",
+          workflowDefinitionVersion: 1,
+          isDefault: true,
+          createdBySubjectId: source.identitySubjects[0]!.id,
+          createdAt: source.exportedAt,
+          updatedBySubjectId: source.identitySubjects[0]!.id,
+          updatedAt: source.exportedAt,
+        },
+      ],
+    };
+    expect(() => parseExport(JSON.stringify(tampered))).toThrow(
+      /missing workflow definition version/,
+    );
+  });
+
   it("rejects unknown export versions", () => {
     const source = createSyntheticExport();
     expect(() =>

@@ -324,9 +324,43 @@ Turnstile/abuse controls, and operational cleanup are implemented and validated.
   v1/v2 creation, direct update/delete rejection, tenant/version lookup, dual authorization,
   malformed/cross-origin requests, audit evidence, accessibility/responsiveness, and independent
   synthetic-session isolation.
-- This slice does not add workspace workflow applicability/default-selection rules, retirement or
-  deprecation semantics, automatic migration/activation, graphical workflow authoring, production
-  authentication, production Cloudflare resources, customer data, or paid services.
+- This slice does not add workflow retirement/deprecation semantics, automatic migration/activation,
+  graphical workflow authoring, production authentication, production Cloudflare resources,
+  customer data, or paid services.
+
+### Authorized workspace Workflow Selection administration (synthetic/test only)
+
+- `/demo/app/admin/workflow-selection` configures which exact immutable workflow-definition versions
+  are applicable to the current workspace and which applicable version is the default for future
+  workflow starts; it does not introduce a second workflow-definition store.
+- The synthetic route uses the server-controlled Tenant Administrator and requires `workflow.manage`
+  at the current workspace before reading or changing selection policy. A dedicated authorization
+  test verifies denial occurs before persistence when that permission is absent.
+- Migration `0005_workspace_workflow_selection.sql` stores tenant/workspace/definition/version
+  applicability, enforces referential tenant boundaries, protects assignment identity fields from
+  rewrite, and permits at most one database-enforced default workflow version per workspace.
+- A workflow version must be applicable before it can become the default. The current default cannot
+  be removed from applicability until another applicable version has been selected as default.
+- Selection changes affect only future workflow starts. Existing workflow instances, reviews,
+  approvals, and audit evidence remain bound to the exact workflow-definition version they started
+  with; changing the workspace default never migrates or rewrites historical state.
+- The guided synthetic workflow now resolves the workspace default at workflow-start time instead of
+  hardcoding seeded v1. The seeded v1 remains the initial workspace default until an administrator
+  explicitly changes the selection.
+- Successful changes append `workflow.workspace_applicability.enabled`,
+  `workflow.workspace_applicability.disabled`, and `workflow.workspace_default.changed` events to
+  the existing immutable audit stream; duplicate/no-op requests do not fabricate change evidence.
+- Backup & Portability exports now include exact workspace workflow assignments/defaults. The field is
+  additive and optional in export v1, so legacy v1 packages without workspace workflow assignments
+  remain accepted while present assignments are validated against tenant/workspace/definition and
+  actor boundaries.
+- SQLite and browser coverage verifies exact-version selection, one-default enforcement,
+  cross-tenant rejection, default-removal protection, future-start default resolution, historical
+  version pinning, same-origin mutation protection, accessibility/responsive behavior, audit
+  evidence, and independent synthetic-session isolation.
+- This slice does **not** add workflow retirement/deprecation, automatic migration of running
+  workflows, graphical workflow authoring, production authentication, production Cloudflare
+  resources, customer data/uploads, or paid services.
 
 ### Authorized controlled Template Lifecycle administration (synthetic/test only)
 
@@ -377,8 +411,9 @@ production authentication or public-demo hardening.
   UI PR #9, workspace navigation PR #10, document evidence PR #11, Reviews & Approvals PR #12,
   workspace search/filter PR #13, Backup & Portability PR #14, workspace Audit Log PR #15,
   tenant presentation administration PR #16, workspace Roles & Access administration PR #17,
-  immutable Workflow Definition administration PR #18, and controlled Template Lifecycle
-  administration PR #19.
+  immutable Workflow Definition administration PR #18, controlled Template Lifecycle administration
+  PR #19, Template Lifecycle integration reconciliation PR #20, and workspace Workflow Selection
+  administration PR #21.
 - `main` is the authoritative integration branch after reviewed/validated pull requests are merged.
 - No production Cloudflare resources, custom domains, customer data, analytics, paid services, or
   public-upload capability have been introduced.
@@ -396,8 +431,7 @@ production authentication or public-demo hardening.
   metadata filtering only.
 - Custom/system role-definition creation/editing or permission-authoring UI; tenant/platform role
   assignment administration; member invitations/provisioning; or identity-provider/group mapping.
-- Workspace workflow applicability/default selection, workflow retirement/deprecation semantics, or
-  richer workflow authoring.
+- Workflow retirement/deprecation semantics or richer workflow authoring.
 - Template content upload/new-version authoring, new-template creation, or storage/scanning
   orchestration.
 - Logo/favicon upload or external branding-asset URL management.

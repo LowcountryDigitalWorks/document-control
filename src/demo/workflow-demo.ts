@@ -1,6 +1,7 @@
 import { AuthorizedDocumentWorkflowService } from "../application/authorized-document-workflow-service";
 import { DocumentWorkflowService } from "../application/document-workflow-service";
 import type { DatabaseProvider } from "../application/ports";
+import { WorkspaceWorkflowSelectionService } from "../application/workspace-workflow-selection-service";
 import { buildDocumentVersionContentKey } from "../infrastructure/content-key";
 import { DatabaseAuthorizationPolicy } from "../infrastructure/database-authorization-policy";
 
@@ -263,6 +264,22 @@ export async function ensureGuidedDemoSeed(
         seedTimestamp,
       ],
     ),
+    statement(
+      `INSERT OR IGNORE INTO workspace_workflow_assignments
+         (tenant_id, workspace_id, workflow_definition_id,
+          workflow_definition_version, is_default,
+          created_by_subject_id, created_at, updated_by_subject_id, updated_at)
+       VALUES (?, ?, ?, 1, 1, ?, ?, ?, ?)`,
+      [
+        demo.tenantId,
+        demo.workspaceId,
+        demo.workflowDefinitionId,
+        demo.authorSubjectId,
+        seedTimestamp,
+        demo.authorSubjectId,
+        seedTimestamp,
+      ],
+    ),
   ]);
 }
 
@@ -360,12 +377,15 @@ export async function runGuidedDemoAction(
       auditEventId: id("audit-document-created"),
     });
   } else if (action === "submit") {
+    const selectedWorkflow = await new WorkspaceWorkflowSelectionService(
+      database,
+    ).resolveDefault(demo.tenantId, demo.workspaceId);
     await service.startWorkflow({
       tenantId: demo.tenantId,
       documentId: demo.documentId,
       workflowInstanceId: demo.workflowInstanceId,
-      workflowDefinitionId: demo.workflowDefinitionId,
-      workflowDefinitionVersion: 1,
+      workflowDefinitionId: selectedWorkflow.workflowDefinitionId,
+      workflowDefinitionVersion: selectedWorkflow.workflowDefinitionVersion,
       actorSubjectId: demo.authorSubjectId,
       occurredAt,
       auditEventId: id("audit-workflow-started"),

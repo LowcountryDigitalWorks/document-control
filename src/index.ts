@@ -15,6 +15,7 @@ import { AuthorizedPortableExportService } from "./application/authorized-portab
 import { AuthorizedReviewApprovalQueueReadService } from "./application/authorized-review-approval-queue-read-service";
 import { AuthorizedWorkspaceReadService } from "./application/authorized-workspace-read-service";
 import { AuthorizedWorkflowDefinitionAdminService } from "./application/authorized-workflow-definition-admin-service";
+import { AuthorizedWorkspaceWorkflowSelectionService } from "./application/authorized-workspace-workflow-selection-service";
 import {
   DocumentDetailReadService,
   DocumentNotFoundError,
@@ -45,6 +46,11 @@ import {
 } from "./application/workspace-filter-input";
 import { WorkspaceReadService } from "./application/workspace-read-service";
 import { WorkflowDefinitionAdminService } from "./application/workflow-definition-admin-service";
+import { WorkspaceWorkflowSelectionService } from "./application/workspace-workflow-selection-service";
+import {
+  parseWorkspaceWorkflowSelectionInput,
+  WorkspaceWorkflowSelectionInputValidationError,
+} from "./application/workspace-workflow-selection-input";
 import {
   parseExistingWorkflowId,
   parseWorkflowDefinitionInput,
@@ -76,6 +82,7 @@ import { renderReviewApprovalQueue } from "./ui/render-review-approval-queue";
 import { renderRolesAccessAdmin } from "./ui/render-roles-access-admin";
 import { renderTemplateLifecycleAdmin } from "./ui/render-template-lifecycle-admin";
 import { renderWorkflowDefinitionAdmin } from "./ui/render-workflow-definition-admin";
+import { renderWorkspaceWorkflowSelection } from "./ui/render-workspace-workflow-selection";
 import {
   renderWorkspaceDocuments,
   renderWorkspaceOverview,
@@ -893,6 +900,129 @@ app.post("/demo/app/admin/workflows/version", async (context) => {
   }
 });
 
+app.get("/demo/app/admin/workflow-selection", async (context) => {
+  if (!guidedDemoEnabled(context.env)) {
+    return context.html(renderNotFound(createTheme(context.env)), 404);
+  }
+
+  const session = resolveGuidedDemoSession(
+    context.req.header("Cookie"),
+    context.req.url,
+  );
+  if (session.setCookie) {
+    context.header("Set-Cookie", session.setCookie);
+  }
+  const database = new D1DatabaseProvider(context.env.DOCUMENT_CONTROL_DB);
+  const demo = createGuidedDemoContext(session.sessionId);
+  await ensureGuidedDemoSeed(database, session.sessionId);
+  const admin = await ensureGuidedTenantAdmin(database, session.sessionId);
+  const service = createAuthorizedWorkspaceWorkflowSelectionService(database);
+
+  try {
+    const catalog = await service.getCatalog({
+      subjectId: admin.subjectId,
+      tenantId: demo.tenantId,
+      workspaceId: demo.workspaceId,
+    });
+    const noticeValue = new URL(context.req.url).searchParams.get("notice");
+    const notice =
+      noticeValue === "enabled"
+        ? "Workflow version made available to this workspace."
+        : noticeValue === "disabled"
+          ? "Workflow version removed from this workspace."
+          : noticeValue === "default"
+            ? "Workspace default workflow changed."
+            : noticeValue === "unchanged"
+              ? "No workflow selection change was needed."
+              : undefined;
+    context.header("Cache-Control", "no-store");
+    return context.html(
+      renderWorkspaceWorkflowSelection(
+        await createPersistedTenantTheme(database, context.env, demo.tenantId),
+        catalog,
+        notice,
+      ),
+    );
+  } catch (error) {
+    if (error instanceof AuthorizationDeniedError) {
+      return context.html(renderNotFound(createTheme(context.env)), 404);
+    }
+    throw error;
+  }
+});
+
+app.post("/demo/app/admin/workflow-selection/update", async (context) => {
+  if (!guidedDemoEnabled(context.env)) return context.notFound();
+  if (!hasSameOrigin(context.req.url, context.req.header("Origin"))) {
+    return context.json({ error: "Same-origin demo request required." }, 403);
+  }
+  const sessionId = readGuidedDemoSession(context.req.header("Cookie"));
+  if (!sessionId) {
+    return context.json(
+      {
+        error:
+          "Synthetic administration session missing. Reload Workflow Selection.",
+      },
+      409,
+    );
+  }
+
+  try {
+    const input = parseWorkspaceWorkflowSelectionInput(
+      await readWorkflowSelectionFormValues(context.req.raw),
+    );
+    const database = new D1DatabaseProvider(context.env.DOCUMENT_CONTROL_DB);
+    const demo = createGuidedDemoContext(sessionId);
+    await ensureGuidedDemoSeed(database, sessionId);
+    const admin = await ensureGuidedTenantAdmin(database, sessionId);
+    const service = createAuthorizedWorkspaceWorkflowSelectionService(database);
+    const authContext = {
+      subjectId: admin.subjectId,
+      tenantId: demo.tenantId,
+      workspaceId: demo.workspaceId,
+    };
+    const baseCommand = {
+      workflowDefinitionId: input.workflowDefinitionId,
+      workflowDefinitionVersion: input.workflowDefinitionVersion,
+      auditEventId: `workflow-selection-audit-${crypto.randomUUID()}`,
+      occurredAt: new Date().toISOString(),
+    };
+
+    let result: { changed: boolean };
+    if (input.action === "default") {
+      result = await service.setDefault(authContext, baseCommand);
+    } else {
+      result = await service.setApplicability(authContext, {
+        ...baseCommand,
+        applicable: input.action === "enable",
+      });
+    }
+    const notice = result.changed
+      ? input.action === "enable"
+        ? "enabled"
+        : input.action === "disable"
+          ? "disabled"
+          : "default"
+      : "unchanged";
+    return context.redirect(
+      `/demo/app/admin/workflow-selection?notice=${notice}`,
+      303,
+    );
+  } catch (error) {
+    if (error instanceof WorkspaceWorkflowSelectionInputValidationError) {
+      return context.text(error.message, 400);
+    }
+    if (error instanceof AuthorizationDeniedError) {
+      return context.html(renderNotFound(createTheme(context.env)), 404);
+    }
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Workflow selection update failed.";
+    return context.text(message, 409);
+  }
+});
+
 app.get("/demo/app/admin/templates", async (context) => {
   if (!guidedDemoEnabled(context.env)) {
     return context.html(renderNotFound(createTheme(context.env)), 404);
@@ -1147,6 +1277,15 @@ function createAuthorizedWorkflowDefinitionAdminService(
   );
 }
 
+function createAuthorizedWorkspaceWorkflowSelectionService(
+  database: D1DatabaseProvider,
+): AuthorizedWorkspaceWorkflowSelectionService {
+  return new AuthorizedWorkspaceWorkflowSelectionService(
+    new WorkspaceWorkflowSelectionService(database),
+    new DatabaseAuthorizationPolicy(database),
+  );
+}
+
 function createAuthorizedTemplateLifecycleAdminService(
   database: D1DatabaseProvider,
 ): AuthorizedTemplateLifecycleAdminService {
@@ -1273,6 +1412,29 @@ async function readWorkflowFormValues(
   }
   const values = new URLSearchParams();
   for (const key of keys) {
+    const value = formData.get(key);
+    if (typeof value === "string") values.set(key, value);
+  }
+  return values;
+}
+
+async function readWorkflowSelectionFormValues(
+  request: Request,
+): Promise<URLSearchParams> {
+  let formData: FormData;
+  try {
+    formData = await request.formData();
+  } catch {
+    throw new WorkspaceWorkflowSelectionInputValidationError(
+      "A valid form body is required.",
+    );
+  }
+  const values = new URLSearchParams();
+  for (const key of [
+    "workflowDefinitionId",
+    "workflowDefinitionVersion",
+    "action",
+  ]) {
     const value = formData.get(key);
     if (typeof value === "string") values.set(key, value);
   }
