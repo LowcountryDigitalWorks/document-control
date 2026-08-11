@@ -69,7 +69,9 @@ test("Template Manager supersedes a published version without changing existing 
   ).toBeVisible();
 
   await page.goto(evidenceHref ?? "/demo/app/documents");
-  await expect(page.getByText(seededTemplateName, { exact: true })).toBeVisible();
+  await expect(
+    page.getByText(seededTemplateName, { exact: true }),
+  ).toBeVisible();
   await expect(page.locator("main")).toContainText("Version 1");
   await expect(page.locator("main")).toContainText(contentHash);
   await expect(page.locator("main")).toContainText("Superseded");
