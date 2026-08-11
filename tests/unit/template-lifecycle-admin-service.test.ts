@@ -86,7 +86,7 @@ async function createHarness(): Promise<{
     INSERT INTO tenant_memberships (id, tenant_id, subject_id, status, created_at)
     VALUES ('membership-manager', 'tenant-1', 'manager-1', 'active', '${timestamp}');
     INSERT INTO templates (id, tenant_id, workspace_id, name, current_version, created_at)
-    VALUES ('template-1', 'tenant-1', 'workspace-1', 'Checklist', 1, '${timestamp}');
+    VALUES ('template-1', 'tenant-1', 'workspace-1', 'Checklist', NULL, '${timestamp}');
     INSERT INTO template_versions
       (id, tenant_id, template_id, version_number, lifecycle_state, content_hash,
        content_provider, content_key, created_by_subject_id, provenance, created_at)
@@ -94,6 +94,7 @@ async function createHarness(): Promise<{
       ('template-version-1', 'tenant-1', 'template-1', 1, 'draft', '${hash}',
        'r2', 'tenant-1/workspace-1/template/template-1/version/1/object',
        'creator-1', 'synthetic', '${timestamp}');
+    UPDATE templates SET current_version = 1 WHERE id = 'template-1';
   `);
   return {
     database,
