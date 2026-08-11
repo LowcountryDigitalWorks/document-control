@@ -9,7 +9,7 @@ import type {
 import { TemplateLifecycleAdminService } from "../../src/application/template-lifecycle-admin-service";
 
 const timestamp = "2026-08-10T23:55:00.000Z";
-const hash = "a".repeat(64);
+const hash = `sha256:${"a".repeat(64)}`;
 type SqlValue = string | number | bigint | Uint8Array | null;
 
 class SqliteDatabaseProvider implements DatabaseProvider {
@@ -184,7 +184,7 @@ describe("TemplateLifecycleAdminService", () => {
     expect(() =>
       database
         .prepare("UPDATE template_versions SET content_hash = ? WHERE id = ?")
-        .run("b".repeat(64), "template-version-1"),
+        .run(`sha256:${"b".repeat(64)}`, "template-version-1"),
     ).toThrow(/content identity and provenance are immutable/u);
     expect(() =>
       database
