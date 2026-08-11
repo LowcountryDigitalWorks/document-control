@@ -91,7 +91,7 @@ test("tenant administrator stages, activates, assigns, and suspends a direct mem
   await page.goto("/demo/app/audit?q=tenant.membership.status_changed");
   await expect(
     page.getByText("Tenant · Membership · Status changed", { exact: true }),
-  ).toBeVisible();
+  ).toHaveCount(2);
 });
 
 test("member lifecycle rejects cross-origin mutation and hides current-admin suspension", async ({
