@@ -1,0 +1,41 @@
+name: PR27 Format Maintenance
+
+on:
+  push:
+    branches:
+      - feature/workflow-retirement-deprecation
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feature/workflow-retirement-deprecation
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Format lifecycle files
+        run: >-
+          pnpm exec prettier --write
+          src/ui/render-workspace-workflow-selection.ts
+          tests/e2e/workflow-lifecycle.spec.ts
+      - run: git diff --check
+      - name: Commit formatting
+        run: |
+          if git diff --quiet -- src/ui/render-workspace-workflow-selection.ts tests/e2e/workflow-lifecycle.spec.ts; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/ui/render-workspace-workflow-selection.ts tests/e2e/workflow-lifecycle.spec.ts
+          git commit -m "Format workflow lifecycle UI and tests"
+          git push origin HEAD:feature/workflow-retirement-deprecation
