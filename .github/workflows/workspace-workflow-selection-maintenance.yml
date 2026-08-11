@@ -1,0 +1,38 @@
+name: Workspace Workflow Selection Maintenance
+
+on:
+  push:
+    branches: [agent/workspace-workflow-selection-v2]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: workspace-workflow-selection-maintenance-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  wire:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/workspace-workflow-selection-v2
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Wire feature routes and guided default behavior
+        run: |
+          python .github/maintenance/wire_workspace_workflow_selection.py
+          pnpm exec prettier --write src/index.ts src/demo/workflow-demo.ts src/ui/render-admin-settings.ts src/ui/render-workflow-definition-admin.ts
+          if ! git diff --quiet -- src/index.ts src/demo/workflow-demo.ts src/ui/render-admin-settings.ts src/ui/render-workflow-definition-admin.ts; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add src/index.ts src/demo/workflow-demo.ts src/ui/render-admin-settings.ts src/ui/render-workflow-definition-admin.ts
+            git commit -m "Wire workspace workflow selection"
+            git push origin HEAD:agent/workspace-workflow-selection-v2
+          fi
