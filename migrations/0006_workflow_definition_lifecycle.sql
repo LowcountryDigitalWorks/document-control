@@ -2,7 +2,7 @@ CREATE TABLE workflow_definition_lifecycle (
   tenant_id TEXT NOT NULL,
   workflow_definition_id TEXT NOT NULL,
   workflow_definition_version INTEGER NOT NULL CHECK (workflow_definition_version > 0),
-  lifecycle_state TEXT NOT NULL CHECK (lifecycle_state IN ('active', 'deprecated', 'retired')),
+  lifecycle_state TEXT NOT NULL CHECK (lifecycle_state IN ('active', 'legacy', 'retired')),
   changed_by_subject_id TEXT REFERENCES identity_subjects(id),
   changed_at TEXT NOT NULL,
   PRIMARY KEY (tenant_id, workflow_definition_id, workflow_definition_version),
@@ -62,9 +62,9 @@ END;
 CREATE TRIGGER workflow_definition_lifecycle_transition_guard
 BEFORE UPDATE ON workflow_definition_lifecycle
 WHEN NOT (
-  (OLD.lifecycle_state = 'active' AND NEW.lifecycle_state = 'deprecated')
-  OR (OLD.lifecycle_state = 'deprecated' AND NEW.lifecycle_state = 'active')
-  OR (OLD.lifecycle_state = 'deprecated' AND NEW.lifecycle_state = 'retired')
+  (OLD.lifecycle_state = 'active' AND NEW.lifecycle_state = 'legacy')
+  OR (OLD.lifecycle_state = 'legacy' AND NEW.lifecycle_state = 'active')
+  OR (OLD.lifecycle_state = 'legacy' AND NEW.lifecycle_state = 'retired')
 )
 BEGIN
   SELECT RAISE(ABORT, 'invalid workflow lifecycle transition');
