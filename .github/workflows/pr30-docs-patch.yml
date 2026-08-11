@@ -1,0 +1,35 @@
+name: PR30 Documentation Reconcile
+
+on:
+  push:
+    branches:
+      - feature/provider-neutral-member-lifecycle
+
+permissions:
+  contents: write
+
+jobs:
+  document:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feature/provider-neutral-member-lifecycle
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: python scripts/patch-member-lifecycle-docs.py
+      - run: pnpm exec prettier --write README.md docs
+      - run: pnpm format:check
+      - name: Commit reconciled documentation
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add README.md docs
+          git commit -m "Reconcile provider-neutral member lifecycle documentation"
+          git push origin HEAD:feature/provider-neutral-member-lifecycle
