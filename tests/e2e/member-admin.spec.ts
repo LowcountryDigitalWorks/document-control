@@ -16,18 +16,26 @@ test("tenant administrator stages, activates, assigns, and suspends a direct mem
   );
   await createForm.locator('input[name="displayName"]').fill("Jordan Smith");
   await createForm.locator('input[name="email"]').fill("jordan@example.com");
-  await createForm.locator('select[name="initialStatus"]').selectOption("invited");
+  await createForm
+    .locator('select[name="initialStatus"]')
+    .selectOption("invited");
   await createForm.getByRole("button", { name: "Add member" }).click();
 
   await expect(page).toHaveURL(/\/demo\/app\/admin\/members\?notice=created$/u);
   await expect(page.getByRole("status")).toHaveText("Tenant member added.");
-  let jordanCard = page.locator(".member-card").filter({ hasText: "Jordan Smith" });
+  let jordanCard = page
+    .locator(".member-card")
+    .filter({ hasText: "Jordan Smith" });
   await expect(jordanCard.getByText("Staged", { exact: true })).toBeVisible();
-  await expect(jordanCard.getByText("App-local / direct", { exact: true })).toBeVisible();
+  await expect(
+    jordanCard.getByText("App-local / direct", { exact: true }),
+  ).toBeVisible();
 
   await page.goto("/demo/app/admin/access");
   await expect(
-    page.locator('select[name="subjectId"] option').filter({ hasText: "Jordan Smith" }),
+    page
+      .locator('select[name="subjectId"] option')
+      .filter({ hasText: "Jordan Smith" }),
   ).toHaveCount(0);
 
   await openMembers(page);
@@ -41,27 +49,43 @@ test("tenant administrator stages, activates, assigns, and suspends a direct mem
   await page
     .locator('select[name="subjectId"]')
     .selectOption({ label: "Jordan Smith — jordan@example.com" });
-  await page.locator('select[name="roleDefinitionId"]').selectOption({ label: "Viewer" });
+  await page
+    .locator('select[name="roleDefinitionId"]')
+    .selectOption({ label: "Viewer" });
   await page.getByRole("button", { name: "Assign role" }).click();
   await expect(
-    page.locator("tbody tr").filter({ hasText: "Jordan Smith" }).filter({ hasText: "Viewer" }),
+    page
+      .locator("tbody tr")
+      .filter({ hasText: "Jordan Smith" })
+      .filter({ hasText: "Viewer" }),
   ).toHaveCount(1);
 
   await openMembers(page);
   jordanCard = page.locator(".member-card").filter({ hasText: "Jordan Smith" });
-  await expect(jordanCard.getByText(/1 total · 0 tenant · 1 workspace/u)).toBeVisible();
+  await expect(
+    jordanCard.getByText(/1 total · 0 tenant · 1 workspace/u),
+  ).toBeVisible();
   await jordanCard.getByRole("button", { name: "Suspend member" }).click();
   await expect(page.getByRole("status")).toHaveText("Membership suspended.");
   jordanCard = page.locator(".member-card").filter({ hasText: "Jordan Smith" });
-  await expect(jordanCard.getByText("Suspended", { exact: true })).toBeVisible();
-  await expect(jordanCard.getByText(/1 total · 0 tenant · 1 workspace/u)).toBeVisible();
+  await expect(
+    jordanCard.getByText("Suspended", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    jordanCard.getByText(/1 total · 0 tenant · 1 workspace/u),
+  ).toBeVisible();
 
   await page.goto("/demo/app/admin/access");
   await expect(
-    page.locator('select[name="subjectId"] option').filter({ hasText: "Jordan Smith" }),
+    page
+      .locator('select[name="subjectId"] option')
+      .filter({ hasText: "Jordan Smith" }),
   ).toHaveCount(0);
   await expect(
-    page.locator("tbody tr").filter({ hasText: "Jordan Smith" }).filter({ hasText: "Viewer" }),
+    page
+      .locator("tbody tr")
+      .filter({ hasText: "Jordan Smith" })
+      .filter({ hasText: "Viewer" }),
   ).toHaveCount(1);
 
   await page.goto("/demo/app/audit?q=tenant.membership.status_changed");
@@ -84,14 +108,17 @@ test("member lifecycle rejects cross-origin mutation and hides current-admin sus
     selfCard.getByRole("button", { name: "Suspend member" }),
   ).toHaveCount(0);
 
-  const crossOrigin = await page.request.post("/demo/app/admin/members/create", {
-    headers: { Origin: "https://example.test" },
-    form: {
-      displayName: "Blocked Member",
-      email: "blocked@example.com",
-      initialStatus: "active",
+  const crossOrigin = await page.request.post(
+    "/demo/app/admin/members/create",
+    {
+      headers: { Origin: "https://example.test" },
+      form: {
+        displayName: "Blocked Member",
+        email: "blocked@example.com",
+        initialStatus: "active",
+      },
     },
-  });
+  );
   expect(crossOrigin.status()).toBe(403);
 });
 
@@ -109,10 +136,14 @@ test("member administration is accessible, responsive, and session isolated", as
     await form.locator('input[name="email"]').fill("session@example.com");
     await form.locator('select[name="initialStatus"]').selectOption("active");
     await form.getByRole("button", { name: "Add member" }).click();
-    await expect(first.getByText("Session Member", { exact: true })).toBeVisible();
+    await expect(
+      first.getByText("Session Member", { exact: true }),
+    ).toBeVisible();
 
     await second.goto("http://127.0.0.1:8787/demo/app/admin/members");
-    await expect(second.getByText("Session Member", { exact: true })).toHaveCount(0);
+    await expect(
+      second.getByText("Session Member", { exact: true }),
+    ).toHaveCount(0);
 
     const accessibility = await new AxeBuilder({ page: first }).analyze();
     expect(accessibility.violations).toEqual([]);

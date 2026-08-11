@@ -173,9 +173,17 @@ export class MemberAdminService {
     command: TransitionMembershipCommand,
   ): Promise<TenantMemberDirectory> {
     await this.loadTenantWorkspace(command.tenantId, command.workspaceId);
-    const member = await this.loadMember(command.tenantId, command.membershipId);
-    if (member.subjectId === command.actorSubjectId && command.targetStatus !== "active") {
-      throw new Error("The acting tenant administrator cannot suspend their own membership.");
+    const member = await this.loadMember(
+      command.tenantId,
+      command.membershipId,
+    );
+    if (
+      member.subjectId === command.actorSubjectId &&
+      command.targetStatus !== "active"
+    ) {
+      throw new Error(
+        "The acting tenant administrator cannot suspend their own membership.",
+      );
     }
     if (member.status === command.targetStatus) {
       return this.getDirectory(command.tenantId, command.workspaceId);
@@ -207,7 +215,9 @@ export class MemberAdminService {
           from: member.status,
           to: command.targetStatus,
           preservedTenantRoleBindings: String(member.tenantRoleBindingCount),
-          preservedWorkspaceRoleBindings: String(member.workspaceRoleBindingCount),
+          preservedWorkspaceRoleBindings: String(
+            member.workspaceRoleBindingCount,
+          ),
         },
       }),
     ]);
@@ -229,7 +239,8 @@ export class MemberAdminService {
        WHERE tenant.id = ? AND workspace.id = ?`,
       [tenantId, workspaceId],
     );
-    if (!row) throw new Error("Tenant member administration context was not found.");
+    if (!row)
+      throw new Error("Tenant member administration context was not found.");
     return row;
   }
 
@@ -278,7 +289,9 @@ export class MemberAdminService {
       [tenantId, email],
     );
     if (existing) {
-      throw new Error("A tenant member with this email address already exists.");
+      throw new Error(
+        "A tenant member with this email address already exists.",
+      );
     }
   }
 }
@@ -304,7 +317,9 @@ function normalizeDisplayName(value: string): string {
     throw new Error("Member display name must contain 2 to 100 characters.");
   }
   if (/\p{C}/u.test(name)) {
-    throw new Error("Member display name contains unsupported control characters.");
+    throw new Error(
+      "Member display name contains unsupported control characters.",
+    );
   }
   return name;
 }

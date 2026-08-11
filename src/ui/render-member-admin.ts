@@ -93,8 +93,12 @@ export function renderMemberAdmin(
 </html>`;
 }
 
-function renderMember(member: TenantMemberRecord, actorSubjectId: string): string {
-  const roleCount = member.tenantRoleBindingCount + member.workspaceRoleBindingCount;
+function renderMember(
+  member: TenantMemberRecord,
+  actorSubjectId: string,
+): string {
+  const roleCount =
+    member.tenantRoleBindingCount + member.workspaceRoleBindingCount;
   const provider = providerLabel(member.provider);
   const action = renderAction(member, actorSubjectId);
   return `<article class="member-card">
@@ -109,14 +113,27 @@ function renderMember(member: TenantMemberRecord, actorSubjectId: string): strin
   </article>`;
 }
 
-function renderAction(member: TenantMemberRecord, actorSubjectId: string): string {
+function renderAction(
+  member: TenantMemberRecord,
+  actorSubjectId: string,
+): string {
   if (member.subjectId === actorSubjectId) {
     return '<p class="locked">Current administrator membership cannot be suspended from this screen.</p>';
   }
   if (member.status === "active") {
-    return transitionForm(member.membershipId, "suspended", "Suspend member", true);
+    return transitionForm(
+      member.membershipId,
+      "suspended",
+      "Suspend member",
+      true,
+    );
   }
-  return transitionForm(member.membershipId, "active", "Activate member", false);
+  return transitionForm(
+    member.membershipId,
+    "active",
+    "Activate member",
+    false,
+  );
 }
 
 function transitionForm(
