@@ -36,6 +36,7 @@ import {
 import { PresentationSettingsService } from "./application/presentation-settings-service";
 import {
   parseCustomRoleCreateInput,
+  parseCustomRoleRetirementInput,
   parseCustomRoleUpdateInput,
   parseRoleAssignmentInput,
   parseRoleRemovalInput,
@@ -787,9 +788,11 @@ app.get("/demo/app/admin/access", async (context) => {
             ? "Custom workspace role created."
             : noticeValue === "role-updated"
               ? "Custom workspace role updated."
-              : noticeValue === "unchanged"
-                ? "No access change was needed."
-                : undefined;
+              : noticeValue === "role-retired"
+                ? "Custom workspace role retired."
+                : noticeValue === "unchanged"
+                  ? "No access change was needed."
+                  : undefined;
     context.header("Cache-Control", "no-store");
     return context.html(
       renderRolesAccessAdmin(
@@ -1029,6 +1032,62 @@ app.post("/demo/app/admin/access/roles/update", async (context) => {
     }
     return context.text(
       error instanceof Error ? error.message : "Custom role update failed.",
+      409,
+    );
+  }
+});
+
+app.post("/demo/app/admin/access/roles/retire", async (context) => {
+  if (!guidedDemoEnabled(context.env)) return context.notFound();
+  if (!hasSameOrigin(context.req.url, context.req.header("Origin"))) {
+    return context.json({ error: "Same-origin demo request required." }, 403);
+  }
+  const sessionId = readGuidedDemoSession(context.req.header("Cookie"));
+  if (!sessionId) {
+    return context.json(
+      {
+        error:
+          "Synthetic administration session missing. Reload Roles & Access.",
+      },
+      409,
+    );
+  }
+
+  try {
+    const input = parseCustomRoleRetirementInput(
+      await readFormValues(context.req.raw, ["roleDefinitionId"]),
+    );
+    const database = new D1DatabaseProvider(context.env.DOCUMENT_CONTROL_DB);
+    const demo = createGuidedDemoContext(sessionId);
+    await ensureGuidedDemoSeed(database, sessionId);
+    const admin = await ensureGuidedTenantAdmin(database, sessionId);
+    const result = await createAuthorizedRolesAccessAdminService(
+      database,
+    ).retireCustomWorkspaceRole(
+      {
+        subjectId: admin.subjectId,
+        tenantId: demo.tenantId,
+        workspaceId: demo.workspaceId,
+      },
+      {
+        roleDefinitionId: input.roleDefinitionId,
+        auditEventId: `role-definition-audit-${crypto.randomUUID()}`,
+        occurredAt: new Date().toISOString(),
+      },
+    );
+    return context.redirect(
+      `/demo/app/admin/access?notice=${result.changed ? "role-retired" : "unchanged"}`,
+      303,
+    );
+  } catch (error) {
+    if (error instanceof RolesAccessInputValidationError) {
+      return context.text(error.message, 400);
+    }
+    if (error instanceof AuthorizationDeniedError) {
+      return context.html(renderNotFound(createTheme(context.env)), 404);
+    }
+    return context.text(
+      error instanceof Error ? error.message : "Custom role retirement failed.",
       409,
     );
   }

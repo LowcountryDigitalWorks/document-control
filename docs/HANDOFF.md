@@ -55,8 +55,8 @@ The synthetic/test-only application now covers:
 - provider-neutral tenant member administration with direct app-local provisioning and Staged / Active /
   Suspended membership lifecycle;
 - workspace Roles & Access assignment administration;
-- tenant-owned custom workspace role creation/editing with bounded operational permissions and
-  tenant-wide assignment-impact acknowledgement;
+- tenant-owned custom workspace role creation/editing with bounded operational permissions,
+  tenant-wide assignment-impact acknowledgement, and terminal non-destructive retirement;
 - immutable Workflow Definition administration;
 - controlled Template Lifecycle administration;
 - workspace Workflow Selection/default-version administration; and
@@ -103,9 +103,15 @@ objects.
 - Custom-role changes append `role.definition.created` / `role.definition.updated` evidence to the
   existing audit stream.
 - Custom roles and their bindings are already represented by the existing portable export model.
+- A tenant-owned custom workspace role may be retired only after every tenant assignment is removed.
+  Retirement is terminal: the definition and permissions remain visible for audit/export history, but
+  the role cannot be edited, reactivated, or assigned again. Database triggers independently enforce
+  the zero-binding requirement and block new bindings to a retired role.
+- Retirement appends `role.definition.retired` to the existing audit stream and portable export carries
+  optional `retiredAt` metadata.
 
-Custom-role deletion is intentionally not implemented yet. A future delete/retire design must define
-historical/audit behavior and current-binding handling rather than silently removing a role definition.
+Custom-role hard deletion is intentionally not implemented. Preserve retired role definitions and
+historical evidence rather than introducing destructive cleanup.
 
 Do **not** couple custom roles to Microsoft-specific group names or claims. A future Entra ID/AD/OIDC/
 SAML provisioning or mapping adapter should resolve immutable external subject/group identifiers to
@@ -152,7 +158,7 @@ Do not imply these are implemented or approved:
 - production invitation delivery, external identity provisioning, JIT/SCIM-style synchronization,
   or identity-provider/group mapping;
 - tenant/platform role-assignment administration or system-role editing;
-- custom-role deletion/retirement;
+- custom-role hard deletion;
 - arbitrary/customer file uploads;
 - upload orchestration across D1 and binary storage;
 - malware scanning, file-type/size policy, quarantine, or failure compensation;

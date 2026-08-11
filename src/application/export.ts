@@ -143,6 +143,14 @@ export function validatePortableExport(data: PortableExportV1): void {
     if (!["platform", "tenant", "workspace"].includes(role.scope)) {
       throw new Error(`Role definition ${role.id} has an invalid scope.`);
     }
+    if (role.retiredAt !== undefined) {
+      requireString(role.retiredAt, `role definition ${role.id} retiredAt`);
+      if (role.isSystem || role.scope !== "workspace" || !role.tenantId) {
+        throw new Error(
+          `Only tenant-owned custom workspace roles may be retired (${role.id}).`,
+        );
+      }
+    }
   }
 
   for (const binding of data.roleBindings) {

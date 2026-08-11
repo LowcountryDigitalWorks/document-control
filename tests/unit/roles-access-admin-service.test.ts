@@ -70,9 +70,17 @@ async function createHarness(): Promise<{
     ),
     "utf8",
   );
+  const retirement = await readFile(
+    new URL(
+      "../../migrations/0007_custom_role_retirement.sql",
+      import.meta.url,
+    ),
+    "utf8",
+  );
   const database = new DatabaseSync(":memory:");
   database.exec(initial);
   database.exec(permissions);
+  database.exec(retirement);
   database.exec(`
     INSERT INTO tenants (id, name, slug, created_at)
     VALUES ('tenant-1', 'Tenant One', 'tenant-one', '${timestamp}');

@@ -314,8 +314,8 @@ Turnstile/abuse controls, and operational cleanup are implemented and validated.
 - Creating or editing a tenant-owned custom role requires tenant-level `tenant.manage` plus
   current-workspace `role.manage`. Assigning an existing eligible workspace role continues to require
   only current-workspace `role.manage`.
-- Built-in system role definitions remain immutable. Custom-role deletion/retirement is deliberately
-  deferred until historical/audit and current-binding behavior is explicitly designed.
+- Built-in system role definitions remain immutable. Terminal non-destructive custom-role retirement
+  is implemented in PR #31; hard deletion remains deliberately unsupported.
 - Before changing a custom role that is currently assigned, the administration surface shows the
   tenant-wide affected subject/workspace assignments and requires acknowledgement. The role change
   then applies consistently anywhere that tenant-owned role is bound.
@@ -341,6 +341,32 @@ Turnstile/abuse controls, and operational cleanup are implemented and validated.
   direct Active Directory connectivity, JIT/SCIM synchronization, production invitation delivery or
   external identity provisioning, provider/group mapping, production Cloudflare resources, customer
   data/uploads, or paid services. Provider-neutral direct member lifecycle is added in PR #30.
+
+### Terminal custom workspace role retirement (synthetic/test only)
+
+- PR #31 adds terminal, non-destructive retirement for tenant-owned custom `workspace` roles without
+  deleting the role definition or introducing a parallel lifecycle store. Migration
+  `0007_custom_role_retirement.sql` adds nullable `retired_at` metadata to `role_definitions`.
+- Retirement requires the same dual authority as custom-role definition administration:
+  tenant-level `tenant.manage` plus current-workspace `role.manage`. Built-in/system roles and roles
+  outside the tenant-owned workspace scope cannot be retired.
+- Every tenant assignment to the role must be removed before retirement. The UI shows retirement as
+  unavailable while assignments remain; the service returns a bounded conflict and a database trigger
+  independently rejects retirement when any binding still references the role.
+- Retirement is terminal. Retired definitions remain visible as historical records but cannot be
+  edited, reactivated, or selected for new assignment. A database trigger independently rejects new
+  role bindings to a retired role.
+- Successful retirement appends `role.definition.retired` to the existing append-only audit stream.
+  Portable export preserves the role definition and adds optional `retiredAt` metadata without
+  changing the export version or storing provider credentials.
+- Unit/invariant coverage verifies the zero-assignment requirement, built-in-role protection, terminal
+  state, edit/assignment rejection, database trigger enforcement, input validation, and dual
+  authorization. Browser coverage verifies create -> assign -> remove -> retire behavior, retired-role
+  UI/read-only history, assignment exclusion, audit evidence, same-origin protection, and axe
+  accessibility on the synthetic administration surface.
+- This slice does **not** hard-delete role definitions/history, configure production authentication or
+  identity providers, add Entra/AD/OIDC/SAML/SCIM integration, touch production Cloudflare resources,
+  accept customer data/uploads, or add paid services.
 
 ### Provider-neutral tenant member lifecycle administration (synthetic/test only)
 
@@ -527,8 +553,8 @@ production authentication or public-demo hardening.
   immutable Workflow Definition administration PR #18, controlled Template Lifecycle administration
   PR #19, Template Lifecycle integration reconciliation PR #20, workspace Workflow Selection
   administration PR #21, controlled Workflow Definition lifecycle administration PR #27,
-  provider-neutral custom workspace roles PR #29, and provider-neutral tenant member lifecycle PR
-  #30.
+  provider-neutral custom workspace roles PR #29, provider-neutral tenant member lifecycle PR #30,
+  and terminal custom role retirement PR #31.
 - `main` is the authoritative integration branch after reviewed/validated pull requests are merged.
 - No production Cloudflare resources, custom domains, customer data, analytics, paid services, or
   public-upload capability have been introduced.
@@ -545,7 +571,7 @@ production authentication or public-demo hardening.
 - Full-text/content-body search or an external/indexed search service; current search is bounded
   metadata filtering only.
 - Built-in/system role-definition editing; tenant/platform role assignment administration;
-  custom-role deletion/retirement; member deletion; production invitation delivery; external identity
+  custom-role hard deletion; member deletion; production invitation delivery; external identity
   provisioning; or identity-provider/group mapping/synchronization.
 - Richer workflow authoring beyond immutable versions, workspace selection, and controlled lifecycle.
 - Template content upload/new-version authoring, new-template creation, or storage/scanning

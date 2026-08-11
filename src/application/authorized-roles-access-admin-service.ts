@@ -4,6 +4,7 @@ import type {
   AssignWorkspaceRoleCommand,
   CreateCustomWorkspaceRoleCommand,
   RemoveWorkspaceRoleCommand,
+  RetireCustomWorkspaceRoleCommand,
   RolesAccessAdminService,
   UpdateCustomWorkspaceRoleCommand,
   WorkspaceAccessSnapshot,
@@ -56,6 +57,22 @@ export class AuthorizedRolesAccessAdminService {
   ): Promise<AccessMutationResult> {
     await this.assertTenantRoleDefinitionManagementAllowed(context);
     return this.access.updateCustomWorkspaceRole({
+      ...command,
+      tenantId: context.tenantId,
+      workspaceId: context.workspaceId,
+      actorSubjectId: context.subjectId,
+    });
+  }
+
+  public async retireCustomWorkspaceRole(
+    context: RolesAccessAuthorizationContext,
+    command: Omit<
+      RetireCustomWorkspaceRoleCommand,
+      "tenantId" | "workspaceId" | "actorSubjectId"
+    >,
+  ): Promise<AccessMutationResult> {
+    await this.assertTenantRoleDefinitionManagementAllowed(context);
+    return this.access.retireCustomWorkspaceRole({
       ...command,
       tenantId: context.tenantId,
       workspaceId: context.workspaceId,

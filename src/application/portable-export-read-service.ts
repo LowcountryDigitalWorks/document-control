@@ -62,6 +62,7 @@ interface RoleDefinitionRow {
   permissionsJson: string;
   isSystem: number;
   createdAt: string;
+  retiredAt: string | null;
 }
 interface RoleBindingRow {
   id: string;
@@ -345,7 +346,8 @@ export class PortableExportReadService {
               scope,
               permissions_json AS permissionsJson,
               is_system AS isSystem,
-              created_at AS createdAt
+              created_at AS createdAt,
+              retired_at AS retiredAt
        FROM role_definitions
        WHERE tenant_id = ?
           OR id IN (
@@ -365,6 +367,7 @@ export class PortableExportReadService {
       permissions: parseStringArray(row.permissionsJson, "permissions_json"),
       isSystem: row.isSystem === 1,
       createdAt: row.createdAt,
+      retiredAt: row.retiredAt ?? undefined,
     }));
   }
 

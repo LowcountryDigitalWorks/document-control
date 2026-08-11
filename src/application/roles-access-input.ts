@@ -55,6 +55,18 @@ export function parseCustomRoleUpdateInput(values: URLSearchParams): {
   };
 }
 
+export function parseCustomRoleRetirementInput(values: URLSearchParams): {
+  roleDefinitionId: string;
+} {
+  return {
+    roleDefinitionId: requiredIdentifier(
+      values,
+      "roleDefinitionId",
+      "Custom role",
+    ),
+  };
+}
+
 function requiredRoleName(values: URLSearchParams): string {
   const name = (values.get("name") ?? "").trim().replace(/\s+/gu, " ");
   if (name.length < 2 || name.length > 80) {

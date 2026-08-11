@@ -26,6 +26,7 @@ export interface AccessRoleDefinition {
   isSystem: boolean;
   assignmentCount: number;
   assignedMembers: readonly string[];
+  retiredAt?: string;
 }
 
 export interface AccessMember {
@@ -100,6 +101,15 @@ export interface UpdateCustomWorkspaceRoleCommand {
   occurredAt: string;
 }
 
+export interface RetireCustomWorkspaceRoleCommand {
+  tenantId: string;
+  workspaceId: string;
+  roleDefinitionId: string;
+  actorSubjectId: string;
+  auditEventId: string;
+  occurredAt: string;
+}
+
 export interface AccessMutationResult {
   changed: boolean;
   snapshot: WorkspaceAccessSnapshot;
@@ -118,6 +128,7 @@ interface RoleRow {
   name: string;
   permissionsJson: string;
   isSystem: number;
+  retiredAt: string | null;
 }
 
 interface MemberRow {
@@ -159,7 +170,8 @@ export class RolesAccessAdminService {
                 role.role_key AS roleKey,
                 role.name,
                 role.permissions_json AS permissionsJson,
-                role.is_system AS isSystem
+                role.is_system AS isSystem,
+                role.retired_at AS retiredAt
          FROM role_definitions role
          WHERE role.scope = 'workspace'
            AND (role.tenant_id IS NULL OR role.tenant_id = ?)
@@ -241,6 +253,7 @@ export class RolesAccessAdminService {
           assignedMembers: impacts.map(
             (impact) => `${impact.subjectName} — ${impact.workspaceName}`,
           ),
+          retiredAt: role.retiredAt ?? undefined,
         };
       }),
       members: memberRows.map((member) => ({
@@ -311,6 +324,9 @@ export class RolesAccessAdminService {
       command.tenantId,
       command.roleDefinitionId,
     );
+    if (current.retiredAt) {
+      throw new Error("Retired custom roles cannot be edited.");
+    }
     const name = normalizeRoleName(command.name);
     const permissions = normalizeCustomPermissions(command.permissions);
     await this.assertCustomRoleNameAvailable(
@@ -379,6 +395,73 @@ export class RolesAccessAdminService {
           previousPermissions: JSON.stringify(currentPermissions),
           permissions: JSON.stringify(permissions),
           assignmentCount: String(impacts.length),
+        },
+      }),
+    ]);
+
+    return {
+      changed: true,
+      snapshot: await this.getWorkspaceAccess(
+        command.tenantId,
+        command.workspaceId,
+      ),
+    };
+  }
+
+  public async retireCustomWorkspaceRole(
+    command: RetireCustomWorkspaceRoleCommand,
+  ): Promise<AccessMutationResult> {
+    await this.loadWorkspace(command.tenantId, command.workspaceId);
+    const current = await this.loadCustomWorkspaceRole(
+      command.tenantId,
+      command.roleDefinitionId,
+    );
+    if (current.retiredAt) {
+      return {
+        changed: false,
+        snapshot: await this.getWorkspaceAccess(
+          command.tenantId,
+          command.workspaceId,
+        ),
+      };
+    }
+
+    const [impact] = await this.database.query<{ assignmentCount: number }>(
+      `SELECT COUNT(*) AS assignmentCount
+       FROM role_bindings
+       WHERE role_definition_id = ? AND tenant_id = ?`,
+      [command.roleDefinitionId, command.tenantId],
+    );
+    const assignmentCount = Number(impact?.assignmentCount ?? 0);
+    if (assignmentCount > 0) {
+      throw new Error(
+        `Remove all ${assignmentCount} current assignment${assignmentCount === 1 ? "" : "s"} before retiring this custom role.`,
+      );
+    }
+
+    await this.database.executeBatch([
+      statement(
+        `UPDATE role_definitions
+         SET retired_at = ?
+         WHERE id = ? AND tenant_id = ? AND scope = 'workspace' AND is_system = 0`,
+        [command.occurredAt, command.roleDefinitionId, command.tenantId],
+      ),
+      auditStatement({
+        id: command.auditEventId,
+        tenantId: command.tenantId,
+        workspaceId: command.workspaceId,
+        actorSubjectId: command.actorSubjectId,
+        eventType: "role.definition.retired",
+        entityType: "role_definition",
+        entityId: command.roleDefinitionId,
+        occurredAt: command.occurredAt,
+        payload: {
+          roleKey: current.roleKey,
+          name: current.name,
+          permissions: JSON.stringify(
+            parsePermissionList(current.permissionsJson),
+          ),
+          retirement: "terminal",
         },
       }),
     ]);
@@ -592,10 +675,12 @@ export class RolesAccessAdminService {
               role_key AS roleKey,
               name,
               permissions_json AS permissionsJson,
-              is_system AS isSystem
+              is_system AS isSystem,
+              retired_at AS retiredAt
        FROM role_definitions
        WHERE id = ?
          AND scope = 'workspace'
+         AND retired_at IS NULL
          AND (tenant_id IS NULL OR tenant_id = ?)`,
       [roleDefinitionId, tenantId],
     );
@@ -616,7 +701,8 @@ export class RolesAccessAdminService {
               role_key AS roleKey,
               name,
               permissions_json AS permissionsJson,
-              is_system AS isSystem
+              is_system AS isSystem,
+              retired_at AS retiredAt
        FROM role_definitions
        WHERE id = ?
          AND tenant_id = ?
