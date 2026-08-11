@@ -77,16 +77,20 @@ async function createHarness(): Promise<{
     INSERT INTO tenants (id, name, slug, created_at)
     VALUES ('tenant-1', 'Tenant One', 'tenant-one', '${timestamp}');
     INSERT INTO workspaces (id, tenant_id, name, created_at)
-    VALUES ('workspace-1', 'tenant-1', 'Operations', '${timestamp}');
+    VALUES
+      ('workspace-1', 'tenant-1', 'Operations', '${timestamp}'),
+      ('workspace-2', 'tenant-1', 'Records', '${timestamp}');
     INSERT INTO identity_subjects (id, display_name, provider, provider_subject, created_at)
     VALUES
       ('admin-1', 'Admin One', 'external', 'admin-1', '${timestamp}'),
       ('member-1', 'Member One', 'external', 'member-1', '${timestamp}'),
+      ('member-2', 'Member Two', 'entra', 'member-2', '${timestamp}'),
       ('inactive-1', 'Inactive One', 'external', 'inactive-1', '${timestamp}');
     INSERT INTO tenant_memberships (id, tenant_id, subject_id, status, created_at)
     VALUES
       ('membership-admin', 'tenant-1', 'admin-1', 'active', '${timestamp}'),
       ('membership-member', 'tenant-1', 'member-1', 'active', '${timestamp}'),
+      ('membership-member-2', 'tenant-1', 'member-2', 'active', '${timestamp}'),
       ('membership-inactive', 'tenant-1', 'inactive-1', 'suspended', '${timestamp}');
     INSERT INTO role_bindings
       (id, role_definition_id, subject_id, tenant_id, workspace_id, created_at)
@@ -100,6 +104,159 @@ async function createHarness(): Promise<{
 }
 
 describe("RolesAccessAdminService", () => {
+  it("creates and updates a tenant-owned custom workspace role with audit evidence", async () => {
+    const { database, service } = await createHarness();
+
+    const created = await service.createCustomWorkspaceRole({
+      tenantId: "tenant-1",
+      workspaceId: "workspace-1",
+      roleDefinitionId: "role-custom-records",
+      roleKey: "custom_records",
+      name: "Records Coordinator",
+      permissions: ["audit.read", "document.read", "document.review"],
+      actorSubjectId: "admin-1",
+      auditEventId: "audit-role-created",
+      occurredAt: timestamp,
+    });
+    expect(created.changed).toBe(true);
+    expect(created.snapshot.roles).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "role-custom-records",
+          name: "Records Coordinator",
+          key: "custom_records",
+          isSystem: false,
+          permissions: ["document.read", "document.review", "audit.read"],
+          assignmentCount: 0,
+        }),
+      ]),
+    );
+    expect(
+      database
+        .prepare(
+          "SELECT event_type, entity_type FROM audit_events WHERE id = ?",
+        )
+        .get("audit-role-created"),
+    ).toEqual({
+      event_type: "role.definition.created",
+      entity_type: "role_definition",
+    });
+
+    await service.assignWorkspaceRole({
+      tenantId: "tenant-1",
+      workspaceId: "workspace-1",
+      subjectId: "member-1",
+      roleDefinitionId: "role-custom-records",
+      bindingId: "binding-custom-1",
+      actorSubjectId: "admin-1",
+      auditEventId: "audit-custom-binding-1",
+      occurredAt: timestamp,
+    });
+    await service.assignWorkspaceRole({
+      tenantId: "tenant-1",
+      workspaceId: "workspace-2",
+      subjectId: "member-2",
+      roleDefinitionId: "role-custom-records",
+      bindingId: "binding-custom-2",
+      actorSubjectId: "admin-1",
+      auditEventId: "audit-custom-binding-2",
+      occurredAt: timestamp,
+    });
+
+    await expect(
+      service.updateCustomWorkspaceRole({
+        tenantId: "tenant-1",
+        workspaceId: "workspace-1",
+        roleDefinitionId: "role-custom-records",
+        name: "Records Lead",
+        permissions: ["document.read", "document.review", "audit.read"],
+        acknowledgeAssignments: false,
+        actorSubjectId: "admin-1",
+        auditEventId: "audit-role-update-blocked",
+        occurredAt: timestamp,
+      }),
+    ).rejects.toThrow(/currently affects 2 assignments/iu);
+
+    const updated = await service.updateCustomWorkspaceRole({
+      tenantId: "tenant-1",
+      workspaceId: "workspace-1",
+      roleDefinitionId: "role-custom-records",
+      name: "Records Lead",
+      permissions: [
+        "document.read",
+        "document.review",
+        "document.approve",
+        "audit.read",
+      ],
+      acknowledgeAssignments: true,
+      actorSubjectId: "admin-1",
+      auditEventId: "audit-role-updated",
+      occurredAt: timestamp,
+    });
+    expect(updated.changed).toBe(true);
+    expect(updated.snapshot.roles).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "role-custom-records",
+          name: "Records Lead",
+          assignmentCount: 2,
+          assignedMembers: [
+            "Member One — Operations",
+            "Member Two — Records",
+          ],
+        }),
+      ]),
+    );
+    expect(
+      database
+        .prepare("SELECT event_type FROM audit_events WHERE id = ?")
+        .get("audit-role-updated"),
+    ).toEqual({ event_type: "role.definition.updated" });
+  });
+
+  it("rejects administrative permissions and duplicate custom role names", async () => {
+    const { service } = await createHarness();
+
+    await expect(
+      service.createCustomWorkspaceRole({
+        tenantId: "tenant-1",
+        workspaceId: "workspace-1",
+        roleDefinitionId: "role-custom-unsafe",
+        roleKey: "custom_unsafe",
+        name: "Unsafe Role",
+        permissions: ["document.read", "role.manage"],
+        actorSubjectId: "admin-1",
+        auditEventId: "audit-unsafe",
+        occurredAt: timestamp,
+      }),
+    ).rejects.toThrow(/not available to tenant-defined workspace roles/iu);
+
+    await service.createCustomWorkspaceRole({
+      tenantId: "tenant-1",
+      workspaceId: "workspace-1",
+      roleDefinitionId: "role-custom-records",
+      roleKey: "custom_records",
+      name: "Records Coordinator",
+      permissions: ["document.read"],
+      actorSubjectId: "admin-1",
+      auditEventId: "audit-role-created",
+      occurredAt: timestamp,
+    });
+    await expect(
+      service.createCustomWorkspaceRole({
+        tenantId: "tenant-1",
+        workspaceId: "workspace-1",
+        roleDefinitionId: "role-custom-records-2",
+        roleKey: "custom_records_2",
+        name: "records coordinator",
+        permissions: ["document.read"],
+        actorSubjectId: "admin-1",
+        auditEventId: "audit-role-created-2",
+        occurredAt: timestamp,
+      }),
+    ).rejects.toThrow(/with this name already exists/iu);
+  });
+
   it("assigns and removes an eligible workspace role with audit evidence", async () => {
     const { database, service } = await createHarness();
 
