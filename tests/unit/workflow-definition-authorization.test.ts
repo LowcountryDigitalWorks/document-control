@@ -24,10 +24,16 @@ function createHarness(denyAt: number | null = null) {
   const getCatalog = vi.fn().mockResolvedValue({ definitions: [] });
   const createDefinition = vi.fn().mockResolvedValue({ version: 1 });
   const createVersion = vi.fn().mockResolvedValue({ version: 2 });
+  const transitionLifecycle = vi.fn().mockResolvedValue({
+    id: "workflow-1",
+    version: 1,
+    lifecycleState: "deprecated",
+  });
   const workflows = {
     getCatalog,
     createDefinition,
     createVersion,
+    transitionLifecycle,
   } as unknown as WorkflowDefinitionAdminService;
   return {
     service: new AuthorizedWorkflowDefinitionAdminService(
@@ -38,6 +44,7 @@ function createHarness(denyAt: number | null = null) {
     getCatalog,
     createDefinition,
     createVersion,
+    transitionLifecycle,
   };
 }
 
@@ -87,5 +94,52 @@ describe("AuthorizedWorkflowDefinitionAdminService", () => {
       }),
     ).rejects.toBeInstanceOf(AuthorizationDeniedError);
     expect(workflowDenied.createVersion).not.toHaveBeenCalled();
+  });
+
+  it("uses the same dual authorization boundary before lifecycle mutation", async () => {
+    const allowed = createHarness();
+    await allowed.service.transitionLifecycle(context, {
+      workflowDefinitionId: "workflow-1",
+      workflowDefinitionVersion: 1,
+      targetState: "deprecated",
+      auditEventId: "audit-lifecycle",
+      occurredAt: "2026-08-11T18:50:00.000Z",
+    });
+
+    expect(allowed.requests).toEqual([
+      {
+        subjectId: context.subjectId,
+        tenantId: context.tenantId,
+        permission: "tenant.manage",
+      },
+      {
+        subjectId: context.subjectId,
+        tenantId: context.tenantId,
+        workspaceId: context.workspaceId,
+        permission: "workflow.manage",
+      },
+    ]);
+    expect(allowed.transitionLifecycle).toHaveBeenCalledWith({
+      tenantId: context.tenantId,
+      workspaceId: context.workspaceId,
+      actorSubjectId: context.subjectId,
+      workflowDefinitionId: "workflow-1",
+      workflowDefinitionVersion: 1,
+      targetState: "deprecated",
+      auditEventId: "audit-lifecycle",
+      occurredAt: "2026-08-11T18:50:00.000Z",
+    });
+
+    const denied = createHarness(2);
+    await expect(
+      denied.service.transitionLifecycle(context, {
+        workflowDefinitionId: "workflow-1",
+        workflowDefinitionVersion: 1,
+        targetState: "deprecated",
+        auditEventId: "audit-denied",
+        occurredAt: "2026-08-11T18:50:00.000Z",
+      }),
+    ).rejects.toBeInstanceOf(AuthorizationDeniedError);
+    expect(denied.transitionLifecycle).not.toHaveBeenCalled();
   });
 });
