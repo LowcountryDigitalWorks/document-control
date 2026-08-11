@@ -42,7 +42,7 @@ export function renderAdminSettings(
       <h1 id="page-title">Administration</h1>
       <p class="lede">Configure the synthetic tenant's workspace name, application presentation, and document-control terminology. These values are persisted in the existing tenant configuration model and applied to the tenant UI after validation.</p>
       ${saved ? '<p class="notice" role="status">Presentation settings saved.</p>' : ""}
-      <p><a href="/demo/app/admin/access"><strong>Manage Roles &amp; Access</strong></a> · <a href="/demo/app/admin/workflows">Workflow Definitions</a> · <a href="/demo/app/admin/backup">Backup &amp; Portability</a></p>
+      <p><a href="/demo/app/admin/access"><strong>Manage Roles &amp; Access</strong></a> · <a href="/demo/app/admin/workflows">Workflow Definitions</a> · <a href="/demo/app/admin/templates">Template Lifecycle</a> · <a href="/demo/app/admin/backup">Backup &amp; Portability</a></p>
     </section>
 
     <section class="context" aria-labelledby="context-title">
