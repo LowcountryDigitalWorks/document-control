@@ -26,7 +26,7 @@ export function renderWorkspaceWorkflowSelection(
     <section class="intro" aria-labelledby="page-title">
       <p class="eyebrow">Workspace workflow policy</p>
       <h1 id="page-title">Workflow Selection</h1>
-      <p class="lede">Choose which active workflow versions are available in <strong>${escapeHtml(catalog.workspaceName)}</strong> and which exact active version new workflow starts use by default.</p>
+      <p class="lede">Choose which Active workflow versions are available in <strong>${escapeHtml(catalog.workspaceName)}</strong> and which exact Active version new workflow starts use by default.</p>
       ${notice ? `<p class="notice" role="status">${escapeHtml(notice)}</p>` : ""}
       <p><a href="/demo/app/admin/workflows">Manage tenant Workflow Definitions and lifecycle</a></p>
     </section>
@@ -36,9 +36,9 @@ export function renderWorkspaceWorkflowSelection(
       <h2 id="boundary-title">Lifecycle changes availability, not history</h2>
       <ul>
         <li>Only <strong>Active</strong> versions can be newly made available or selected as a new default.</li>
-        <li><strong>Deprecated</strong> versions may remain where already configured, including as an existing default, until administrators move away from them.</li>
+        <li><strong>Legacy</strong> versions may remain where already configured, including as an existing default, until administrators move away from them.</li>
         <li><strong>Retired</strong> versions cannot be assigned to a workspace or start a new workflow.</li>
-        <li>The current default cannot be removed until another active applicable default is selected.</li>
+        <li>The current default cannot be removed until another Active applicable default is selected.</li>
         <li>Running workflow instances and recorded approvals remain bound to the exact version they started with.</li>
       </ul>
     </section>
@@ -53,6 +53,11 @@ export function renderWorkspaceWorkflowSelection(
 </html>`;
 }
 
+function lifecycleLabel(state: string): string {
+  if (state === "deprecated") return "Legacy";
+  return `${state[0]?.toUpperCase()}${state.slice(1)}`;
+}
+
 function renderDefinition(
   definition: WorkspaceWorkflowSelectionCatalog["definitions"][number],
 ): string {
@@ -61,7 +66,7 @@ function renderDefinition(
     : definition.applicable
       ? '<span class="badge enabled">Applicable</span>'
       : '<span class="badge neutral">Not applicable</span>';
-  const lifecycleStatus = `<span class="badge lifecycle ${definition.lifecycleState}">${definition.lifecycleState[0]?.toUpperCase()}${definition.lifecycleState.slice(1)}</span>`;
+  const lifecycleStatus = `<span class="badge lifecycle ${definition.lifecycleState}">${lifecycleLabel(definition.lifecycleState)}</span>`;
   const action = renderActions(definition);
 
   return `<article class="definition-card">
@@ -84,10 +89,10 @@ function renderActions(
   }
   if (definition.lifecycleState === "deprecated") {
     if (!definition.applicable) {
-      return '<p class="locked">Deprecated versions cannot be newly assigned. Reactivate this version in Workflow Definitions first.</p>';
+      return '<p class="locked">Legacy versions cannot be newly assigned. Return this version to Active in Workflow Definitions first.</p>';
     }
     if (definition.isDefault) {
-      return '<p class="locked">This deprecated version remains the current default. Select an active applicable version as default before removing it.</p>';
+      return '<p class="locked">This Legacy version remains the current default. Select an Active applicable version as default before removing it.</p>';
     }
     return actionForm(definition, "disable", "Remove from workspace", true);
   }
