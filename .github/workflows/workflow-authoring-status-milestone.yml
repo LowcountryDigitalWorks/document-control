@@ -1,18 +1,16 @@
 name: Workflow Authoring Status Milestone
 
 on:
-  workflow_dispatch:
-    inputs:
-      pull_request_number:
-        description: Pull request number to record
-        required: true
-        type: string
+  push:
+    branches:
+      - feature/workflow-authoring-improvements
 
 permissions:
   contents: write
 
 jobs:
   document:
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -26,16 +24,13 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Record release milestone
-        env:
-          PR_NUMBER: ${{ inputs.pull_request_number }}
         run: |
           python - <<'PY'
-          import os
           from pathlib import Path
           path = Path('docs/STATUS.md')
           text = path.read_text()
           old = '  provider-neutral custom workspace roles PR #29, provider-neutral tenant member lifecycle PR #30,\n  and terminal custom role retirement PR #31.\n'
-          new = f'  provider-neutral custom workspace roles PR #29, provider-neutral tenant member lifecycle PR #30,\n  terminal custom role retirement PR #31, and workflow authoring improvements PR #{os.environ["PR_NUMBER"]}.\n'
+          new = '  provider-neutral custom workspace roles PR #29, provider-neutral tenant member lifecycle PR #30,\n  terminal custom role retirement PR #31, and workflow authoring improvements PR #32.\n'
           if old not in text:
               raise SystemExit('STATUS milestone marker not found')
           path.write_text(text.replace(old, new, 1))
