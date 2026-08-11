@@ -362,6 +362,29 @@ Turnstile/abuse controls, and operational cleanup are implemented and validated.
   workflows, graphical workflow authoring, production authentication, production Cloudflare
   resources, customer data/uploads, or paid services.
 
+### Controlled Workflow Definition lifecycle administration (synthetic/test only)
+
+- Exact immutable workflow-definition versions now have separate lifecycle state: `active`,
+  `deprecated`, or `retired`; lifecycle changes never rewrite definition content.
+- New versions begin Active. Active versions may be newly assigned to a workspace and selected as a
+  new workspace default.
+- Deprecated versions may remain where already configured, including as an existing default so
+  administrators can migrate deliberately, but cannot be newly assigned or newly selected as a
+  default. Deprecated versions can be reactivated.
+- Retirement is terminal and requires the exact version to be removed from every workspace first.
+  Running workflow instances, reviews, approvals, and audit history remain pinned to their original
+  exact definition version after retirement.
+- Migration `0006_workflow_definition_lifecycle.sql` enforces legal transitions, blocks new
+  assignment/default promotion for non-Active versions, and prevents retirement while assignments
+  remain.
+- Lifecycle administration uses `tenant.manage` plus current-workspace `workflow.manage`; successful
+  changes append `workflow.definition.lifecycle_transitioned` to the immutable audit stream.
+- Backup & Portability exports include lifecycle state and transition metadata. Legacy v1 exports
+  without the additive lifecycle field remain accepted for compatibility.
+- This slice does not delete workflow history, migrate running instances, rewrite approvals, add
+  production authentication, create production Cloudflare resources, accept customer data/uploads,
+  or add paid services.
+
 ### Authorized controlled Template Lifecycle administration (synthetic/test only)
 
 - `/demo/app/admin/templates` manages lifecycle state for existing controlled template versions in the
@@ -431,7 +454,7 @@ production authentication or public-demo hardening.
   metadata filtering only.
 - Custom/system role-definition creation/editing or permission-authoring UI; tenant/platform role
   assignment administration; member invitations/provisioning; or identity-provider/group mapping.
-- Workflow retirement/deprecation semantics or richer workflow authoring.
+- Richer workflow authoring beyond immutable versions, workspace selection, and controlled lifecycle.
 - Template content upload/new-version authoring, new-template creation, or storage/scanning
   orchestration.
 - Logo/favicon upload or external branding-asset URL management.

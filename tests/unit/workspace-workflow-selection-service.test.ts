@@ -66,6 +66,7 @@ async function createHarness(): Promise<{
     "0003_workflow_definition_immutability.sql",
     "0004_template_version_lifecycle_integrity.sql",
     "0005_workspace_workflow_selection.sql",
+    "0006_workflow_definition_lifecycle.sql",
   ]) {
     database.exec(
       await readFile(

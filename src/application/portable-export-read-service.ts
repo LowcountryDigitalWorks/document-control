@@ -3,6 +3,7 @@ import {
   exportVersion,
   validatePortableExport,
   type PortableExportV1,
+  type WorkflowDefinitionLifecycleExport,
   type WorkspaceWorkflowAssignmentExport,
 } from "./export";
 import type { DatabaseProvider } from "./ports";
@@ -105,6 +106,14 @@ interface TemplateVersionRow {
   publishedAt: string | null;
   supersededAt: string | null;
 }
+interface WorkflowDefinitionLifecycleRow {
+  tenantId: string;
+  workflowDefinitionId: string;
+  workflowDefinitionVersion: number;
+  lifecycleState: "active" | "deprecated" | "retired";
+  changedBySubjectId: string | null;
+  changedAt: string;
+}
 interface WorkspaceWorkflowAssignmentRow {
   tenantId: string;
   workspaceId: string;
@@ -175,6 +184,7 @@ export class PortableExportReadService {
       templates,
       templateVersions,
       workflowDefinitions,
+      workflowDefinitionLifecycles,
       workspaceWorkflowAssignments,
       workflowInstances,
       reviews,
@@ -191,6 +201,7 @@ export class PortableExportReadService {
       this.readTemplates(tenantId),
       this.readTemplateVersions(tenantId),
       this.readWorkflowDefinitions(tenantId),
+      this.readWorkflowDefinitionLifecycles(tenantId),
       this.readWorkspaceWorkflowAssignments(tenantId),
       this.readWorkflowInstances(tenantId),
       this.readReviews(tenantId),
@@ -214,6 +225,7 @@ export class PortableExportReadService {
       templates,
       templateVersions,
       workflowDefinitions,
+      workflowDefinitionLifecycles,
       workspaceWorkflowAssignments,
       workflowInstances,
       reviews,
@@ -278,9 +290,11 @@ export class PortableExportReadService {
          UNION SELECT actor_subject_id FROM reviews WHERE tenant_id = ?
          UNION SELECT actor_subject_id FROM approvals WHERE tenant_id = ?
          UNION SELECT actor_subject_id FROM audit_events WHERE tenant_id = ?
+         UNION SELECT changed_by_subject_id FROM workflow_definition_lifecycle
+           WHERE tenant_id = ? AND changed_by_subject_id IS NOT NULL
        )
        ORDER BY subject.id`,
-      [tenantId, tenantId, tenantId, tenantId, tenantId, tenantId],
+      [tenantId, tenantId, tenantId, tenantId, tenantId, tenantId, tenantId],
     );
     return rows.map((row) => ({
       id: row.id,
@@ -515,6 +529,31 @@ export class PortableExportReadService {
         transitions: definition.transitions,
       };
     });
+  }
+
+  private async readWorkflowDefinitionLifecycles(
+    tenantId: string,
+  ): Promise<WorkflowDefinitionLifecycleExport[]> {
+    const rows = await this.database.query<WorkflowDefinitionLifecycleRow>(
+      `SELECT tenant_id AS tenantId,
+            workflow_definition_id AS workflowDefinitionId,
+            workflow_definition_version AS workflowDefinitionVersion,
+            lifecycle_state AS lifecycleState,
+            changed_by_subject_id AS changedBySubjectId,
+            changed_at AS changedAt
+     FROM workflow_definition_lifecycle
+     WHERE tenant_id = ?
+     ORDER BY workflow_definition_id, workflow_definition_version`,
+      [tenantId],
+    );
+    return rows.map((row) => ({
+      tenantId: row.tenantId,
+      workflowDefinitionId: row.workflowDefinitionId,
+      workflowDefinitionVersion: Number(row.workflowDefinitionVersion),
+      lifecycleState: row.lifecycleState,
+      changedBySubjectId: row.changedBySubjectId ?? undefined,
+      changedAt: row.changedAt,
+    }));
   }
 
   private async readWorkspaceWorkflowAssignments(

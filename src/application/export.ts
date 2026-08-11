@@ -20,6 +20,15 @@ import type {
 export const exportFormat = "ldw.document-control.export" as const;
 export const exportVersion = 1 as const;
 
+export interface WorkflowDefinitionLifecycleExport {
+  tenantId: string;
+  workflowDefinitionId: string;
+  workflowDefinitionVersion: number;
+  lifecycleState: "active" | "deprecated" | "retired";
+  changedBySubjectId?: string;
+  changedAt: string;
+}
+
 export interface WorkspaceWorkflowAssignmentExport {
   tenantId: string;
   workspaceId: string;
@@ -48,6 +57,7 @@ export interface PortableExportV1 {
   templates: Template[];
   templateVersions: TemplateVersion[];
   workflowDefinitions: WorkflowDefinition[];
+  workflowDefinitionLifecycles?: WorkflowDefinitionLifecycleExport[];
   workspaceWorkflowAssignments?: WorkspaceWorkflowAssignmentExport[];
   workflowInstances: WorkflowInstance[];
   reviews: Review[];
@@ -74,6 +84,18 @@ export function parseExport(serialized: string): PortableExportV1 {
 
   for (const field of arrayFields) {
     requireArray(root[field], field);
+  }
+  if (root.workflowDefinitionLifecycles !== undefined) {
+    requireArray(
+      root.workflowDefinitionLifecycles,
+      "workflowDefinitionLifecycles",
+    );
+  }
+  if (root.workspaceWorkflowAssignments !== undefined) {
+    requireArray(
+      root.workspaceWorkflowAssignments,
+      "workspaceWorkflowAssignments",
+    );
   }
 
   const data = candidate as unknown as PortableExportV1;
@@ -280,6 +302,50 @@ export function validatePortableExport(data: PortableExportV1): void {
     );
   }
 
+  const workflowLifecycleByKey = new Map<
+    string,
+    WorkflowDefinitionLifecycleExport
+  >();
+  if (data.workflowDefinitionLifecycles !== undefined) {
+    for (const lifecycle of data.workflowDefinitionLifecycles) {
+      assertTenant(
+        lifecycle.tenantId,
+        tenantId,
+        `workflow lifecycle ${lifecycle.workflowDefinitionId}`,
+      );
+      const key = `${lifecycle.workflowDefinitionId}:${lifecycle.workflowDefinitionVersion}`;
+      if (!workflowDefinitions.has(key)) {
+        throw new Error(
+          `Workflow lifecycle ${key} references a missing workflow definition version.`,
+        );
+      }
+      if (workflowLifecycleByKey.has(key)) {
+        throw new Error(
+          `Workflow lifecycle contains duplicate version ${key}.`,
+        );
+      }
+      if (
+        !["active", "deprecated", "retired"].includes(lifecycle.lifecycleState)
+      ) {
+        throw new Error(`Workflow lifecycle ${key} has an invalid state.`);
+      }
+      requireString(lifecycle.changedAt, `workflow lifecycle ${key} changedAt`);
+      if (lifecycle.changedBySubjectId !== undefined) {
+        assertReferenced(
+          subjects,
+          lifecycle.changedBySubjectId,
+          "workflow lifecycle actor",
+        );
+      }
+      workflowLifecycleByKey.set(key, lifecycle);
+    }
+    if (workflowLifecycleByKey.size !== workflowDefinitions.size) {
+      throw new Error(
+        "Workflow lifecycle export must contain exactly one record per workflow definition version.",
+      );
+    }
+  }
+
   for (const assignment of data.workspaceWorkflowAssignments ?? []) {
     assertTenant(
       assignment.tenantId,
@@ -296,13 +362,18 @@ export function validatePortableExport(data: PortableExportV1): void {
       tenantId,
       `workspace workflow assignment ${assignment.workspaceId}`,
     );
-    if (
-      !workflowDefinitions.has(
-        `${assignment.workflowDefinitionId}:${assignment.workflowDefinitionVersion}`,
-      )
-    ) {
+    const assignmentWorkflowKey = `${assignment.workflowDefinitionId}:${assignment.workflowDefinitionVersion}`;
+    if (!workflowDefinitions.has(assignmentWorkflowKey)) {
       throw new Error(
         `Workspace workflow assignment ${assignment.workspaceId} references a missing workflow definition version.`,
+      );
+    }
+    if (
+      workflowLifecycleByKey.get(assignmentWorkflowKey)?.lifecycleState ===
+      "retired"
+    ) {
+      throw new Error(
+        `Workspace workflow assignment ${assignment.workspaceId} references a retired workflow version.`,
       );
     }
     assertReferenced(
