@@ -18,7 +18,9 @@ export function parseWorkflowLifecycleInput(values: URLSearchParams): {
   workflowDefinitionVersion: number;
   targetState: WorkflowLifecycleState;
 } {
-  const workflowDefinitionId = (values.get("workflowDefinitionId") ?? "").trim();
+  const workflowDefinitionId = (
+    values.get("workflowDefinitionId") ?? ""
+  ).trim();
   if (
     !workflowDefinitionId ||
     workflowDefinitionId.length > 256 ||

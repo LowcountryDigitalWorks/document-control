@@ -66,7 +66,10 @@ test("workflow lifecycle stages deprecation and retirement without rewriting his
   await openWorkflowAdmin(page);
 
   let versionOne = versionCard(page, 1);
-  const workflowDefinitionId = await versionOne.locator("code").first().textContent();
+  const workflowDefinitionId = await versionOne
+    .locator("code")
+    .first()
+    .textContent();
   expect(workflowDefinitionId).toBeTruthy();
   await expect(versionOne.getByText("Active", { exact: true })).toBeVisible();
   await versionOne.getByRole("button", { name: "Deprecate" }).click();
@@ -78,13 +81,17 @@ test("workflow lifecycle stages deprecation and retirement without rewriting his
     "Workflow lifecycle transition recorded.",
   );
   versionOne = versionCard(page, 1);
-  await expect(versionOne.getByText("Deprecated", { exact: true })).toBeVisible();
   await expect(
-    versionOne.getByText(/Remove this deprecated version from every workspace/u),
+    versionOne.getByText("Deprecated", { exact: true }),
   ).toBeVisible();
   await expect(
-    versionOne.getByRole("button", { name: "Retire" }),
-  ).toHaveCount(0);
+    versionOne.getByText(
+      /Remove this deprecated version from every workspace/u,
+    ),
+  ).toBeVisible();
+  await expect(versionOne.getByRole("button", { name: "Retire" })).toHaveCount(
+    0,
+  );
 
   // Retirement remains blocked while any workspace assignment still references v1.
   const blockedRetirement = await page.request.post(
@@ -106,7 +113,9 @@ test("workflow lifecycle stages deprecation and retirement without rewriting his
   await openWorkflowSelection(page);
   versionOne = versionCard(page, 1);
   let versionTwo = versionCard(page, 2);
-  await expect(versionOne.getByText("Deprecated", { exact: true })).toBeVisible();
+  await expect(
+    versionOne.getByText("Deprecated", { exact: true }),
+  ).toBeVisible();
   await expect(
     versionOne.getByText("Workspace default", { exact: true }),
   ).toBeVisible();
@@ -125,13 +134,13 @@ test("workflow lifecycle stages deprecation and retirement without rewriting his
 
   await openWorkflowAdmin(page);
   versionOne = versionCard(page, 1);
-  await expect(versionOne.getByText("Deprecated", { exact: true })).toBeVisible();
+  await expect(
+    versionOne.getByText("Deprecated", { exact: true }),
+  ).toBeVisible();
   await versionOne.getByRole("button", { name: "Retire" }).click();
   versionOne = versionCard(page, 1);
   await expect(versionOne.getByText("Retired", { exact: true })).toBeVisible();
-  await expect(
-    versionOne.getByText(/historical evidence/u),
-  ).toBeVisible();
+  await expect(versionOne.getByText(/historical evidence/u)).toBeVisible();
   await expect(versionOne.getByRole("button")).toHaveCount(0);
 
   // The workflow instance created before lifecycle changes remains pinned to v1.
@@ -147,7 +156,9 @@ test("workflow lifecycle stages deprecation and retirement without rewriting his
     page.getByText("Standard review and approval v2 · v2", { exact: true }),
   ).toHaveCount(0);
 
-  await page.goto("/demo/app/audit?q=workflow.definition.lifecycle_transitioned");
+  await page.goto(
+    "/demo/app/audit?q=workflow.definition.lifecycle_transitioned",
+  );
   await expect(
     page.getByText("Workflow · Definition · Lifecycle transitioned", {
       exact: true,
@@ -208,14 +219,16 @@ test("workflow lifecycle changes remain isolated between synthetic sessions", as
     let firstV1 = versionCard(first, 1);
     await firstV1.getByRole("button", { name: "Deprecate" }).click();
     firstV1 = versionCard(first, 1);
-    await expect(firstV1.getByText("Deprecated", { exact: true })).toBeVisible();
+    await expect(
+      firstV1.getByText("Deprecated", { exact: true }),
+    ).toBeVisible();
 
     await second.goto("http://127.0.0.1:8787/demo/app/admin/workflows");
     const secondV1 = versionCard(second, 1);
     await expect(secondV1.getByText("Active", { exact: true })).toBeVisible();
-    await expect(
-      secondV1.getByText("Deprecated", { exact: true }),
-    ).toHaveCount(0);
+    await expect(secondV1.getByText("Deprecated", { exact: true })).toHaveCount(
+      0,
+    );
   } finally {
     await firstContext.close();
     await secondContext.close();

@@ -163,7 +163,9 @@ describe("workflow definition lifecycle", () => {
     await selections.setApplicability(
       applicability("workspace-1", 1, true, "w1-v1-enable"),
     );
-    await selections.setDefault(defaultCommand("workspace-1", 1, "w1-v1-default"));
+    await selections.setDefault(
+      defaultCommand("workspace-1", 1, "w1-v1-default"),
+    );
     await selections.setApplicability(
       applicability("workspace-2", 1, true, "w2-v1-enable"),
     );
@@ -230,7 +232,9 @@ describe("workflow definition lifecycle", () => {
     await selections.setApplicability(
       applicability("workspace-1", 2, true, "w1-v2-enable"),
     );
-    await selections.setDefault(defaultCommand("workspace-1", 2, "w1-v2-default"));
+    await selections.setDefault(
+      defaultCommand("workspace-1", 2, "w1-v2-default"),
+    );
     await selections.setApplicability(
       applicability("workspace-1", 1, false, "w1-v1-disable"),
     );
@@ -251,7 +255,11 @@ describe("workflow definition lifecycle", () => {
     expect(retired.lifecycleState).toBe("retired");
     expect(retired.availableLifecycleTransitions).toEqual([]);
     expect(
-      database.prepare("SELECT state FROM workflow_instances WHERE id = 'instance-v1'").get(),
+      database
+        .prepare(
+          "SELECT state FROM workflow_instances WHERE id = 'instance-v1'",
+        )
+        .get(),
     ).toEqual({ state: "draft" });
   });
 

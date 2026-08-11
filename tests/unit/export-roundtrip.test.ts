@@ -31,7 +31,8 @@ describe("portable export", () => {
           tenantId: source.tenant.id,
           workflowDefinitionId: definition.id,
           workflowDefinitionVersion: definition.version,
-          lifecycleState: index === 0 ? ("deprecated" as const) : ("active" as const),
+          lifecycleState:
+            index === 0 ? ("deprecated" as const) : ("active" as const),
           changedBySubjectId: actor,
           changedAt: source.exportedAt,
         }),
@@ -39,7 +40,8 @@ describe("portable export", () => {
     };
 
     expect(
-      parseExport(serializeExport(lifecycleExport)).workflowDefinitionLifecycles,
+      parseExport(serializeExport(lifecycleExport))
+        .workflowDefinitionLifecycles,
     ).toEqual(lifecycleExport.workflowDefinitionLifecycles);
   });
 

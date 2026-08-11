@@ -400,7 +400,9 @@ function mapCatalogRow(row: CatalogRow): WorkflowDefinitionRecord {
     workspaceAssignmentCount,
     availableLifecycleTransitions: availableWorkflowLifecycleTransitions(
       row.lifecycleState,
-    ).filter((target) => target !== "retired" || workspaceAssignmentCount === 0),
+    ).filter(
+      (target) => target !== "retired" || workspaceAssignmentCount === 0,
+    ),
   };
   assertValidWorkflowDefinition(definition);
   return definition;

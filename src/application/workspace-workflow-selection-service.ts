@@ -345,7 +345,9 @@ export class WorkspaceWorkflowSelectionService {
       throw new Error("No default workflow is configured for this workspace.");
     }
     if (row.lifecycleState === "retired") {
-      throw new Error("A retired workflow version cannot start a new workflow.");
+      throw new Error(
+        "A retired workflow version cannot start a new workflow.",
+      );
     }
     return {
       workflowDefinitionId: row.workflowDefinitionId,
