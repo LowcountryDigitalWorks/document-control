@@ -94,6 +94,14 @@ WHEN NOT EXISTS (
     AND lifecycle.workflow_definition_version = NEW.workflow_definition_version
     AND lifecycle.lifecycle_state = 'active'
 )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM workspace_workflow_assignments AS existing
+    WHERE existing.tenant_id = NEW.tenant_id
+      AND existing.workspace_id = NEW.workspace_id
+      AND existing.workflow_definition_id = NEW.workflow_definition_id
+      AND existing.workflow_definition_version = NEW.workflow_definition_version
+  )
 BEGIN
   SELECT RAISE(ABORT, 'only active workflow versions can be newly assigned to a workspace');
 END;
