@@ -50,7 +50,7 @@ async function openWorkflowSelection(page: Page): Promise<void> {
   );
 }
 
-test("workflow lifecycle stages deprecation and retirement without rewriting historical evidence", async ({
+test("workflow lifecycle stages Legacy and Retired use without rewriting historical evidence", async ({
   page,
 }) => {
   // Create a real workflow instance while seeded v1 is still the workspace default.
@@ -72,7 +72,7 @@ test("workflow lifecycle stages deprecation and retirement without rewriting his
     .textContent();
   expect(workflowDefinitionId).toBeTruthy();
   await expect(versionOne.getByText("Active", { exact: true })).toBeVisible();
-  await versionOne.getByRole("button", { name: "Deprecate" }).click();
+  await versionOne.getByRole("button", { name: "Mark Legacy" }).click();
 
   await expect(page).toHaveURL(
     /\/demo\/app\/admin\/workflows\?notice=lifecycle$/u,
@@ -81,13 +81,9 @@ test("workflow lifecycle stages deprecation and retirement without rewriting his
     "Workflow lifecycle transition recorded.",
   );
   versionOne = versionCard(page, 1);
+  await expect(versionOne.getByText("Legacy", { exact: true })).toBeVisible();
   await expect(
-    versionOne.getByText("Deprecated", { exact: true }),
-  ).toBeVisible();
-  await expect(
-    versionOne.getByText(
-      /Remove this deprecated version from every workspace/u,
-    ),
+    versionOne.getByText(/Remove this Legacy version from every workspace/u),
   ).toBeVisible();
   await expect(versionOne.getByRole("button", { name: "Retire" })).toHaveCount(
     0,
@@ -113,9 +109,7 @@ test("workflow lifecycle stages deprecation and retirement without rewriting his
   await openWorkflowSelection(page);
   versionOne = versionCard(page, 1);
   let versionTwo = versionCard(page, 2);
-  await expect(
-    versionOne.getByText("Deprecated", { exact: true }),
-  ).toBeVisible();
+  await expect(versionOne.getByText("Legacy", { exact: true })).toBeVisible();
   await expect(
     versionOne.getByText("Workspace default", { exact: true }),
   ).toBeVisible();
@@ -134,9 +128,7 @@ test("workflow lifecycle stages deprecation and retirement without rewriting his
 
   await openWorkflowAdmin(page);
   versionOne = versionCard(page, 1);
-  await expect(
-    versionOne.getByText("Deprecated", { exact: true }),
-  ).toBeVisible();
+  await expect(versionOne.getByText("Legacy", { exact: true })).toBeVisible();
   await versionOne.getByRole("button", { name: "Retire" }).click();
   versionOne = versionCard(page, 1);
   await expect(versionOne.getByText("Retired", { exact: true })).toBeVisible();
@@ -217,18 +209,14 @@ test("workflow lifecycle changes remain isolated between synthetic sessions", as
 
     await first.goto("http://127.0.0.1:8787/demo/app/admin/workflows");
     let firstV1 = versionCard(first, 1);
-    await firstV1.getByRole("button", { name: "Deprecate" }).click();
+    await firstV1.getByRole("button", { name: "Mark Legacy" }).click();
     firstV1 = versionCard(first, 1);
-    await expect(
-      firstV1.getByText("Deprecated", { exact: true }),
-    ).toBeVisible();
+    await expect(firstV1.getByText("Legacy", { exact: true })).toBeVisible();
 
     await second.goto("http://127.0.0.1:8787/demo/app/admin/workflows");
     const secondV1 = versionCard(second, 1);
     await expect(secondV1.getByText("Active", { exact: true })).toBeVisible();
-    await expect(secondV1.getByText("Deprecated", { exact: true })).toHaveCount(
-      0,
-    );
+    await expect(secondV1.getByText("Legacy", { exact: true })).toHaveCount(0);
   } finally {
     await firstContext.close();
     await secondContext.close();
