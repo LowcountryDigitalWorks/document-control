@@ -1,0 +1,34 @@
+name: Template E2E Formatter
+
+on:
+  push:
+    branches: [hotfix/template-lifecycle-integration]
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: hotfix/template-lifecycle-integration
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec prettier --write tests/e2e/template-lifecycle-admin.spec.ts
+      - name: Commit formatting if needed
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git diff --quiet -- tests/e2e/template-lifecycle-admin.spec.ts; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add tests/e2e/template-lifecycle-admin.spec.ts
+            git commit -m "Format template lifecycle browser proof"
+            git push origin HEAD:hotfix/template-lifecycle-integration
+          fi
