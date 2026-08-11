@@ -214,7 +214,7 @@ describe("workflow definition lifecycle", () => {
     });
     await expect(
       selections.setDefault(defaultCommand("workspace-2", 1, "w2-v1-default")),
-    ).rejects.toThrow(/only an active workflow version/u);
+    ).rejects.toThrow(/only an active workflow version/iu);
 
     await expect(
       definitions.transitionLifecycle({
