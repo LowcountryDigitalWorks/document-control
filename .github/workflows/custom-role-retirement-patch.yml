@@ -24,6 +24,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: python scripts/patch-custom-role-retirement.py
+      - run: python scripts/patch-custom-role-retirement-tests.py
       - run: pnpm exec prettier --write src scripts/e2e-d1.ts tests
       - run: pnpm check
       - name: Commit validated integration
