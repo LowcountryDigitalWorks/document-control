@@ -3,6 +3,7 @@ import {
   exportVersion,
   validatePortableExport,
   type PortableExportV1,
+  type WorkspaceWorkflowAssignmentExport,
 } from "./export";
 import type { DatabaseProvider } from "./ports";
 import type {
@@ -104,6 +105,17 @@ interface TemplateVersionRow {
   publishedAt: string | null;
   supersededAt: string | null;
 }
+interface WorkspaceWorkflowAssignmentRow {
+  tenantId: string;
+  workspaceId: string;
+  workflowDefinitionId: string;
+  workflowDefinitionVersion: number;
+  isDefault: number;
+  createdBySubjectId: string;
+  createdAt: string;
+  updatedBySubjectId: string;
+  updatedAt: string;
+}
 interface WorkflowDefinitionRow {
   id: string;
   tenantId: string;
@@ -163,6 +175,7 @@ export class PortableExportReadService {
       templates,
       templateVersions,
       workflowDefinitions,
+      workspaceWorkflowAssignments,
       workflowInstances,
       reviews,
       approvals,
@@ -178,6 +191,7 @@ export class PortableExportReadService {
       this.readTemplates(tenantId),
       this.readTemplateVersions(tenantId),
       this.readWorkflowDefinitions(tenantId),
+      this.readWorkspaceWorkflowAssignments(tenantId),
       this.readWorkflowInstances(tenantId),
       this.readReviews(tenantId),
       this.readApprovals(tenantId),
@@ -200,6 +214,7 @@ export class PortableExportReadService {
       templates,
       templateVersions,
       workflowDefinitions,
+      workspaceWorkflowAssignments,
       workflowInstances,
       reviews,
       approvals,
@@ -500,6 +515,37 @@ export class PortableExportReadService {
         transitions: definition.transitions,
       };
     });
+  }
+
+  private async readWorkspaceWorkflowAssignments(
+    tenantId: string,
+  ): Promise<WorkspaceWorkflowAssignmentExport[]> {
+    const rows = await this.database.query<WorkspaceWorkflowAssignmentRow>(
+      `SELECT tenant_id AS tenantId,
+              workspace_id AS workspaceId,
+              workflow_definition_id AS workflowDefinitionId,
+              workflow_definition_version AS workflowDefinitionVersion,
+              is_default AS isDefault,
+              created_by_subject_id AS createdBySubjectId,
+              created_at AS createdAt,
+              updated_by_subject_id AS updatedBySubjectId,
+              updated_at AS updatedAt
+       FROM workspace_workflow_assignments
+       WHERE tenant_id = ?
+       ORDER BY workspace_id, workflow_definition_id, workflow_definition_version`,
+      [tenantId],
+    );
+    return rows.map((row) => ({
+      tenantId: row.tenantId,
+      workspaceId: row.workspaceId,
+      workflowDefinitionId: row.workflowDefinitionId,
+      workflowDefinitionVersion: row.workflowDefinitionVersion,
+      isDefault: row.isDefault === 1,
+      createdBySubjectId: row.createdBySubjectId,
+      createdAt: row.createdAt,
+      updatedBySubjectId: row.updatedBySubjectId,
+      updatedAt: row.updatedAt,
+    }));
   }
 
   private async readWorkflowInstances(
