@@ -192,7 +192,7 @@ describe("TemplateLifecycleAdminService", () => {
           "UPDATE template_versions SET lifecycle_state = 'published' WHERE id = ?",
         )
         .run("template-version-1"),
-    ).toThrow(/invalid template lifecycle transition/u);
+    ).toThrow(/template lifecycle (timestamps must match the allowed transition|transition)/u);
     expect(() =>
       database
         .prepare("DELETE FROM template_versions WHERE id = ?")
