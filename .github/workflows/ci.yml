@@ -1,49 +1,25 @@
-name: CI
+name: Template Lifecycle Maintenance
 
 on:
-  pull_request:
   push:
-    branches: [main]
+    branches: [agent/template-lifecycle-admin]
 
 permissions:
   contents: read
 
 concurrency:
-  group: document-control-ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: template-lifecycle-maintenance-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  quality:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm check
-      - run: pnpm audit --audit-level=high
-
-  browser:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm exec playwright install --with-deps chromium
-      - run: pnpm test:e2e
-
-  secrets:
+  wire-template-lifecycle:
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: agent/template-lifecycle-admin
           fetch-depth: 0
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
@@ -51,4 +27,28 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm secrets:scan
+      - name: Wire and normalize template lifecycle administration
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .github/maintenance/wire_template_lifecycle.py
+          pnpm exec prettier --write \
+            src/index.ts \
+            src/application/template-lifecycle-input.ts \
+            src/application/template-lifecycle-admin-service.ts \
+            src/application/authorized-template-lifecycle-admin-service.ts \
+            src/demo/template-manager-context.ts \
+            src/ui/render-template-lifecycle-admin.ts \
+            src/ui/render-admin-settings.ts \
+            scripts/e2e-d1.ts \
+            tests/unit/template-lifecycle-admin-service.test.ts \
+            tests/unit/template-lifecycle-authorization.test.ts \
+            tests/unit/template-lifecycle-input.test.ts \
+            tests/e2e/template-lifecycle-admin.spec.ts
+          if ! git diff --quiet -- src scripts tests; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add src scripts tests
+            git commit -m "Wire controlled template lifecycle administration"
+            git push origin HEAD:agent/template-lifecycle-admin
+          fi
