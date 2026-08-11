@@ -21,36 +21,16 @@ jobs:
         with:
           ref: hotfix/template-lifecycle-integration
           fetch-depth: 0
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
       - name: Apply promised PR 19 integration
         shell: bash
         run: |
           set -euo pipefail
           python .github/maintenance/wire_template_lifecycle.py
           python .github/maintenance/update_template_lifecycle_status.py
-          pnpm exec prettier --write \
-            src/index.ts \
-            src/application/template-lifecycle-input.ts \
-            src/application/template-lifecycle-admin-service.ts \
-            src/application/authorized-template-lifecycle-admin-service.ts \
-            src/demo/template-manager-context.ts \
-            src/ui/render-template-lifecycle-admin.ts \
-            src/ui/render-admin-settings.ts \
-            scripts/e2e-d1.ts \
-            tests/unit/template-lifecycle-admin-service.test.ts \
-            tests/unit/template-lifecycle-authorization.test.ts \
-            tests/unit/template-lifecycle-input.test.ts \
-            tests/e2e/template-lifecycle-admin.spec.ts \
-            docs/STATUS.md
-          if ! git diff --quiet -- src scripts tests docs/STATUS.md; then
+          if ! git diff --quiet -- src scripts docs/STATUS.md; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add src scripts tests docs/STATUS.md
+            git add src scripts docs/STATUS.md
             git commit -m "Reconcile controlled template lifecycle integration"
             git push origin HEAD:hotfix/template-lifecycle-integration
           fi
