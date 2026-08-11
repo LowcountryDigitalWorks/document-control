@@ -37,7 +37,7 @@ export function renderWorkflowDefinitionAdmin(
     <section class="intro" aria-labelledby="page-title">
       <p class="eyebrow">Tenant workflow catalog</p>
       <h1 id="page-title">Workflow Definitions</h1>
-      <p class="lede">Create immutable workflow versions and control whether an exact version is active, deprecated, or retired. Existing workflow instances stay bound to the exact definition version they started with.</p>
+      <p class="lede">Create immutable workflow versions and control whether an exact version is Active, Legacy, or Retired. Existing workflow instances stay bound to the exact definition version they started with.</p>
       <p><a href="/demo/app/admin/workflow-selection">Configure workspace applicability and default selection</a></p>
       ${notice ? `<p class="notice" role="status">${escapeHtml(notice)}</p>` : ""}
     </section>
@@ -48,7 +48,7 @@ export function renderWorkflowDefinitionAdmin(
       <ul>
         <li>Workflow-definition content cannot be updated or deleted; structural changes create a new version.</li>
         <li><strong>Active</strong> versions may be newly assigned to workspaces and selected as defaults.</li>
-        <li><strong>Deprecated</strong> versions may continue where already configured, but cannot be newly assigned or newly selected as default.</li>
+        <li><strong>Legacy</strong> versions may continue where already configured, but cannot be newly assigned or newly selected as default. They can be returned to Active if needed.</li>
         <li><strong>Retired</strong> versions are historical-only. Remove every workspace assignment before retirement.</li>
         <li>Retirement never migrates running workflows or rewrites reviews, approvals, or audit evidence.</li>
       </ul>
@@ -148,8 +148,13 @@ function renderDefinition(
   </article>`;
 }
 
+function lifecycleLabel(state: WorkflowLifecycleState): string {
+  if (state === "deprecated") return "Legacy";
+  return `${state[0]?.toUpperCase()}${state.slice(1)}`;
+}
+
 function lifecycleBadge(state: WorkflowLifecycleState): string {
-  return `<span class="badge ${state}">${state[0]?.toUpperCase()}${state.slice(1)}</span>`;
+  return `<span class="badge ${state}">${lifecycleLabel(state)}</span>`;
 }
 
 function renderLifecycleActions(
@@ -167,7 +172,7 @@ function renderLifecycleActions(
     definition.workspaceAssignmentCount > 0
   ) {
     actions.push(
-      '<p class="locked">Remove this deprecated version from every workspace before retiring it.</p>',
+      '<p class="locked">Remove this Legacy version from every workspace before retiring it.</p>',
     );
   }
   return actions.join(" ");
@@ -179,8 +184,8 @@ function lifecycleForm(
   targetState: WorkflowLifecycleState,
 ): string {
   const labels: Record<WorkflowLifecycleState, string> = {
-    active: "Reactivate",
-    deprecated: "Deprecate",
+    active: "Return to Active",
+    deprecated: "Mark Legacy",
     retired: "Retire",
   };
   return `<form method="post" action="/demo/app/admin/workflows/lifecycle">
