@@ -1,0 +1,41 @@
+name: PR27 Status Milestone
+
+on:
+  push:
+    branches: [feature/workflow-retirement-deprecation]
+
+permissions:
+  contents: write
+
+jobs:
+  document:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feature/workflow-retirement-deprecation
+          fetch-depth: 0
+      - name: Record Workflow Definition lifecycle milestone
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path("docs/STATUS.md")
+          text = path.read_text()
+          old = """  immutable Workflow Definition administration PR #18, controlled Template Lifecycle administration
+  PR #19, Template Lifecycle integration reconciliation PR #20, and workspace Workflow Selection
+  administration PR #21.
+"""
+          new = """  immutable Workflow Definition administration PR #18, controlled Template Lifecycle administration
+  PR #19, Template Lifecycle integration reconciliation PR #20, workspace Workflow Selection
+  administration PR #21, and controlled Workflow Definition lifecycle administration PR #27.
+"""
+          if old not in text:
+              raise SystemExit("repository milestone marker missing")
+          path.write_text(text.replace(old, new, 1))
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/STATUS.md
+          git commit -m "Record workflow lifecycle release milestone"
+          git push origin HEAD:feature/workflow-retirement-deprecation
