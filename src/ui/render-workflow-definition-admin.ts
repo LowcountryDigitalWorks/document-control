@@ -37,6 +37,7 @@ export function renderWorkflowDefinitionAdmin(
       <p class="eyebrow">Tenant workflow catalog</p>
       <h1 id="page-title">Workflow Definitions</h1>
       <p class="lede">Create a new tenant workflow family or append a new immutable version. Existing workflow instances stay bound to the exact definition version they started with.</p>
+      <p><a href="/demo/app/admin/workflow-selection">Configure workspace applicability and default selection</a></p>
       ${notice ? `<p class="notice" role="status">${escapeHtml(notice)}</p>` : ""}
     </section>
 
