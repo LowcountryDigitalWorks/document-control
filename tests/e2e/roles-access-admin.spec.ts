@@ -8,6 +8,121 @@ async function openAccess(page: Page): Promise<void> {
   );
 }
 
+test("tenant administrator creates, assigns, and safely updates a custom workspace role", async ({
+  page,
+}) => {
+  await openAccess(page);
+  await expect(
+    page.getByText(/Microsoft Entra ID \/ Active Directory/u),
+  ).toBeVisible();
+
+  const createForm = page.locator(
+    'form[action="/demo/app/admin/access/roles/create"]',
+  );
+  await createForm.locator('input[name="name"]').fill("Records Coordinator");
+  await createForm
+    .locator('input[name="permission"][value="document.read"]')
+    .check();
+  await createForm
+    .locator('input[name="permission"][value="document.review"]')
+    .check();
+  await createForm
+    .locator('input[name="permission"][value="audit.read"]')
+    .check();
+  await createForm.getByRole("button", { name: "Create custom role" }).click();
+
+  await expect(page).toHaveURL(
+    /\/demo\/app\/admin\/access\?notice=role-created$/u,
+  );
+  await expect(page.getByRole("status")).toHaveText(
+    "Custom workspace role created.",
+  );
+  let customRoleCard = page
+    .locator(".custom-role-card")
+    .filter({ hasText: "Records Coordinator" });
+  await expect(customRoleCard).toHaveCount(1);
+  await expect(
+    customRoleCard.getByText("No current tenant assignments use this role."),
+  ).toBeVisible();
+
+  await page
+    .locator('select[name="subjectId"]')
+    .selectOption({ label: "Avery Author" });
+  await page
+    .locator('select[name="roleDefinitionId"]')
+    .selectOption({ label: "Records Coordinator — custom" });
+  await page.getByRole("button", { name: "Assign role" }).click();
+  await expect(page.getByRole("status")).toHaveText("Workspace role assigned.");
+
+  customRoleCard = page
+    .locator(".custom-role-card")
+    .filter({ hasText: "Records Coordinator" });
+  await expect(
+    customRoleCard.getByText(/1 current tenant assignment/u),
+  ).toBeVisible();
+  await expect(customRoleCard.getByText(/Avery Author —/u)).toBeVisible();
+
+  const updateForm = customRoleCard.locator(
+    'form[action="/demo/app/admin/access/roles/update"]',
+  );
+  await updateForm.locator('input[name="name"]').fill("Records Lead");
+  await updateForm
+    .locator('input[name="permission"][value="document.approve"]')
+    .check();
+  await updateForm.locator('input[name="acknowledgeAssignments"]').check();
+  await updateForm.getByRole("button", { name: "Save custom role" }).click();
+
+  await expect(page).toHaveURL(
+    /\/demo\/app\/admin\/access\?notice=role-updated$/u,
+  );
+  await expect(page.getByRole("status")).toHaveText(
+    "Custom workspace role updated.",
+  );
+  await expect(
+    page.locator("tbody tr").filter({ hasText: "Avery Author" }).filter({
+      hasText: "Records Lead",
+    }),
+  ).toHaveCount(1);
+
+  await page.goto("/demo/app/audit?q=role.definition.updated");
+  await expect(
+    page.getByText("Role · Definition · Updated", { exact: true }),
+  ).toBeVisible();
+});
+
+test("custom role boundary rejects administrative grants and cross-origin mutation", async ({
+  page,
+}) => {
+  await openAccess(page);
+
+  const unsafe = await page.request.post(
+    "/demo/app/admin/access/roles/create",
+    {
+      headers: {
+        Origin: "http://127.0.0.1:8787",
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      data: "name=Unsafe+Role&permission=document.read&permission=role.manage",
+    },
+  );
+  expect(unsafe.status()).toBe(400);
+  expect(await unsafe.text()).toContain(
+    "not available to custom workspace roles",
+  );
+
+  const crossOrigin = await page.request.post(
+    "/demo/app/admin/access/roles/create",
+    {
+      headers: { Origin: "https://example.test" },
+      form: {
+        name: "Cross Origin Role",
+        permission: "document.read",
+      },
+    },
+  );
+  expect(crossOrigin.status()).toBe(403);
+});
+
 test("tenant administrator assigns and removes a workspace role with audit evidence", async ({
   page,
 }) => {
@@ -17,7 +132,7 @@ test("tenant administrator assigns and removes a workspace role with audit evide
     .getByRole("heading", { level: 2, name: "Members" })
     .locator("..");
   const rolesPanel = page
-    .getByRole("heading", { level: 2, name: "Eligible workspace roles" })
+    .getByRole("heading", { level: 2, name: "Built-in workspace roles" })
     .locator("..");
   await expect(
     membersPanel.getByText("Avery Author", { exact: true }),

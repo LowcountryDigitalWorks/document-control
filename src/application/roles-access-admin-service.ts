@@ -1,11 +1,31 @@
 import type { DatabaseProvider, DatabaseStatement } from "./ports";
 
+export const customWorkspaceRolePermissions = [
+  "template.read",
+  "template.use",
+  "template.manage",
+  "document.read",
+  "document.create",
+  "document.version.create",
+  "document.review",
+  "document.approve",
+  "workflow.execute",
+  "workflow.manage",
+  "audit.read",
+  "export.create",
+] as const;
+
+export type CustomWorkspaceRolePermission =
+  (typeof customWorkspaceRolePermissions)[number];
+
 export interface AccessRoleDefinition {
   id: string;
   key: string;
   name: string;
   permissions: readonly string[];
   isSystem: boolean;
+  assignmentCount: number;
+  assignedMembers: readonly string[];
 }
 
 export interface AccessMember {
@@ -56,6 +76,30 @@ export interface RemoveWorkspaceRoleCommand {
   occurredAt: string;
 }
 
+export interface CreateCustomWorkspaceRoleCommand {
+  tenantId: string;
+  workspaceId: string;
+  roleDefinitionId: string;
+  roleKey: string;
+  name: string;
+  permissions: readonly string[];
+  actorSubjectId: string;
+  auditEventId: string;
+  occurredAt: string;
+}
+
+export interface UpdateCustomWorkspaceRoleCommand {
+  tenantId: string;
+  workspaceId: string;
+  roleDefinitionId: string;
+  name: string;
+  permissions: readonly string[];
+  acknowledgeAssignments: boolean;
+  actorSubjectId: string;
+  auditEventId: string;
+  occurredAt: string;
+}
+
 export interface AccessMutationResult {
   changed: boolean;
   snapshot: WorkspaceAccessSnapshot;
@@ -95,6 +139,12 @@ interface BindingRow {
   createdAt: string;
 }
 
+interface RoleImpactRow {
+  roleDefinitionId: string;
+  subjectName: string;
+  workspaceName: string;
+}
+
 export class RolesAccessAdminService {
   public constructor(private readonly database: DatabaseProvider) {}
 
@@ -103,7 +153,7 @@ export class RolesAccessAdminService {
     workspaceId: string,
   ): Promise<WorkspaceAccessSnapshot> {
     const workspace = await this.loadWorkspace(tenantId, workspaceId);
-    const [roleRows, memberRows, bindingRows] = await Promise.all([
+    const [roleRows, memberRows, bindingRows, impactRows] = await Promise.all([
       this.database.query<RoleRow>(
         `SELECT role.id,
                 role.role_key AS roleKey,
@@ -147,17 +197,52 @@ export class RolesAccessAdminService {
          ORDER BY subject.display_name ASC, role.name ASC, binding.id ASC`,
         [tenantId, workspaceId, tenantId],
       ),
+      this.database.query<RoleImpactRow>(
+        `SELECT binding.role_definition_id AS roleDefinitionId,
+                subject.display_name AS subjectName,
+                workspace.name AS workspaceName
+         FROM role_bindings binding
+         JOIN role_definitions role ON role.id = binding.role_definition_id
+         JOIN identity_subjects subject ON subject.id = binding.subject_id
+         JOIN workspaces workspace
+           ON workspace.id = binding.workspace_id
+          AND workspace.tenant_id = binding.tenant_id
+         WHERE binding.tenant_id = ?
+           AND role.scope = 'workspace'
+           AND role.tenant_id = ?
+         ORDER BY role.name ASC, workspace.name ASC, subject.display_name ASC`,
+        [tenantId, tenantId],
+      ),
     ]);
+
+    const bindings = bindingRows.map((binding) => ({
+      id: binding.id,
+      subjectId: binding.subjectId,
+      subjectName: binding.subjectName,
+      roleDefinitionId: binding.roleDefinitionId,
+      roleName: binding.roleName,
+      roleKey: binding.roleKey,
+      createdAt: binding.createdAt,
+    }));
 
     return {
       ...workspace,
-      roles: roleRows.map((role) => ({
-        id: role.id,
-        key: role.roleKey,
-        name: role.name,
-        permissions: parsePermissionList(role.permissionsJson),
-        isSystem: role.isSystem === 1,
-      })),
+      roles: roleRows.map((role) => {
+        const impacts = impactRows.filter(
+          (impact) => impact.roleDefinitionId === role.id,
+        );
+        return {
+          id: role.id,
+          key: role.roleKey,
+          name: role.name,
+          permissions: parsePermissionList(role.permissionsJson),
+          isSystem: role.isSystem === 1,
+          assignmentCount: impacts.length,
+          assignedMembers: impacts.map(
+            (impact) => `${impact.subjectName} — ${impact.workspaceName}`,
+          ),
+        };
+      }),
       members: memberRows.map((member) => ({
         subjectId: member.subjectId,
         displayName: member.displayName,
@@ -165,15 +250,145 @@ export class RolesAccessAdminService {
         provider: member.provider,
         membershipStatus: member.membershipStatus,
       })),
-      bindings: bindingRows.map((binding) => ({
-        id: binding.id,
-        subjectId: binding.subjectId,
-        subjectName: binding.subjectName,
-        roleDefinitionId: binding.roleDefinitionId,
-        roleName: binding.roleName,
-        roleKey: binding.roleKey,
-        createdAt: binding.createdAt,
-      })),
+      bindings,
+    };
+  }
+
+  public async createCustomWorkspaceRole(
+    command: CreateCustomWorkspaceRoleCommand,
+  ): Promise<AccessMutationResult> {
+    await this.loadWorkspace(command.tenantId, command.workspaceId);
+    const name = normalizeRoleName(command.name);
+    const permissions = normalizeCustomPermissions(command.permissions);
+    await this.assertCustomRoleNameAvailable(command.tenantId, name);
+
+    await this.database.executeBatch([
+      statement(
+        `INSERT INTO role_definitions
+           (id, tenant_id, role_key, name, scope, permissions_json, is_system, created_at)
+         VALUES (?, ?, ?, ?, 'workspace', ?, 0, ?)`,
+        [
+          command.roleDefinitionId,
+          command.tenantId,
+          command.roleKey,
+          name,
+          JSON.stringify(permissions),
+          command.occurredAt,
+        ],
+      ),
+      auditStatement({
+        id: command.auditEventId,
+        tenantId: command.tenantId,
+        workspaceId: command.workspaceId,
+        actorSubjectId: command.actorSubjectId,
+        eventType: "role.definition.created",
+        entityType: "role_definition",
+        entityId: command.roleDefinitionId,
+        occurredAt: command.occurredAt,
+        payload: {
+          roleKey: command.roleKey,
+          name,
+          permissions: JSON.stringify(permissions),
+          scope: "workspace",
+        },
+      }),
+    ]);
+
+    return {
+      changed: true,
+      snapshot: await this.getWorkspaceAccess(
+        command.tenantId,
+        command.workspaceId,
+      ),
+    };
+  }
+
+  public async updateCustomWorkspaceRole(
+    command: UpdateCustomWorkspaceRoleCommand,
+  ): Promise<AccessMutationResult> {
+    await this.loadWorkspace(command.tenantId, command.workspaceId);
+    const current = await this.loadCustomWorkspaceRole(
+      command.tenantId,
+      command.roleDefinitionId,
+    );
+    const name = normalizeRoleName(command.name);
+    const permissions = normalizeCustomPermissions(command.permissions);
+    await this.assertCustomRoleNameAvailable(
+      command.tenantId,
+      name,
+      command.roleDefinitionId,
+    );
+
+    const impacts = await this.database.query<RoleImpactRow>(
+      `SELECT binding.role_definition_id AS roleDefinitionId,
+              subject.display_name AS subjectName,
+              workspace.name AS workspaceName
+       FROM role_bindings binding
+       JOIN identity_subjects subject ON subject.id = binding.subject_id
+       JOIN workspaces workspace
+         ON workspace.id = binding.workspace_id
+        AND workspace.tenant_id = binding.tenant_id
+       WHERE binding.tenant_id = ? AND binding.role_definition_id = ?`,
+      [command.tenantId, command.roleDefinitionId],
+    );
+    if (impacts.length > 0 && !command.acknowledgeAssignments) {
+      throw new Error(
+        `This role currently affects ${impacts.length} assignment${impacts.length === 1 ? "" : "s"}. Acknowledge the impact before changing it.`,
+      );
+    }
+
+    const currentPermissions = parsePermissionList(current.permissionsJson);
+    if (
+      current.name === name &&
+      JSON.stringify(currentPermissions) === JSON.stringify(permissions)
+    ) {
+      return {
+        changed: false,
+        snapshot: await this.getWorkspaceAccess(
+          command.tenantId,
+          command.workspaceId,
+        ),
+      };
+    }
+
+    await this.database.executeBatch([
+      statement(
+        `UPDATE role_definitions
+         SET name = ?, permissions_json = ?
+         WHERE id = ? AND tenant_id = ? AND scope = 'workspace' AND is_system = 0`,
+        [
+          name,
+          JSON.stringify(permissions),
+          command.roleDefinitionId,
+          command.tenantId,
+        ],
+      ),
+      auditStatement({
+        id: command.auditEventId,
+        tenantId: command.tenantId,
+        workspaceId: command.workspaceId,
+        actorSubjectId: command.actorSubjectId,
+        eventType: "role.definition.updated",
+        entityType: "role_definition",
+        entityId: command.roleDefinitionId,
+        occurredAt: command.occurredAt,
+        payload: {
+          roleKey: current.roleKey,
+          previousName: current.name,
+          name,
+          previousPermissions: JSON.stringify(currentPermissions),
+          permissions: JSON.stringify(permissions),
+          assignmentCount: String(impacts.length),
+        },
+      }),
+    ]);
+
+    return {
+      changed: true,
+      snapshot: await this.getWorkspaceAccess(
+        command.tenantId,
+        command.workspaceId,
+      ),
     };
   }
 
@@ -230,6 +445,7 @@ export class RolesAccessAdminService {
         workspaceId: command.workspaceId,
         actorSubjectId: command.actorSubjectId,
         eventType: "role.binding.created",
+        entityType: "role_binding",
         entityId: command.bindingId,
         occurredAt: command.occurredAt,
         payload: {
@@ -309,6 +525,7 @@ export class RolesAccessAdminService {
         workspaceId: command.workspaceId,
         actorSubjectId: command.actorSubjectId,
         eventType: "role.binding.removed",
+        entityType: "role_binding",
         entityId: command.bindingId,
         occurredAt: command.occurredAt,
         payload: {
@@ -389,6 +606,89 @@ export class RolesAccessAdminService {
     }
     return role;
   }
+
+  private async loadCustomWorkspaceRole(
+    tenantId: string,
+    roleDefinitionId: string,
+  ): Promise<RoleRow> {
+    const [role] = await this.database.query<RoleRow>(
+      `SELECT id,
+              role_key AS roleKey,
+              name,
+              permissions_json AS permissionsJson,
+              is_system AS isSystem
+       FROM role_definitions
+       WHERE id = ?
+         AND tenant_id = ?
+         AND scope = 'workspace'
+         AND is_system = 0`,
+      [roleDefinitionId, tenantId],
+    );
+    if (!role) {
+      throw new Error(
+        "Only a tenant-defined workspace role can be edited from this screen.",
+      );
+    }
+    return role;
+  }
+
+  private async assertCustomRoleNameAvailable(
+    tenantId: string,
+    name: string,
+    excludingRoleDefinitionId?: string,
+  ): Promise<void> {
+    const parameters: unknown[] = [tenantId, name];
+    let exclusion = "";
+    if (excludingRoleDefinitionId) {
+      exclusion = " AND id <> ?";
+      parameters.push(excludingRoleDefinitionId);
+    }
+    const [existing] = await this.database.query<{ id: string }>(
+      `SELECT id FROM role_definitions
+       WHERE tenant_id = ?
+         AND scope = 'workspace'
+         AND lower(name) = lower(?)${exclusion}
+       LIMIT 1`,
+      parameters,
+    );
+    if (existing) {
+      throw new Error("A custom workspace role with this name already exists.");
+    }
+  }
+}
+
+function normalizeRoleName(value: string): string {
+  const name = value.trim().replace(/\s+/gu, " ");
+  if (name.length < 2 || name.length > 80) {
+    throw new Error("Custom role name must contain 2 to 80 characters.");
+  }
+  if (/\p{C}/u.test(name)) {
+    throw new Error(
+      "Custom role name contains unsupported control characters.",
+    );
+  }
+  return name;
+}
+
+function normalizeCustomPermissions(values: readonly string[]): string[] {
+  const selected = new Set(values);
+  if (selected.size === 0) {
+    throw new Error("Select at least one permission for a custom role.");
+  }
+  for (const permission of selected) {
+    if (
+      !customWorkspaceRolePermissions.includes(
+        permission as CustomWorkspaceRolePermission,
+      )
+    ) {
+      throw new Error(
+        `Permission ${permission} is not available to tenant-defined workspace roles.`,
+      );
+    }
+  }
+  return customWorkspaceRolePermissions.filter((permission) =>
+    selected.has(permission),
+  );
 }
 
 function parsePermissionList(serialized: string): readonly string[] {
@@ -415,6 +715,7 @@ function auditStatement(input: {
   workspaceId: string;
   actorSubjectId: string;
   eventType: string;
+  entityType: "role_binding" | "role_definition";
   entityId: string;
   occurredAt: string;
   payload: Readonly<Record<string, string>>;
@@ -423,13 +724,14 @@ function auditStatement(input: {
     `INSERT INTO audit_events
        (id, tenant_id, workspace_id, actor_subject_id, event_type,
         entity_type, entity_id, occurred_at, payload_json)
-     VALUES (?, ?, ?, ?, ?, 'role_binding', ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       input.id,
       input.tenantId,
       input.workspaceId,
       input.actorSubjectId,
       input.eventType,
+      input.entityType,
       input.entityId,
       input.occurredAt,
       JSON.stringify(input.payload),
