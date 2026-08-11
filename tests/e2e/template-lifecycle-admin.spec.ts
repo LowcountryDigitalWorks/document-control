@@ -1,6 +1,8 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 
+const seededTemplateName = "Standard Operating Procedure";
+
 async function openTemplateAdmin(page: Page): Promise<void> {
   await page.goto("/demo/app/admin/templates");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(
@@ -29,7 +31,7 @@ test("Template Manager supersedes a published version without changing existing 
   await openTemplateAdmin(page);
   const templateCard = page
     .locator(".version-card")
-    .filter({ hasText: "Harbor opening checklist" })
+    .filter({ hasText: seededTemplateName })
     .filter({ hasText: "Published" });
   await expect(templateCard).toHaveCount(1);
   const contentHash =
@@ -53,7 +55,7 @@ test("Template Manager supersedes a published version without changing existing 
   );
   const supersededCard = page
     .locator(".version-card")
-    .filter({ hasText: "Harbor opening checklist" })
+    .filter({ hasText: seededTemplateName })
     .filter({ hasText: "Superseded" });
   await expect(supersededCard).toHaveCount(1);
   await expect(supersededCard).toContainText(contentHash);
@@ -67,9 +69,7 @@ test("Template Manager supersedes a published version without changing existing 
   ).toBeVisible();
 
   await page.goto(evidenceHref ?? "/demo/app/documents");
-  await expect(
-    page.getByText("Harbor opening checklist", { exact: true }),
-  ).toBeVisible();
+  await expect(page.getByText(seededTemplateName, { exact: true })).toBeVisible();
   await expect(page.locator("main")).toContainText("Version 1");
   await expect(page.locator("main")).toContainText(contentHash);
   await expect(page.locator("main")).toContainText("Superseded");
@@ -89,7 +89,7 @@ test("retired current template version cannot create a new document", async ({
   await openTemplateAdmin(page);
   const publishedCard = page
     .locator(".version-card")
-    .filter({ hasText: "Harbor opening checklist" })
+    .filter({ hasText: seededTemplateName })
     .filter({ hasText: "Published" });
   await publishedCard
     .locator('select[name="targetState"]')
@@ -151,7 +151,7 @@ test("keeps template lifecycle state isolated between synthetic sessions", async
     await firstPage.goto("http://127.0.0.1:8787/demo/app/admin/templates");
     const firstCard = firstPage
       .locator(".version-card")
-      .filter({ hasText: "Harbor opening checklist" });
+      .filter({ hasText: seededTemplateName });
     await firstCard
       .locator('select[name="targetState"]')
       .selectOption("superseded");
@@ -163,7 +163,7 @@ test("keeps template lifecycle state isolated between synthetic sessions", async
     await expect(
       secondPage
         .locator(".version-card")
-        .filter({ hasText: "Harbor opening checklist" })
+        .filter({ hasText: seededTemplateName })
         .filter({ hasText: "Published" }),
     ).toHaveCount(1);
   } finally {
