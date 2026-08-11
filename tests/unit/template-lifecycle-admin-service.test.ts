@@ -117,7 +117,7 @@ describe("TemplateLifecycleAdminService", () => {
     });
     expect(version.lifecycleState).toBe("review");
 
-    version = await service.transitionVersion({
+    await service.transitionVersion({
       tenantId: "tenant-1",
       workspaceId: "workspace-1",
       templateVersionId: "template-version-1",
