@@ -18,7 +18,7 @@ Implemented synthetic/test-only product capabilities include:
 - exact-version workflow instances, review evidence, approvals, and changed-version invalidation;
 - workspace overview, Documents, Templates, Reviews, Approvals, Audit Log, and bounded search/filtering;
 - Backup & Portability export of persisted application state and external content references;
-- tenant presentation settings, workspace Roles & Access, and tenant-owned custom workspace roles;
+- tenant presentation settings, provider-neutral tenant member lifecycle, workspace Roles & Access, and tenant-owned custom workspace roles;
 - immutable Workflow Definition creation/versioning;
 - workspace Workflow Selection with exact default-version assignment;
 - controlled Template Lifecycle administration; and
@@ -37,6 +37,12 @@ memberships and role definitions.
 The application schema already recognizes `local`, `oidc`, `saml`, `entra`, and `external` identity
 providers. Provider identity describes **where an identity came from**; it does not grant application
 permissions by itself.
+
+The tenant member administration surface uses the existing membership states as **Staged / Active /
+Suspended**. The stored Staged value remains `invited`, but this slice does not send invitation email.
+Directly provisioned members use the `local` provider marker without storing passwords or other
+credentials. Suspending any member makes the existing active-membership authorization check fail while
+preserving role bindings and audit/history references.
 
 Tenant-owned custom workspace roles can combine the bounded operational permissions exposed by the
 application. They intentionally cannot grant wildcard `*`, `tenant.manage`, `workspace.manage`, or
@@ -83,7 +89,7 @@ workflow-definition version they originally used regardless of later lifecycle c
 - The synthetic demo contains no customer data and accepts no arbitrary file uploads.
 - LDW is a configurable reference theme rather than a hard-coded product identity.
 
-Production authentication/SSO, directory/group synchronization, customer uploads, production
+Production authentication/SSO, invitation delivery, external identity provisioning/directory/group synchronization, customer uploads, production
 Cloudflare D1/R2 provisioning, public interactive-demo hardening, malware scanning, retention/legal
 hold, backup of external binary content, and paid services remain deliberately out of scope until
 separately designed and approved.

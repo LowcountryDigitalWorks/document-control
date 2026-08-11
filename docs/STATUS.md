@@ -283,17 +283,18 @@ Turnstile/abuse controls, and operational cleanup are implemented and validated.
 - Administration POSTs require the validated synthetic session, fixed expected form fields, bounded
   identifier validation, and same-origin enforcement. The browser cannot select the acting subject,
   tenant, workspace, or authorization scope.
-- The UI also shows tenant membership status and eligible workspace role permissions for context, but
-  does not invite/create members, change membership state, configure an identity provider, or assign
-  tenant/platform roles.
+- The UI also shows tenant membership status and eligible workspace role permissions for context.
+  Provider-neutral member creation/status administration is implemented separately in PR #30; this
+  Roles & Access surface still does not configure an identity provider or assign tenant/platform
+  roles.
 - Executable SQLite coverage verifies assign/remove/audit behavior, duplicate no-op behavior,
   suspended-member and tenant-role rejection, and the self-role-management removal guard. Browser
   coverage verifies assignment/removal, audit evidence, scope rejection, cross-origin denial,
   accessibility/responsiveness, and independent synthetic-session isolation.
 - This original assignment slice does not add production authentication, SSO/group mapping,
-  tenant/platform binding administration, member invitations/provisioning, production Cloudflare
-  resources, or paid services. Tenant-owned custom workspace role creation/editing is implemented in
-  PR #29 as the following slice.
+  tenant/platform binding administration, production invitation delivery/external provisioning,
+  production Cloudflare resources, or paid services. Tenant-owned custom workspace role
+  creation/editing is implemented in PR #29 and provider-neutral member lifecycle in PR #30.
 
 ### Tenant-owned custom workspace role administration (synthetic/test only)
 
@@ -337,8 +338,49 @@ Turnstile/abuse controls, and operational cleanup are implemented and validated.
   expectations, and the rule that provider credentials/tokens never belong in role definitions or
   portable exports.
 - This slice does **not** configure production authentication/SSO, Entra application registration,
-  direct Active Directory connectivity, JIT/SCIM synchronization, member invitations/provisioning,
-  provider/group mapping, production Cloudflare resources, customer data/uploads, or paid services.
+  direct Active Directory connectivity, JIT/SCIM synchronization, production invitation delivery or
+  external identity provisioning, provider/group mapping, production Cloudflare resources, customer
+  data/uploads, or paid services. Provider-neutral direct member lifecycle is added in PR #30.
+
+### Provider-neutral tenant member lifecycle administration (synthetic/test only)
+
+- `/demo/app/admin/members` provides tenant-wide membership administration over the existing
+  `identity_subjects` and `tenant_memberships` tables; no second user directory or authentication
+  store is introduced.
+- The route uses the server-controlled synthetic Tenant Administrator and requires tenant-level
+  `tenant.manage`. Membership administration is deliberately separate from workspace `role.manage`.
+- Directly provisioned members are recorded with provider `local`, a server-generated immutable
+  provider subject, display name, and email. The slice stores no password, MFA secret, passkey,
+  recovery code, access/refresh token, or invitation credential.
+- Existing membership values are presented as **Staged / Active / Suspended**. Staged retains the
+  stored value `invited` but means pre-provisioned only; no invitation email is sent. New direct
+  members may be staged or active.
+- Membership transitions support Staged -> Active/Suspended, Active -> Suspended, and Suspended ->
+  Active. Direct member deletion and return-to-Staged after activation are intentionally omitted.
+- The acting Tenant Administrator cannot suspend their own current membership from this surface.
+- The tenant directory shows provider attribution and tenant/workspace role-binding counts. Suspending
+  a member does not delete bindings; the existing authorization policy immediately denies access
+  because non-active tenant membership fails authorization. Reactivation therefore restores the same
+  preserved role relationships.
+- Externally sourced identities, including Entra-backed subjects, use the same application membership
+  state without mutating the external provider. This preserves the future boundary for Entra ID,
+  Active Directory-connected, OIDC, or SAML provisioning/group mapping.
+- Direct provisioning normalizes display names/email and rejects a duplicate email already represented
+  in the same tenant. IDs, acting identity, tenant, workspace, provider, and audit metadata remain
+  server controlled.
+- Successful creation appends `tenant.membership.created`; status changes append
+  `tenant.membership.status_changed`, including provider, previous/new status, and preserved role
+  binding counts, to the existing append-only audit stream.
+- Unit coverage verifies staged/local creation, activation, duplicate email rejection, self-suspension
+  protection, tenant-management authorization, Entra-backed suspension, preserved role bindings, and
+  immediate authorization denial after suspension. Browser coverage verifies staged -> active -> role
+  assignment -> suspended behavior, preserved binding display, active-member eligibility changes,
+  audit evidence, same-origin protection, accessibility/responsiveness, and independent synthetic
+  session isolation.
+- This slice does **not** implement production passwords/login, invitation email delivery, Entra app
+  registration, Active Directory connectivity, OIDC/SAML configuration, JIT/SCIM provisioning,
+  directory/group synchronization, member deletion, production Cloudflare resources, customer
+  data/uploads, analytics, or paid services.
 
 ### Authorized tenant Workflow Definition administration (synthetic/test only)
 
@@ -484,8 +526,9 @@ production authentication or public-demo hardening.
   tenant presentation administration PR #16, workspace Roles & Access administration PR #17,
   immutable Workflow Definition administration PR #18, controlled Template Lifecycle administration
   PR #19, Template Lifecycle integration reconciliation PR #20, workspace Workflow Selection
-  administration PR #21, controlled Workflow Definition lifecycle administration PR #27, and
-  provider-neutral custom workspace roles PR #29.
+  administration PR #21, controlled Workflow Definition lifecycle administration PR #27,
+  provider-neutral custom workspace roles PR #29, and provider-neutral tenant member lifecycle PR
+  #30.
 - `main` is the authoritative integration branch after reviewed/validated pull requests are merged.
 - No production Cloudflare resources, custom domains, customer data, analytics, paid services, or
   public-upload capability have been introduced.
@@ -502,8 +545,8 @@ production authentication or public-demo hardening.
 - Full-text/content-body search or an external/indexed search service; current search is bounded
   metadata filtering only.
 - Built-in/system role-definition editing; tenant/platform role assignment administration;
-  custom-role deletion/retirement; member invitations/provisioning; or identity-provider/group
-  mapping/synchronization.
+  custom-role deletion/retirement; member deletion; production invitation delivery; external identity
+  provisioning; or identity-provider/group mapping/synchronization.
 - Richer workflow authoring beyond immutable versions, workspace selection, and controlled lifecycle.
 - Template content upload/new-version authoring, new-template creation, or storage/scanning
   orchestration.

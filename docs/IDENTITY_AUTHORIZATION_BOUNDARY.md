@@ -26,6 +26,15 @@ permissions by itself.
 A small deployment may use locally managed or otherwise directly provisioned members and assign
 built-in or tenant-owned custom workspace roles in Document Control.
 
+The application member lifecycle uses the existing membership states as **Staged / Active /
+Suspended**. Staged is stored as `invited`, but it means pre-provisioned only in the current product;
+no invitation email or credential is created by that action. Directly created members use the `local`
+provider marker without storing passwords, MFA material, recovery codes, or tokens.
+
+Suspension is application-owned and immediately removes authorization eligibility because the existing
+policy requires active tenant membership. Role bindings remain intact so reactivation restores the
+same internal role relationships and historical evidence is not deleted.
+
 No external directory is required merely to use role-based access control.
 
 ## Enterprise / directory-backed deployment
@@ -70,7 +79,7 @@ Before production identity integration, explicitly decide and document:
 - OIDC, SAML, Microsoft Entra ID, or other supported authentication protocols/providers;
 - whether on-premises Active Directory is connected through Entra/ADFS/another IdP rather than direct
   LDAP-style application integration;
-- invited/local-account behavior for customers without an enterprise IdP;
+- production authentication and invitation-delivery behavior for app-local members;
 - subject and group immutable identifiers;
 - just-in-time provisioning versus pre-provisioning / SCIM-style synchronization;
 - group-to-role mapping ownership and approval;
