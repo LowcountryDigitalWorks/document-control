@@ -206,6 +206,12 @@ describe("controlled document retirement", () => {
     const { database, service } = await createHarness();
     database.exec("DELETE FROM approvals;");
 
+    expect(() =>
+      database.exec(
+        `UPDATE documents SET status = 'retired' WHERE id = '${documentId}';`,
+      ),
+    ).toThrow(/exact current-version approval evidence/iu);
+
     await expect(
       service.retireDocument({
         tenantId,
