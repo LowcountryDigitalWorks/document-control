@@ -225,6 +225,15 @@ Turnstile/abuse controls, and operational cleanup are implemented and validated.
   wildcard escaping, checks axe accessibility/responsive overflow, and proves separate synthetic
   sessions cannot read one another's workspace audit history.
 
+### Workspace Audit evidence CSV export (synthetic/test only)
+
+- `/demo/app/audit/export.csv` downloads the same authorized workspace Audit Log view as CSV, including the currently submitted literal search filter and the existing 100-record newest-first cap.
+- Export reuses the server-controlled synthetic Auditor and existing workspace `audit.read` authorization path; it does not introduce a broader export permission or tenant-wide audit scope.
+- CSV includes timestamp, event type, entity type/ID, actor display name, and the same bounded primitive evidence summary shown by the read model. Unrestricted raw `payload_json` and actor subject IDs are not exported.
+- Every cell is CSV-escaped and spreadsheet-formula prefixes are neutralized before download. Responses use `Cache-Control: no-store` and a fixed safe attachment filename.
+- Unit/browser coverage verifies CSV encoding, formula neutralization, filter preservation, response headers, bounded result scope, and invalid-filter rejection while existing Audit Log authorization/session-isolation coverage remains authoritative.
+- This slice does **not** add external SIEM integration, audit forwarding, long-term archival, production retention policy, a raw audit API, production authentication, customer data, Cloudflare resources, or paid services.
+
 ### Authorized tenant presentation administration (synthetic/test only)
 
 - `/demo/app/admin/settings` provides the first persisted Administration & Configuration surface over
@@ -642,7 +651,7 @@ production authentication or public-demo hardening.
 - PostgreSQL and SharePoint adapters; the provider boundaries remain the extension points.
 - Bundled R2/SharePoint binaries in portable exports.
 - Production backup scheduling, restore orchestration, disaster recovery, or retention automation.
-- External audit/SIEM export, long-term audit archival, or production log-retention policy.
+- External audit/SIEM integration or archival, unrestricted raw audit-payload export, or production log-retention policy.
 
 ## Decisions pending approval
 

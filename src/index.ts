@@ -4,6 +4,7 @@ import {
   AuditLogFilterValidationError,
   parseAuditLogFilters,
 } from "./application/audit-log-filter-input";
+import { serializeAuditLogCsv } from "./application/audit-log-export";
 import { AuditLogReadService } from "./application/audit-log-read-service";
 import { AuthorizationDeniedError } from "./application/authorization";
 import { AuthorizedPresentationSettingsService } from "./application/authorized-presentation-settings-service";
@@ -532,6 +533,52 @@ app.get("/demo/app/audit", async (context) => {
       filters,
     ),
   );
+});
+
+app.get("/demo/app/audit/export.csv", async (context) => {
+  if (!guidedDemoEnabled(context.env)) {
+    return context.html(renderNotFound(createTheme(context.env)), 404);
+  }
+
+  let filters;
+  try {
+    filters = parseAuditLogFilters(new URL(context.req.url).searchParams);
+  } catch (error) {
+    if (error instanceof AuditLogFilterValidationError) {
+      return context.text(error.message, 400);
+    }
+    throw error;
+  }
+
+  const session = resolveGuidedDemoSession(
+    context.req.header("Cookie"),
+    context.req.url,
+  );
+  if (session.setCookie) {
+    context.header("Set-Cookie", session.setCookie);
+  }
+  const database = new D1DatabaseProvider(context.env.DOCUMENT_CONTROL_DB);
+  const demo = createGuidedDemoContext(session.sessionId);
+  await ensureGuidedDemoSeed(database, session.sessionId);
+  const auditor = await ensureGuidedAuditor(database, session.sessionId);
+  const items = await createAuthorizedAuditLogReadService(
+    database,
+  ).listAuditEvents(
+    {
+      subjectId: auditor.subjectId,
+      tenantId: demo.tenantId,
+      workspaceId: demo.workspaceId,
+    },
+    filters,
+  );
+
+  context.header("Cache-Control", "no-store");
+  context.header("Content-Type", "text/csv; charset=utf-8");
+  context.header(
+    "Content-Disposition",
+    'attachment; filename="workspace-audit-log.csv"',
+  );
+  return context.body(serializeAuditLogCsv(items));
 });
 
 app.get("/demo/app/admin/settings", async (context) => {

@@ -50,7 +50,7 @@ The synthetic/test-only application now covers:
 - workspace Overview, Documents, Templates, document evidence, Reviews, and Approvals;
 - bounded metadata search/filtering;
 - Backup & Portability export;
-- Audit Log;
+- Audit Log with bounded workspace CSV evidence export;
 - tenant presentation administration;
 - provider-neutral tenant member administration with direct app-local provisioning and Staged / Active /
   Suspended membership lifecycle;
@@ -181,6 +181,14 @@ approvals, and audit evidence remain pinned to their original exact workflow ver
 - Actual template binary/content replacement remains a separate future boundary requiring content
   identity creation plus the unresolved upload, scanning, storage, and failure-compensation decisions.
 
+## Audit evidence export boundary
+
+- The workspace Audit Log remains a read over the existing append-only `audit_events` ledger.
+- An authorized Auditor may export the same current workspace/filter view as CSV; export reuses the existing `audit.read` decision, literal bounded search, newest-first ordering, and 100-record cap.
+- CSV contains only fields already represented by the Audit Log read model plus the existing four-item primitive payload summary. It does not expose unrestricted raw `payload_json` or actor subject IDs.
+- Spreadsheet-formula prefixes are neutralized before CSV encoding, and the response is `Cache-Control: no-store`.
+- This is a local/synthetic evidence convenience, not external SIEM integration, long-term archival, production audit retention, or a complete audit data warehouse/export API.
+
 ## Synthetic application boundary
 
 Interactive synthetic routes are disabled unless `DEMO_MUTATIONS_ENABLED=true`.
@@ -215,6 +223,7 @@ Do not imply these are implemented or approved:
 - template binary/content replacement or upload, new-template-family upload flows, and storage/scanning orchestration;
 - full-text/content-body search or external search infrastructure;
 - PostgreSQL/SharePoint production adapters;
+- external audit/SIEM archival, unrestricted raw audit-payload export, or production audit-log retention policy;
 - analytics, AI services, or paid SaaS dependencies.
 
 Any production infrastructure or recurring-cost change requires current-state inspection, proposed
