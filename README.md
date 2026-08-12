@@ -20,6 +20,7 @@ Implemented synthetic/test-only product capabilities include:
 - Backup & Portability export of persisted application state and external content references;
 - tenant presentation settings, provider-neutral tenant member lifecycle, workspace Roles & Access, and tenant-owned custom workspace roles with terminal retirement;
 - immutable Workflow Definition creation/versioning;
+- terminal, non-destructive controlled document retirement with preserved evidence;
 - exact-version workflow draft cloning, server-side graph analysis, and unreachable-state rejection for new drafts;
 - workspace Workflow Selection with exact default-version assignment;
 - controlled Template Lifecycle administration; and
@@ -83,6 +84,9 @@ workflow-definition version they originally used regardless of later lifecycle c
   permission evaluation.
 - Workflow definitions are immutable by version; workflow instances remain bound to the exact
   definition version they started with.
+- Approved controlled documents can be terminally retired without deleting versions, approvals,
+  workflows, provenance, audit evidence, or portable-export records; retired documents cannot accept
+  new versions or workflow activity.
 - Authoring may copy an exact historical workflow version into a new editable draft, but saving always
   inserts a new immutable version.
 - Templates are controlled/versioned records with lifecycle and provenance metadata.

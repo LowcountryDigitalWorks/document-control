@@ -146,7 +146,9 @@ describe("controlled document retirement", () => {
 
     expect(retired.status).toBe("retired");
     expect(
-      database.prepare("SELECT status FROM documents WHERE id = ?").get(documentId),
+      database
+        .prepare("SELECT status FROM documents WHERE id = ?")
+        .get(documentId),
     ).toEqual({ status: "retired" });
     expect(
       database
@@ -214,7 +216,9 @@ describe("controlled document retirement", () => {
       }),
     ).rejects.toThrow(/exact approval evidence/iu);
 
-    database.exec(`UPDATE documents SET status = 'draft' WHERE id = '${documentId}';`);
+    database.exec(
+      `UPDATE documents SET status = 'draft' WHERE id = '${documentId}';`,
+    );
     await expect(
       service.retireDocument({
         tenantId,
@@ -238,7 +242,10 @@ describe("controlled document retirement", () => {
       .all() as { roleKey: string; permissionsJson: string }[];
 
     const grants = new Map(
-      rows.map((row) => [row.roleKey, JSON.parse(row.permissionsJson) as string[]]),
+      rows.map((row) => [
+        row.roleKey,
+        JSON.parse(row.permissionsJson) as string[],
+      ]),
     );
     expect(grants.get("tenant_admin")).toContain("document.retire");
     expect(grants.get("workspace_admin")).toContain("document.retire");

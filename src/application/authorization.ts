@@ -8,6 +8,7 @@ export const permissions = [
   "document.read",
   "document.create",
   "document.version.create",
+  "document.retire",
   "document.review",
   "document.approve",
   "workflow.execute",

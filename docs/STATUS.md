@@ -538,6 +538,25 @@ Turnstile/abuse controls, and operational cleanup are implemented and validated.
   authoring, malware scanning, storage orchestration, production authentication, production Cloudflare
   resources, customer data, or paid services.
 
+### Controlled document retirement (synthetic/test only)
+
+- Approved documents with exact current-version approval evidence can be terminally retired through
+  the synthetic document evidence surface. Retirement changes operational state only; no document,
+  version, approval, workflow, review, provenance, audit, or content-reference evidence is deleted.
+- A dedicated `document.retire` workspace permission is granted by default to Tenant Administrator,
+  Workspace Administrator, and Document Owner and is available to bounded tenant custom workspace roles.
+- Service guards reject new versions and workflow/review/approval activity for retired documents.
+  Migration `0008_controlled_document_retirement.sql` independently blocks invalid retirement,
+  reactivation, new versions, new workflows, workflow mutation, reviews, and approvals at the database boundary.
+- Successful retirement appends `document.retired` to the existing immutable audit stream with the exact
+  current version/hash and approval evidence used to justify disposition. Existing portable export already
+  carries document status plus all preserved evidence, so no export-version change is required.
+- The browser flow requires explicit confirmation, remains same-origin/session protected, and keeps retired
+  records readable as historical evidence. Unit and browser coverage verify approval requirements, terminal
+  state, service/database mutation guards, role grants, audit evidence, accessibility, and responsive behavior.
+- This slice does **not** delete content, implement retention/legal hold, add storage cleanup, accept uploads,
+  configure production identity or Cloudflare resources, or add paid services.
+
 ### Workflow authoring improvements (synthetic/test only)
 
 - Workflow Definition administration can use any exact existing definition version as the starting
@@ -601,7 +620,7 @@ production authentication or public-demo hardening.
 - Template content upload/new-version authoring, new-template creation, or storage/scanning
   orchestration.
 - Logo/favicon upload or external branding-asset URL management.
-- Rich document authoring, retention automation, legal hold, GRC frameworks, or AI functions.
+- Rich document authoring, retention automation, legal hold, destructive document deletion, GRC frameworks, or AI functions.
 - PostgreSQL and SharePoint adapters; the provider boundaries remain the extension points.
 - Bundled R2/SharePoint binaries in portable exports.
 - Production backup scheduling, restore orchestration, disaster recovery, or retention automation.

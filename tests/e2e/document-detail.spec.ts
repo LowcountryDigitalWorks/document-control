@@ -28,7 +28,9 @@ test("shows exact-version workflow, approval, template, and audit evidence", asy
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(
     "Harbor Opening Checklist",
   );
-  await expect(page.getByText("Synthetic evidence · read-only")).toBeVisible();
+  await expect(
+    page.getByText("Synthetic evidence · controlled lifecycle"),
+  ).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Standard Operating Procedure" }),
   ).toBeVisible();

@@ -47,9 +47,9 @@ test("retires an approved document while preserving evidence and blocking later 
   await expect(
     page.getByRole("heading", { name: "Retired historical record" }),
   ).toBeVisible();
-  await expect(page.getByRole("button", { name: "Retire document" })).toHaveCount(
-    0,
-  );
+  await expect(
+    page.getByRole("button", { name: "Retire document" }),
+  ).toHaveCount(0);
   await expect(
     page.getByText("Document · Retired", { exact: true }),
   ).toBeVisible();
@@ -60,11 +60,16 @@ test("retires an approved document while preserving evidence and blocking later 
     page.getByText("Standard Operating Procedure", { exact: true }),
   ).toBeVisible();
 
-  const blockedChange = await page.request.post("/demo/workflow/actions/change", {
-    headers: { Origin: "http://127.0.0.1:8787" },
-  });
+  const blockedChange = await page.request.post(
+    "/demo/workflow/actions/change",
+    {
+      headers: { Origin: "http://127.0.0.1:8787" },
+    },
+  );
   expect(blockedChange.status()).toBe(409);
-  expect(await blockedChange.text()).toContain("Retired documents are historical");
+  expect(await blockedChange.text()).toContain(
+    "Retired documents are historical",
+  );
 
   const accessibility = await new AxeBuilder({ page }).analyze();
   expect(accessibility.violations).toEqual([]);
@@ -75,7 +80,9 @@ test("retires an approved document while preserving evidence and blocking later 
   expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth);
 });
 
-test("requires explicit confirmation and same-origin protection", async ({ page }) => {
+test("requires explicit confirmation and same-origin protection", async ({
+  page,
+}) => {
   const detailHref = await approveVersionOne(page);
   const retirementUrl = `${detailHref}/retire`;
 
