@@ -28,6 +28,8 @@ jobs:
         run: python scripts/patch-queue-native-review-approval-actions.py
       - name: Reconcile queue input lint
         run: python scripts/fix-queue-action-input-lint.py
+      - name: Reconcile queue action browser navigation
+        run: python scripts/fix-queue-action-browser-test.py
       - name: Format permanent changes
         run: pnpm exec prettier --write src tests README.md docs migrations
       - name: Validate repository
