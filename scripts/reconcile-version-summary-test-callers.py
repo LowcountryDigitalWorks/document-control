@@ -32,3 +32,12 @@ new_direct = '''        INSERT INTO document_versions\n          (id, tenant_id,
 if text.count(old_direct) != 1:
     raise SystemExit(f"Expected one direct retirement-block insert, found {text.count(old_direct)}")
 path.write_text(text.replace(old_direct, new_direct, 1))
+
+# The summary belongs on the document evidence page, not the guided workflow page.
+path = Path("tests/e2e/document-detail.spec.ts")
+text = path.read_text()
+old_browser = '''  await page.getByRole("button", { name: "Create changed version 2" }).click();\n  await expect(page.getByText("Synthetic controlled version change.", { exact: true })).toBeVisible();\n  await page.goto("/demo/app/documents");\n  await page.getByRole("link", { name: "View evidence" }).click();\n'''
+new_browser = '''  await page.getByRole("button", { name: "Create changed version 2" }).click();\n  await page.goto("/demo/app/documents");\n  await page.getByRole("link", { name: "View evidence" }).click();\n  await expect(page.getByText("Synthetic controlled version change.", { exact: true })).toBeVisible();\n'''
+if text.count(old_browser) != 1:
+    raise SystemExit(f"Expected one generated summary browser assertion block, found {text.count(old_browser)}")
+path.write_text(text.replace(old_browser, new_browser, 1))
