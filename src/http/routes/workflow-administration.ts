@@ -161,7 +161,10 @@ export function registerWorkflowAdministrationRoutes(
       const dependencies = createDependencies(context.env);
       const demo = createGuidedDemoContext(sessionId);
       await ensureGuidedDemoSeed(dependencies.database, sessionId);
-      const admin = await ensureGuidedTenantAdmin(dependencies.database, sessionId);
+      const admin = await ensureGuidedTenantAdmin(
+        dependencies.database,
+        sessionId,
+      );
       const catalog = await dependencies.workflowDefinitionAdmin.getCatalog({
         subjectId: admin.subjectId,
         tenantId: demo.tenantId,
@@ -255,7 +258,10 @@ export function registerWorkflowAdministrationRoutes(
       const dependencies = createDependencies(context.env);
       const demo = createGuidedDemoContext(sessionId);
       await ensureGuidedDemoSeed(dependencies.database, sessionId);
-      const admin = await ensureGuidedTenantAdmin(dependencies.database, sessionId);
+      const admin = await ensureGuidedTenantAdmin(
+        dependencies.database,
+        sessionId,
+      );
       await dependencies.workflowDefinitionAdmin.createDefinition(
         {
           subjectId: admin.subjectId,
@@ -313,7 +319,10 @@ export function registerWorkflowAdministrationRoutes(
       const dependencies = createDependencies(context.env);
       const demo = createGuidedDemoContext(sessionId);
       await ensureGuidedDemoSeed(dependencies.database, sessionId);
-      const admin = await ensureGuidedTenantAdmin(dependencies.database, sessionId);
+      const admin = await ensureGuidedTenantAdmin(
+        dependencies.database,
+        sessionId,
+      );
       await dependencies.workflowDefinitionAdmin.createVersion(
         {
           subjectId: admin.subjectId,
@@ -327,7 +336,10 @@ export function registerWorkflowAdministrationRoutes(
           input,
         },
       );
-      return context.redirect("/demo/app/admin/workflows?notice=versioned", 303);
+      return context.redirect(
+        "/demo/app/admin/workflows?notice=versioned",
+        303,
+      );
     } catch (error) {
       if (error instanceof WorkflowDefinitionInputValidationError) {
         return context.text(error.message, 400);
@@ -366,7 +378,10 @@ export function registerWorkflowAdministrationRoutes(
       const dependencies = createDependencies(context.env);
       const demo = createGuidedDemoContext(sessionId);
       await ensureGuidedDemoSeed(dependencies.database, sessionId);
-      const admin = await ensureGuidedTenantAdmin(dependencies.database, sessionId);
+      const admin = await ensureGuidedTenantAdmin(
+        dependencies.database,
+        sessionId,
+      );
       await dependencies.workflowDefinitionAdmin.transitionLifecycle(
         {
           subjectId: admin.subjectId,
@@ -381,7 +396,10 @@ export function registerWorkflowAdministrationRoutes(
           occurredAt: new Date().toISOString(),
         },
       );
-      return context.redirect("/demo/app/admin/workflows?notice=lifecycle", 303);
+      return context.redirect(
+        "/demo/app/admin/workflows?notice=lifecycle",
+        303,
+      );
     } catch (error) {
       if (error instanceof WorkflowLifecycleInputValidationError) {
         return context.text(error.message, 400);
@@ -478,7 +496,10 @@ export function registerWorkflowAdministrationRoutes(
       const dependencies = createDependencies(context.env);
       const demo = createGuidedDemoContext(sessionId);
       await ensureGuidedDemoSeed(dependencies.database, sessionId);
-      const admin = await ensureGuidedTenantAdmin(dependencies.database, sessionId);
+      const admin = await ensureGuidedTenantAdmin(
+        dependencies.database,
+        sessionId,
+      );
       const authContext = {
         subjectId: admin.subjectId,
         tenantId: demo.tenantId,

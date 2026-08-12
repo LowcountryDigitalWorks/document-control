@@ -98,11 +98,10 @@ export function createRequestDependencies(
       new WorkflowDefinitionAdminService(database),
       authorization,
     ),
-    workspaceWorkflowSelection:
-      new AuthorizedWorkspaceWorkflowSelectionService(
-        new WorkspaceWorkflowSelectionService(database),
-        authorization,
-      ),
+    workspaceWorkflowSelection: new AuthorizedWorkspaceWorkflowSelectionService(
+      new WorkspaceWorkflowSelectionService(database),
+      authorization,
+    ),
     templateLifecycleAdmin: new AuthorizedTemplateLifecycleAdminService(
       new TemplateLifecycleAdminService(database),
       authorization,

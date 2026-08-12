@@ -101,11 +101,7 @@ export async function readWorkflowLifecycleFormValues(
 ): Promise<URLSearchParams> {
   return readStringFormValues(
     request,
-    [
-      "workflowDefinitionId",
-      "workflowDefinitionVersion",
-      "targetState",
-    ],
+    ["workflowDefinitionId", "workflowDefinitionVersion", "targetState"],
     () =>
       new WorkflowLifecycleInputValidationError(
         "A valid form body is required.",
@@ -118,11 +114,7 @@ export async function readWorkflowSelectionFormValues(
 ): Promise<URLSearchParams> {
   return readStringFormValues(
     request,
-    [
-      "workflowDefinitionId",
-      "workflowDefinitionVersion",
-      "action",
-    ],
+    ["workflowDefinitionId", "workflowDefinitionVersion", "action"],
     () =>
       new WorkspaceWorkflowSelectionInputValidationError(
         "A valid form body is required.",

@@ -700,3 +700,15 @@ production authentication or public-demo hardening.
 - Document evidence pages and versioned `document-evidence/v1` downloads expose the summary beside the exact version/hash. Tenant portable export v1 carries it as an additive optional field so older v1 exports remain accepted.
 - The synthetic guided version-2 action supplies a fixed synthetic change reason; this release does not add a binary editor, file upload, content replacement, malware scanning, rich authoring, retention/legal-hold behavior, production identity, production Cloudflare resources, or paid services.
 - Unit/browser/export coverage validates trimming and bounds, migration backfill, raw-SQL omission rejection, immutability, evidence visibility, export preservation, and existing lifecycle behavior.
+
+### Production Readiness Foundation I — Threat Model & Architecture Boundaries
+
+- Production-readiness work now pivots from synthetic feature breadth to the security and architecture boundaries required before real authentication, tenant provisioning, arbitrary content ingestion, or controlled staging.
+- `docs/THREAT_MODEL.md` records protected assets, actors, trust boundaries, existing mitigations, planned mitigations, residual decisions, and release gates. It is an engineering threat model, not a compliance certification or determination.
+- ADR `0002-d1-sqlite-initial-production-persistence.md` records D1/SQLite as the accepted initial production metadata/state-store architecture. Domain/business invariants remain provider-independent, while current application persistence is materially SQL/SQLite coupled through raw `DatabaseProvider` operations.
+- `src/index.ts` is now only the Worker composition entrypoint. Hono application assembly, dependency wiring, synthetic-session/form helpers, and bounded route groups live under `src/http/`; route modules consume injected application dependencies rather than instantiating D1/R2 adapters.
+- Architecture regression coverage protects the composition/domain/provider boundaries, while browser regression coverage verifies the global CSP/security-header baseline across system, guided-workflow, and workspace routes.
+- Route decomposition has zero intended product behavior change. Existing tenant/workspace authorization, synthetic session isolation, same-origin protections, exact-version/hash evidence, template provenance, workflow immutability, append-only audit behavior, and no-upload boundary remain unchanged.
+- Production authentication/session management, tenant provisioning, customer uploads, malware scanning/quarantine, production D1/R2/Worker resources, retention/legal hold, complete backup/restore, customer data, PHI, PostgreSQL, analytics/tracking, and paid services remain unimplemented.
+- Recommended sequencing is Foundation I -> Operations & Supply-Chain Foundation -> Production Identity & Tenant Boundary -> Content Ingestion Architecture -> explicitly approved controlled staging vertical slice -> later retention/backup/customer-readiness gates. Those labels are sequencing guidance, not automatic authorization.
+- This release introduces no new dependency or recurring service cost.

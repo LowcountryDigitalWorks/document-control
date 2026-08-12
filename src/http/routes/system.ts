@@ -13,11 +13,15 @@ export function registerSystemRoutes(app: DocumentControlApp): void {
 
   app.get("/demo/export", (context) => {
     const exportedAt = new Date().toISOString();
-    return context.body(serializeExport(createSyntheticExport(exportedAt)), 200, {
-      "Content-Disposition":
-        'attachment; filename="document-control-demo-export-v1.json"',
-      "Content-Type": "application/json; charset=utf-8",
-    });
+    return context.body(
+      serializeExport(createSyntheticExport(exportedAt)),
+      200,
+      {
+        "Content-Disposition":
+          'attachment; filename="document-control-demo-export-v1.json"',
+        "Content-Type": "application/json; charset=utf-8",
+      },
+    );
   });
 
   app.get("/favicon.svg", (context) =>

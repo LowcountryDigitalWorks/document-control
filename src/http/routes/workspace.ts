@@ -1,7 +1,5 @@
 import { AuthorizationDeniedError } from "../../application/authorization";
-import {
-  DocumentNotFoundError,
-} from "../../application/document-detail-read-service";
+import { DocumentNotFoundError } from "../../application/document-detail-read-service";
 import {
   DocumentRetirementInputValidationError,
   parseDocumentRetirementInput,

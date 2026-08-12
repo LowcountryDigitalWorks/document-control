@@ -136,7 +136,10 @@ export function registerAdministrationRoutes(
     const dependencies = createDependencies(context.env);
     const demo = createGuidedDemoContext(sessionId);
     await ensureGuidedDemoSeed(dependencies.database, sessionId);
-    const admin = await ensureGuidedTenantAdmin(dependencies.database, sessionId);
+    const admin = await ensureGuidedTenantAdmin(
+      dependencies.database,
+      sessionId,
+    );
 
     try {
       const input = parsePresentationSettingsInput(values);
@@ -244,7 +247,10 @@ export function registerAdministrationRoutes(
       const dependencies = createDependencies(context.env);
       const demo = createGuidedDemoContext(sessionId);
       await ensureGuidedDemoSeed(dependencies.database, sessionId);
-      const admin = await ensureGuidedTenantAdmin(dependencies.database, sessionId);
+      const admin = await ensureGuidedTenantAdmin(
+        dependencies.database,
+        sessionId,
+      );
       const memberUuid = crypto.randomUUID();
       await dependencies.memberAdmin.createDirectMember(
         {
@@ -305,7 +311,10 @@ export function registerAdministrationRoutes(
       const dependencies = createDependencies(context.env);
       const demo = createGuidedDemoContext(sessionId);
       await ensureGuidedDemoSeed(dependencies.database, sessionId);
-      const admin = await ensureGuidedTenantAdmin(dependencies.database, sessionId);
+      const admin = await ensureGuidedTenantAdmin(
+        dependencies.database,
+        sessionId,
+      );
       await dependencies.memberAdmin.transitionMembership(
         {
           subjectId: admin.subjectId,
@@ -426,7 +435,10 @@ export function registerAdministrationRoutes(
       const dependencies = createDependencies(context.env);
       const demo = createGuidedDemoContext(sessionId);
       await ensureGuidedDemoSeed(dependencies.database, sessionId);
-      const admin = await ensureGuidedTenantAdmin(dependencies.database, sessionId);
+      const admin = await ensureGuidedTenantAdmin(
+        dependencies.database,
+        sessionId,
+      );
       const result = await dependencies.rolesAccessAdmin.assignWorkspaceRole(
         {
           subjectId: admin.subjectId,
@@ -481,7 +493,10 @@ export function registerAdministrationRoutes(
       const dependencies = createDependencies(context.env);
       const demo = createGuidedDemoContext(sessionId);
       await ensureGuidedDemoSeed(dependencies.database, sessionId);
-      const admin = await ensureGuidedTenantAdmin(dependencies.database, sessionId);
+      const admin = await ensureGuidedTenantAdmin(
+        dependencies.database,
+        sessionId,
+      );
       const result = await dependencies.rolesAccessAdmin.removeWorkspaceRole(
         {
           subjectId: admin.subjectId,
@@ -534,7 +549,10 @@ export function registerAdministrationRoutes(
       const dependencies = createDependencies(context.env);
       const demo = createGuidedDemoContext(sessionId);
       await ensureGuidedDemoSeed(dependencies.database, sessionId);
-      const admin = await ensureGuidedTenantAdmin(dependencies.database, sessionId);
+      const admin = await ensureGuidedTenantAdmin(
+        dependencies.database,
+        sessionId,
+      );
       const roleUuid = crypto.randomUUID();
       await dependencies.rolesAccessAdmin.createCustomWorkspaceRole(
         {
@@ -551,7 +569,10 @@ export function registerAdministrationRoutes(
           occurredAt: new Date().toISOString(),
         },
       );
-      return context.redirect("/demo/app/admin/access?notice=role-created", 303);
+      return context.redirect(
+        "/demo/app/admin/access?notice=role-created",
+        303,
+      );
     } catch (error) {
       if (error instanceof RolesAccessInputValidationError) {
         return context.text(error.message, 400);
@@ -589,22 +610,26 @@ export function registerAdministrationRoutes(
       const dependencies = createDependencies(context.env);
       const demo = createGuidedDemoContext(sessionId);
       await ensureGuidedDemoSeed(dependencies.database, sessionId);
-      const admin = await ensureGuidedTenantAdmin(dependencies.database, sessionId);
-      const result = await dependencies.rolesAccessAdmin.updateCustomWorkspaceRole(
-        {
-          subjectId: admin.subjectId,
-          tenantId: demo.tenantId,
-          workspaceId: demo.workspaceId,
-        },
-        {
-          roleDefinitionId: input.roleDefinitionId,
-          name: input.name,
-          permissions: input.permissions,
-          acknowledgeAssignments: input.acknowledgeAssignments,
-          auditEventId: `role-definition-audit-${crypto.randomUUID()}`,
-          occurredAt: new Date().toISOString(),
-        },
+      const admin = await ensureGuidedTenantAdmin(
+        dependencies.database,
+        sessionId,
       );
+      const result =
+        await dependencies.rolesAccessAdmin.updateCustomWorkspaceRole(
+          {
+            subjectId: admin.subjectId,
+            tenantId: demo.tenantId,
+            workspaceId: demo.workspaceId,
+          },
+          {
+            roleDefinitionId: input.roleDefinitionId,
+            name: input.name,
+            permissions: input.permissions,
+            acknowledgeAssignments: input.acknowledgeAssignments,
+            auditEventId: `role-definition-audit-${crypto.randomUUID()}`,
+            occurredAt: new Date().toISOString(),
+          },
+        );
       return context.redirect(
         `/demo/app/admin/access?notice=${result.changed ? "role-updated" : "unchanged"}`,
         303,
@@ -646,19 +671,23 @@ export function registerAdministrationRoutes(
       const dependencies = createDependencies(context.env);
       const demo = createGuidedDemoContext(sessionId);
       await ensureGuidedDemoSeed(dependencies.database, sessionId);
-      const admin = await ensureGuidedTenantAdmin(dependencies.database, sessionId);
-      const result = await dependencies.rolesAccessAdmin.retireCustomWorkspaceRole(
-        {
-          subjectId: admin.subjectId,
-          tenantId: demo.tenantId,
-          workspaceId: demo.workspaceId,
-        },
-        {
-          roleDefinitionId: input.roleDefinitionId,
-          auditEventId: `role-definition-audit-${crypto.randomUUID()}`,
-          occurredAt: new Date().toISOString(),
-        },
+      const admin = await ensureGuidedTenantAdmin(
+        dependencies.database,
+        sessionId,
       );
+      const result =
+        await dependencies.rolesAccessAdmin.retireCustomWorkspaceRole(
+          {
+            subjectId: admin.subjectId,
+            tenantId: demo.tenantId,
+            workspaceId: demo.workspaceId,
+          },
+          {
+            roleDefinitionId: input.roleDefinitionId,
+            auditEventId: `role-definition-audit-${crypto.randomUUID()}`,
+            occurredAt: new Date().toISOString(),
+          },
+        );
       return context.redirect(
         `/demo/app/admin/access?notice=${result.changed ? "role-retired" : "unchanged"}`,
         303,
@@ -671,7 +700,9 @@ export function registerAdministrationRoutes(
         return context.html(renderNotFound(createTheme(context.env)), 404);
       }
       return context.text(
-        error instanceof Error ? error.message : "Custom role retirement failed.",
+        error instanceof Error
+          ? error.message
+          : "Custom role retirement failed.",
         409,
       );
     }

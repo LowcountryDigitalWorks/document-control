@@ -20,7 +20,9 @@ function sourceFiles(directory: string): string[] {
 function importsFrom(path: string): string[] {
   const source = readFileSync(path, "utf8");
   return Array.from(
-    source.matchAll(/(?:import|export)\s+(?:[^"']+\s+from\s+)?["']([^"']+)["']/gu),
+    source.matchAll(
+      /(?:import|export)\s+(?:[^"']+\s+from\s+)?["']([^"']+)["']/gu,
+    ),
   ).flatMap((match) => (match[1] ? [match[1]] : []));
 }
 
@@ -30,7 +32,9 @@ describe("HTTP architecture boundaries", () => {
 
     expect(source).toContain('from "./http/app"');
     expect(source).toContain('from "./http/dependencies"');
-    expect(source).not.toMatch(/\bapp\.(?:get|post|put|patch|delete|use)\s*\(/u);
+    expect(source).not.toMatch(
+      /\bapp\.(?:get|post|put|patch|delete|use)\s*\(/u,
+    );
     expect(source).not.toContain("D1DatabaseProvider");
     expect(source).not.toContain("R2ContentStore");
   });

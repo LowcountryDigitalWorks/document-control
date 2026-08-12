@@ -8,10 +8,7 @@ import {
 import { renderBackupPortability } from "../../ui/render-backup-portability";
 import { renderNotFound } from "../../ui/render";
 import { createTheme } from "../../ui/theme";
-import {
-  guidedDemoEnabled,
-  resolveGuidedDemoSession,
-} from "../demo-session";
+import { guidedDemoEnabled, resolveGuidedDemoSession } from "../demo-session";
 import type { RequestDependenciesFactory } from "../dependencies";
 import type { DocumentControlApp } from "../types";
 

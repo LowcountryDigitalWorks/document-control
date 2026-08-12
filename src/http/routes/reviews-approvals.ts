@@ -68,57 +68,66 @@ export function registerReviewApprovalRoutes(
     );
   });
 
-  app.post("/demo/app/reviews/:workflowInstanceId/decision", async (context) => {
-    if (!guidedDemoEnabled(context.env)) return context.notFound();
-    if (!hasSameOrigin(context.req.url, context.req.header("Origin"))) {
-      return context.json({ error: "Same-origin demo request required." }, 403);
-    }
-    const sessionId = readGuidedDemoSession(context.req.header("Cookie"));
-    if (!sessionId) {
-      return context.json(
-        { error: "Synthetic review session missing. Reload the Reviewer queue." },
-        409,
-      );
-    }
+  app.post(
+    "/demo/app/reviews/:workflowInstanceId/decision",
+    async (context) => {
+      if (!guidedDemoEnabled(context.env)) return context.notFound();
+      if (!hasSameOrigin(context.req.url, context.req.header("Origin"))) {
+        return context.json(
+          { error: "Same-origin demo request required." },
+          403,
+        );
+      }
+      const sessionId = readGuidedDemoSession(context.req.header("Cookie"));
+      if (!sessionId) {
+        return context.json(
+          {
+            error:
+              "Synthetic review session missing. Reload the Reviewer queue.",
+          },
+          409,
+        );
+      }
 
-    try {
-      const input = parseReviewQueueActionInput(
-        await readWorkQueueActionFormValues(context.req.raw, [
-          "decision",
-          "comment",
-        ]),
-      );
-      const dependencies = createDependencies(context.env);
-      const demo = createGuidedDemoContext(sessionId);
-      await ensureGuidedDemoSeed(dependencies.database, sessionId);
-      const occurredAt = new Date().toISOString();
-      await dependencies.documentWorkflow.recordReview({
-        tenantId: demo.tenantId,
-        workflowInstanceId: context.req.param("workflowInstanceId"),
-        reviewId: `queue-review-${crypto.randomUUID()}`,
-        actorSubjectId: demo.reviewerSubjectId,
-        decision: input.decision,
-        comment: input.comment,
-        occurredAt,
-        auditEventId: `queue-review-audit-${crypto.randomUUID()}`,
-      });
-      return context.redirect(
-        `/demo/app/reviews?notice=${input.decision === "accepted" ? "accepted" : "changes-requested"}`,
-        303,
-      );
-    } catch (error) {
-      if (error instanceof WorkQueueActionInputValidationError) {
-        return context.text(error.message, 400);
+      try {
+        const input = parseReviewQueueActionInput(
+          await readWorkQueueActionFormValues(context.req.raw, [
+            "decision",
+            "comment",
+          ]),
+        );
+        const dependencies = createDependencies(context.env);
+        const demo = createGuidedDemoContext(sessionId);
+        await ensureGuidedDemoSeed(dependencies.database, sessionId);
+        const occurredAt = new Date().toISOString();
+        await dependencies.documentWorkflow.recordReview({
+          tenantId: demo.tenantId,
+          workflowInstanceId: context.req.param("workflowInstanceId"),
+          reviewId: `queue-review-${crypto.randomUUID()}`,
+          actorSubjectId: demo.reviewerSubjectId,
+          decision: input.decision,
+          comment: input.comment,
+          occurredAt,
+          auditEventId: `queue-review-audit-${crypto.randomUUID()}`,
+        });
+        return context.redirect(
+          `/demo/app/reviews?notice=${input.decision === "accepted" ? "accepted" : "changes-requested"}`,
+          303,
+        );
+      } catch (error) {
+        if (error instanceof WorkQueueActionInputValidationError) {
+          return context.text(error.message, 400);
+        }
+        if (error instanceof AuthorizationDeniedError) {
+          return context.html(renderNotFound(createTheme(context.env)), 404);
+        }
+        return context.text(
+          error instanceof Error ? error.message : "Review action failed.",
+          409,
+        );
       }
-      if (error instanceof AuthorizationDeniedError) {
-        return context.html(renderNotFound(createTheme(context.env)), 404);
-      }
-      return context.text(
-        error instanceof Error ? error.message : "Review action failed.",
-        409,
-      );
-    }
-  });
+    },
+  );
 
   app.get("/demo/app/approvals", async (context) => {
     if (!guidedDemoEnabled(context.env)) {
@@ -159,49 +168,58 @@ export function registerReviewApprovalRoutes(
     );
   });
 
-  app.post("/demo/app/approvals/:workflowInstanceId/approve", async (context) => {
-    if (!guidedDemoEnabled(context.env)) return context.notFound();
-    if (!hasSameOrigin(context.req.url, context.req.header("Origin"))) {
-      return context.json({ error: "Same-origin demo request required." }, 403);
-    }
-    const sessionId = readGuidedDemoSession(context.req.header("Cookie"));
-    if (!sessionId) {
-      return context.json(
-        {
-          error: "Synthetic approval session missing. Reload the Approver queue.",
-        },
-        409,
-      );
-    }
+  app.post(
+    "/demo/app/approvals/:workflowInstanceId/approve",
+    async (context) => {
+      if (!guidedDemoEnabled(context.env)) return context.notFound();
+      if (!hasSameOrigin(context.req.url, context.req.header("Origin"))) {
+        return context.json(
+          { error: "Same-origin demo request required." },
+          403,
+        );
+      }
+      const sessionId = readGuidedDemoSession(context.req.header("Cookie"));
+      if (!sessionId) {
+        return context.json(
+          {
+            error:
+              "Synthetic approval session missing. Reload the Approver queue.",
+          },
+          409,
+        );
+      }
 
-    try {
-      parseApprovalQueueActionInput(
-        await readWorkQueueActionFormValues(context.req.raw, ["confirmApproval"]),
-      );
-      const dependencies = createDependencies(context.env);
-      const demo = createGuidedDemoContext(sessionId);
-      await ensureGuidedDemoSeed(dependencies.database, sessionId);
-      const occurredAt = new Date().toISOString();
-      await dependencies.documentWorkflow.approveCurrentVersion({
-        tenantId: demo.tenantId,
-        workflowInstanceId: context.req.param("workflowInstanceId"),
-        approvalId: `queue-approval-${crypto.randomUUID()}`,
-        actorSubjectId: demo.approverSubjectId,
-        occurredAt,
-        auditEventId: `queue-approval-audit-${crypto.randomUUID()}`,
-      });
-      return context.redirect("/demo/app/approvals?notice=approved", 303);
-    } catch (error) {
-      if (error instanceof WorkQueueActionInputValidationError) {
-        return context.text(error.message, 400);
+      try {
+        parseApprovalQueueActionInput(
+          await readWorkQueueActionFormValues(context.req.raw, [
+            "confirmApproval",
+          ]),
+        );
+        const dependencies = createDependencies(context.env);
+        const demo = createGuidedDemoContext(sessionId);
+        await ensureGuidedDemoSeed(dependencies.database, sessionId);
+        const occurredAt = new Date().toISOString();
+        await dependencies.documentWorkflow.approveCurrentVersion({
+          tenantId: demo.tenantId,
+          workflowInstanceId: context.req.param("workflowInstanceId"),
+          approvalId: `queue-approval-${crypto.randomUUID()}`,
+          actorSubjectId: demo.approverSubjectId,
+          occurredAt,
+          auditEventId: `queue-approval-audit-${crypto.randomUUID()}`,
+        });
+        return context.redirect("/demo/app/approvals?notice=approved", 303);
+      } catch (error) {
+        if (error instanceof WorkQueueActionInputValidationError) {
+          return context.text(error.message, 400);
+        }
+        if (error instanceof AuthorizationDeniedError) {
+          return context.html(renderNotFound(createTheme(context.env)), 404);
+        }
+        return context.text(
+          error instanceof Error ? error.message : "Approval action failed.",
+          409,
+        );
       }
-      if (error instanceof AuthorizationDeniedError) {
-        return context.html(renderNotFound(createTheme(context.env)), 404);
-      }
-      return context.text(
-        error instanceof Error ? error.message : "Approval action failed.",
-        409,
-      );
-    }
-  });
+    },
+  );
 }

@@ -1,7 +1,9 @@
 import { expect, test } from "@playwright/test";
 
 for (const path of ["/", "/demo/workflow", "/demo/app"]) {
-  test(`applies the security-header baseline to ${path}`, async ({ request }) => {
+  test(`applies the security-header baseline to ${path}`, async ({
+    request,
+  }) => {
     const response = await request.get(path);
 
     expect(response.ok()).toBe(true);
