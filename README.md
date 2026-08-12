@@ -82,8 +82,9 @@ workflow-definition version they originally used regardless of later lifecycle c
 - Identity/provider integration is separate from application-owned membership, role bindings, and
   permission evaluation.
 - Workflow definitions are immutable by version; workflow instances remain bound to the exact
-  definition version they started with. Authoring may copy an exact historical version into a new
-  editable draft, but saving always inserts a new immutable version.
+  definition version they started with.
+- Authoring may copy an exact historical workflow version into a new editable draft, but saving always
+  inserts a new immutable version.
 - Templates are controlled/versioned records with lifecycle and provenance metadata.
 - Approval records bind actor and timestamp to an exact document version, SHA-256 content hash,
   workflow instance, and workflow-definition version.
