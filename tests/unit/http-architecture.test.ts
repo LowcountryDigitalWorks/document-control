@@ -21,8 +21,7 @@ function importsFrom(path: string): string[] {
   const source = readFileSync(path, "utf8");
   return Array.from(
     source.matchAll(/(?:import|export)\s+(?:[^"']+\s+from\s+)?["']([^"']+)["']/gu),
-    (match) => match[1],
-  );
+  ).flatMap((match) => (match[1] ? [match[1]] : []));
 }
 
 describe("HTTP architecture boundaries", () => {
