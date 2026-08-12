@@ -99,6 +99,9 @@ describe("document evidence manifest export", () => {
     expect(manifest.format).toBe("document-evidence/v1");
     expect(manifest.document.sourceTemplate?.contentHash).toBe("a".repeat(64));
     expect(manifest.document.versions[0]?.contentHash).toBe("b".repeat(64));
+    expect(manifest.document.versions[0]?.changeSummary).toBe(
+      "Synthetic controlled version change.",
+    );
     expect(
       manifest.document.versions[0]?.approvals[0]?.workflowDefinitionVersion,
     ).toBe(1);
@@ -111,6 +114,7 @@ describe("document evidence manifest export", () => {
       detail,
       "2026-08-12T15:00:00.000Z",
     );
+    expect(serialized).toContain("Synthetic controlled version change.");
     expect(serialized).not.toContain("tenant-internal");
     expect(serialized).not.toContain("creator-internal");
     expect(serialized).not.toContain("approver-internal");
