@@ -6,16 +6,14 @@ old = '''  await expect(
     page.getByText("0 items awaiting approval.", { exact: true }),
   ).toBeVisible();
 
-  await reviewCard
-    .getByLabel(/Review comment/u)
+  await reviewCard.getByLabel(/Review comment/u).fill("Queue-native reviewer acceptance.");
 '''
 new = '''  await expect(
     page.getByText("0 items awaiting approval.", { exact: true }),
   ).toBeVisible();
 
   await page.goto("/demo/app/reviews");
-  await reviewCard
-    .getByLabel(/Review comment/u)
+  await reviewCard.getByLabel(/Review comment/u).fill("Queue-native reviewer acceptance.");
 '''
 if text.count(old) != 1:
     raise SystemExit("Expected reviewer return-navigation marker not found exactly once")
