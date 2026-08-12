@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import { DatabaseSync } from "node:sqlite";
 
 type SqlValue = string | number | bigint | Uint8Array | null;
@@ -19,53 +19,21 @@ interface TestPreparedStatement {
 
 export async function createE2eD1Database(): Promise<D1Database> {
   const database = new DatabaseSync(":memory:");
-  const migrations = await Promise.all([
-    readFile(
-      new URL("../migrations/0001_initial.sql", import.meta.url),
-      "utf8",
-    ),
-    readFile(
-      new URL(
-        "../migrations/0002_system_role_permissions.sql",
-        import.meta.url,
-      ),
-      "utf8",
-    ),
-    readFile(
-      new URL(
-        "../migrations/0003_workflow_definition_immutability.sql",
-        import.meta.url,
-      ),
-      "utf8",
-    ),
-    readFile(
-      new URL(
-        "../migrations/0004_template_version_lifecycle_integrity.sql",
-        import.meta.url,
-      ),
-      "utf8",
-    ),
-    readFile(
-      new URL(
-        "../migrations/0005_workspace_workflow_selection.sql",
-        import.meta.url,
-      ),
-      "utf8",
-    ),
-    readFile(
-      new URL(
-        "../migrations/0006_workflow_definition_lifecycle.sql",
-        import.meta.url,
-      ),
-      "utf8",
-    ),
-    readFile(
-      new URL("../migrations/0007_custom_role_retirement.sql", import.meta.url),
-      "utf8",
-    ),
-  ]);
-  for (const migration of migrations) {
-    database.exec(migration);
+  const migrationDirectory = new URL("../migrations/", import.meta.url);
+  const migrationNames = (await readdir(migrationDirectory))
+    .filter((name) => /^\d{4}_[a-z0-9_]+\.sql$/u.test(name))
+    .sort((left, right) => left.localeCompare(right));
+
+  if (migrationNames.length === 0) {
+    throw new Error(
+      "No ordered D1/SQLite migrations were found for E2E setup.",
+    );
+  }
+
+  for (const migrationName of migrationNames) {
+    database.exec(
+      await readFile(new URL(migrationName, migrationDirectory), "utf8"),
+    );
   }
 
   const createPrepared = (

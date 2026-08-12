@@ -60,7 +60,8 @@ The synthetic/test-only application now covers:
 - immutable Workflow Definition administration with exact-version draft cloning, server-side graph analysis, and unreachable-state rejection for newly submitted drafts;
 - controlled Template Lifecycle administration;
 - workspace Workflow Selection/default-version administration; and
-- controlled Workflow Definition lifecycle administration.
+- controlled Workflow Definition lifecycle administration; and
+- controlled document retirement with terminal historical-only semantics and preserved evidence.
 
 See `docs/STATUS.md` and Git history for the detailed invariant/test record for each merged slice.
 
@@ -149,6 +150,19 @@ unless a deliberate migration changes that contract later.
 
 Lifecycle changes never rewrite workflow-definition content. Existing workflow instances, reviews,
 approvals, and audit evidence remain pinned to their original exact workflow version.
+
+## Controlled document retirement
+
+- `document.retire` is a dedicated workspace permission granted by default to Tenant Administrator,
+  Workspace Administrator, and Document Owner, and available to bounded tenant custom workspace roles.
+- Only an `approved` document with exact approval evidence for its current version can be retired.
+- Retirement is terminal and non-destructive. It preserves document/version records, exact approvals,
+  workflow/review history, template provenance, audit evidence, content references, and portable export.
+- Retired documents cannot receive new versions, start or mutate workflows, receive reviews, or receive
+  new approvals. Application guards and migration `0008_controlled_document_retirement.sql` independently
+  enforce the historical-only boundary.
+- Retirement is **not** deletion, retention enforcement, legal hold, binary cleanup, or storage disposal.
+  Those production policies remain separately pending.
 
 ## Synthetic application boundary
 

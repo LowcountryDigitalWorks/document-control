@@ -5,12 +5,14 @@ import type {
   DocumentEvidenceSnapshot,
   DocumentWorkflowService,
   RecordReviewCommand,
+  RetireDocumentCommand,
   StartWorkflowCommand,
   TransitionWorkflowCommand,
 } from "./document-workflow-service";
 import type { AuthorizationPolicy } from "./authorization";
 import type {
   Approval,
+  Document,
   DocumentVersion,
   Review,
   WorkflowInstance,
@@ -96,6 +98,18 @@ export class AuthorizedDocumentWorkflowService {
       permission: "document.version.create",
     });
     return this.workflow.createChangedVersion(command);
+  }
+
+  public async retireDocument(
+    command: RetireDocumentCommand,
+  ): Promise<Document> {
+    await this.authorization.assertAllowed({
+      subjectId: command.actorSubjectId,
+      tenantId: command.tenantId,
+      documentId: command.documentId,
+      permission: "document.retire",
+    });
+    return this.workflow.retireDocument(command);
   }
 
   public async getEvidence(input: {

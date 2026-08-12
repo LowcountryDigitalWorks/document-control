@@ -8,6 +8,7 @@ import type { ThemeConfig } from "./theme";
 export function renderDocumentDetail(
   theme: ThemeConfig,
   detail: DocumentDetailEvidence,
+  notice?: string,
 ): string {
   return `<!doctype html>
 <html lang="en">
@@ -28,7 +29,7 @@ export function renderDocumentDetail(
         <span>${escapeHtml(theme.companyName)}</span>
         <strong>${escapeHtml(theme.appName)}</strong>
       </a>
-      <span class="demo-label">Synthetic evidence · read-only</span>
+      <span class="demo-label">Synthetic evidence · controlled lifecycle</span>
     </div>
   </header>
   <div class="shell layout">
@@ -50,12 +51,12 @@ export function renderDocumentDetail(
             <h1 id="page-title">${escapeHtml(detail.title)}</h1>
             <p class="lede">Version, workflow, approval, template provenance, and audit evidence assembled from persisted tenant-scoped records.</p>
           </div>
-          <span class="badge ${currentApprovalApplies(detail) ? "success" : "warning"}">
-            ${currentApprovalApplies(detail) ? "Current version approved" : "Current approval required"}
-          </span>
+          ${renderCurrentStateBadge(detail)}
         </div>
+        ${notice ? `<p class="notice" role="status">${escapeHtml(notice)}</p>` : ""}
       </section>
 
+      ${renderDocumentRetirement(detail)}
       ${renderSourceTemplate(detail)}
 
       <section aria-labelledby="versions-title">
@@ -74,6 +75,37 @@ export function renderDocumentDetail(
   <footer><div class="shell"><p>Synthetic evidence view by ${escapeHtml(theme.companyName)} · no tracking.</p></div></footer>
 </body>
 </html>`;
+}
+
+function renderDocumentRetirement(detail: DocumentDetailEvidence): string {
+  if (detail.status === "retired") {
+    return `<section class="panel retirement-panel" aria-labelledby="retirement-title">
+      <p class="eyebrow">Controlled disposition</p>
+      <h2 id="retirement-title">Retired historical record</h2>
+      <p>This document is no longer operational. Its exact versions, approvals, workflows, source provenance, and audit evidence remain preserved and readable.</p>
+    </section>`;
+  }
+  if (detail.status !== "approved") {
+    return "";
+  }
+  return `<section class="panel retirement-panel" aria-labelledby="retirement-title">
+    <p class="eyebrow">Controlled disposition</p>
+    <h2 id="retirement-title">Retire this approved document</h2>
+    <p>Retirement is terminal and non-destructive. It stops new versions and workflow activity but preserves all historical evidence. It does not delete content or enforce a retention schedule.</p>
+    <form method="post" action="/demo/app/documents/${encodeURIComponent(detail.id)}/retire">
+      <label class="confirmation"><input type="checkbox" name="confirmRetirement" value="yes" required> I understand this document will become historical-only.</label>
+      <button type="submit">Retire document</button>
+    </form>
+  </section>`;
+}
+
+function renderCurrentStateBadge(detail: DocumentDetailEvidence): string {
+  if (detail.status === "retired") {
+    return '<span class="badge neutral">Retired · evidence preserved</span>';
+  }
+  return `<span class="badge ${currentApprovalApplies(detail) ? "success" : "warning"}">
+    ${currentApprovalApplies(detail) ? "Current version approved" : "Current approval required"}
+  </span>`;
 }
 
 function renderSourceTemplate(detail: DocumentDetailEvidence): string {
@@ -260,5 +292,5 @@ function escapeHtml(value: string): string {
 }
 
 function styles(theme: ThemeConfig): string {
-  return `:root{--brand-primary:${theme.primary};--brand-secondary:${theme.secondary};--brand-accent:${theme.accent};--surface:#f8f7f2;--surface-raised:#fff;--surface-muted:#e8eee9;--text:#102f38;--muted:#4b6369;--border:#cad5d1;--focus:#b85e3c;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--text);background:var(--surface);font-synthesis:none}*{box-sizing:border-box}body{margin:0;min-width:320px;line-height:1.6;background:var(--surface)}a{color:inherit;text-underline-offset:.2em}:focus-visible{outline:3px solid var(--focus);outline-offset:4px}.shell{width:min(1120px,calc(100% - 2rem));margin-inline:auto}.skip-link{position:fixed;top:-5rem;left:1rem;z-index:10;padding:.7rem;background:var(--surface-raised)}.skip-link:focus{top:1rem}header,footer{background:var(--surface-raised);border-bottom:1px solid var(--border)}footer{margin-top:4rem;border-top:1px solid var(--border);border-bottom:0;color:var(--muted)}footer .shell{padding-block:1.5rem}.header-inner{display:flex;min-height:76px;align-items:center;justify-content:space-between;gap:1rem}.wordmark{display:flex;flex-direction:column;text-decoration:none;line-height:1.05}.wordmark span,.eyebrow{font-size:.76rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--brand-accent)}.wordmark strong{font-size:1.15rem}.demo-label{font-size:.9rem;color:var(--muted)}.layout{display:grid;gap:2rem}.app-nav{display:flex;gap:.35rem;overflow-x:auto;padding:1rem 0;border-bottom:1px solid var(--border)}.app-nav a{padding:.55rem .7rem;border-radius:.35rem;text-decoration:none;white-space:nowrap}.app-nav a[aria-current="page"]{background:var(--brand-primary);color:#fff;font-weight:800}.app-nav hr,.workspace-name{display:none}.back{margin:1.5rem 0 0}.intro{padding:2.3rem 0 2rem}.eyebrow{margin:0 0 .5rem}h1,h2,h3,h4{line-height:1.15;text-wrap:balance}h1{margin:.2rem 0 1rem;font-size:clamp(2.3rem,6vw,4.1rem);letter-spacing:-.04em}h2{margin:.2rem 0 1rem;font-size:clamp(1.6rem,4vw,2.2rem)}h3{margin:.2rem 0 .5rem;font-size:1.35rem}h4{margin:0 0 .7rem}.lede{max-width:780px;font-size:1.08rem;color:var(--muted)}.title-row,.panel-heading,.version-heading,.workflow-heading,.audit-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem}.panel,.version-card{margin-bottom:2.5rem;padding:1.3rem;border:1px solid var(--border);border-radius:.65rem;background:var(--surface-raised)}.badge{display:inline-flex;padding:.3rem .6rem;border-radius:999px;font-size:.8rem;font-weight:800;white-space:nowrap}.badge.success{background:#d8f3e5;color:#0b5a36}.badge.warning{background:#fff0c7;color:#734500}.badge.neutral{background:var(--surface-muted);color:var(--text)}.facts,.payload{display:grid;gap:.6rem;margin:1rem 0 0}.facts div,.payload div{display:grid;grid-template-columns:minmax(8rem,.35fr) 1fr;gap:1rem}.facts dt,.payload dt{font-weight:800}.facts dd,.payload dd{margin:0;color:var(--muted);overflow-wrap:anywhere}.hash{overflow-wrap:anywhere;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;color:var(--muted)}.full-hash{padding:.8rem;border-radius:.35rem;background:var(--surface-muted)}.version-list{margin-top:1.5rem}.evidence-grid{display:grid;gap:1rem;margin-top:1.2rem}.evidence-grid>section{padding:1rem;border:1px solid var(--border);border-radius:.5rem}.evidence-row{display:grid;gap:.15rem;padding:.7rem 0;border-top:1px solid var(--border)}.evidence-row:first-of-type{border-top:0}.evidence-row small,.evidence-row span,.workflow-card p,.empty-note{color:var(--muted)}.workflow-card{padding:.8rem 0;border-top:1px solid var(--border)}.workflow-card:first-of-type{border-top:0}.workflow-card p{margin:.25rem 0}.review-list{margin:.7rem 0 0;padding-left:1.2rem}.review-list li+li{margin-top:.7rem}.review-list span{display:block;color:var(--muted);font-size:.9rem}.review-list p{margin:.2rem 0 0}.audit-section{margin-top:3rem}.audit-list{list-style:none;margin:1.5rem 0 0;padding:0}.audit-list li{display:grid;grid-template-columns:18px 1fr;gap:.8rem;position:relative;padding-bottom:1.4rem}.audit-list li:not(:last-child)::before{content:"";position:absolute;left:7px;top:17px;bottom:0;width:2px;background:var(--border)}.audit-marker{width:16px;height:16px;margin-top:.3rem;border:3px solid var(--brand-secondary);border-radius:50%;background:var(--surface)}.audit-content{padding:0 0 .2rem}.audit-heading time{color:var(--muted);font-size:.9rem}.audit-content>p{margin:.2rem 0;color:var(--muted)}@media(min-width:760px){.evidence-grid{grid-template-columns:1fr 1fr}}@media(min-width:900px){.layout{grid-template-columns:220px minmax(0,1fr)}.app-nav{position:sticky;top:0;align-self:start;display:flex;flex-direction:column;overflow:visible;padding:2rem 1rem 2rem 0;border-bottom:0}.app-nav hr{display:block;width:100%;border:0;border-top:1px solid var(--border)}.workspace-name{display:block;margin:0 0 .7rem;padding:.55rem .7rem;font-weight:800;color:var(--muted)}}@media(max-width:650px){.header-inner,.title-row,.panel-heading,.version-heading,.workflow-heading,.audit-heading{align-items:flex-start;flex-direction:column}.header-inner{padding-block:1rem}.facts div,.payload div{grid-template-columns:1fr;gap:0}.badge{white-space:normal}}@media(prefers-color-scheme:dark){:root{--surface:#0f252c;--surface-raised:#17353d;--surface-muted:#132e35;--text:#f3f5f2;--muted:#c3d0d2;--border:#35545b;--focus:#f3a889}.badge.success{background:#103f2b;color:#a8ebca}.badge.warning{background:#4d3706;color:#ffe39b}}`;
+  return `:root{--brand-primary:${theme.primary};--brand-secondary:${theme.secondary};--brand-accent:${theme.accent};--surface:#f8f7f2;--surface-raised:#fff;--surface-muted:#e8eee9;--text:#102f38;--muted:#4b6369;--border:#cad5d1;--focus:#b85e3c;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--text);background:var(--surface);font-synthesis:none}*{box-sizing:border-box}body{margin:0;min-width:320px;line-height:1.6;background:var(--surface)}a{color:inherit;text-underline-offset:.2em}:focus-visible{outline:3px solid var(--focus);outline-offset:4px}.shell{width:min(1120px,calc(100% - 2rem));margin-inline:auto}.skip-link{position:fixed;top:-5rem;left:1rem;z-index:10;padding:.7rem;background:var(--surface-raised)}.skip-link:focus{top:1rem}header,footer{background:var(--surface-raised);border-bottom:1px solid var(--border)}footer{margin-top:4rem;border-top:1px solid var(--border);border-bottom:0;color:var(--muted)}footer .shell{padding-block:1.5rem}.header-inner{display:flex;min-height:76px;align-items:center;justify-content:space-between;gap:1rem}.wordmark{display:flex;flex-direction:column;text-decoration:none;line-height:1.05}.wordmark span,.eyebrow{font-size:.76rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--brand-accent)}.wordmark strong{font-size:1.15rem}.demo-label{font-size:.9rem;color:var(--muted)}.layout{display:grid;gap:2rem}.app-nav{display:flex;gap:.35rem;overflow-x:auto;padding:1rem 0;border-bottom:1px solid var(--border)}.app-nav a{padding:.55rem .7rem;border-radius:.35rem;text-decoration:none;white-space:nowrap}.app-nav a[aria-current="page"]{background:var(--brand-primary);color:#fff;font-weight:800}.app-nav hr,.workspace-name{display:none}.back{margin:1.5rem 0 0}.intro{padding:2.3rem 0 2rem}.eyebrow{margin:0 0 .5rem}h1,h2,h3,h4{line-height:1.15;text-wrap:balance}h1{margin:.2rem 0 1rem;font-size:clamp(2.3rem,6vw,4.1rem);letter-spacing:-.04em}h2{margin:.2rem 0 1rem;font-size:clamp(1.6rem,4vw,2.2rem)}h3{margin:.2rem 0 .5rem;font-size:1.35rem}h4{margin:0 0 .7rem}.lede{max-width:780px;font-size:1.08rem;color:var(--muted)}.title-row,.panel-heading,.version-heading,.workflow-heading,.audit-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem}.panel,.version-card{margin-bottom:2.5rem;padding:1.3rem;border:1px solid var(--border);border-radius:.65rem;background:var(--surface-raised)}.notice{margin-top:1rem;padding:.85rem 1rem;border-left:4px solid var(--brand-secondary);background:var(--surface-muted);font-weight:750}.retirement-panel form{display:grid;gap:.9rem;margin-top:1rem}.confirmation{display:flex;align-items:flex-start;gap:.65rem;font-weight:700}.confirmation input{width:1.1rem;height:1.1rem;margin-top:.25rem;flex:0 0 auto}.retirement-panel button{width:max-content;min-height:44px;border:0;border-radius:.45rem;padding:.65rem 1rem;background:var(--brand-primary);color:#fff;font:inherit;font-weight:800;cursor:pointer}.badge{display:inline-flex;padding:.3rem .6rem;border-radius:999px;font-size:.8rem;font-weight:800;white-space:nowrap}.badge.success{background:#d8f3e5;color:#0b5a36}.badge.warning{background:#fff0c7;color:#734500}.badge.neutral{background:var(--surface-muted);color:var(--text)}.facts,.payload{display:grid;gap:.6rem;margin:1rem 0 0}.facts div,.payload div{display:grid;grid-template-columns:minmax(8rem,.35fr) 1fr;gap:1rem}.facts dt,.payload dt{font-weight:800}.facts dd,.payload dd{margin:0;color:var(--muted);overflow-wrap:anywhere}.hash{overflow-wrap:anywhere;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;color:var(--muted)}.full-hash{padding:.8rem;border-radius:.35rem;background:var(--surface-muted)}.version-list{margin-top:1.5rem}.evidence-grid{display:grid;gap:1rem;margin-top:1.2rem}.evidence-grid>section{padding:1rem;border:1px solid var(--border);border-radius:.5rem}.evidence-row{display:grid;gap:.15rem;padding:.7rem 0;border-top:1px solid var(--border)}.evidence-row:first-of-type{border-top:0}.evidence-row small,.evidence-row span,.workflow-card p,.empty-note{color:var(--muted)}.workflow-card{padding:.8rem 0;border-top:1px solid var(--border)}.workflow-card:first-of-type{border-top:0}.workflow-card p{margin:.25rem 0}.review-list{margin:.7rem 0 0;padding-left:1.2rem}.review-list li+li{margin-top:.7rem}.review-list span{display:block;color:var(--muted);font-size:.9rem}.review-list p{margin:.2rem 0 0}.audit-section{margin-top:3rem}.audit-list{list-style:none;margin:1.5rem 0 0;padding:0}.audit-list li{display:grid;grid-template-columns:18px 1fr;gap:.8rem;position:relative;padding-bottom:1.4rem}.audit-list li:not(:last-child)::before{content:"";position:absolute;left:7px;top:17px;bottom:0;width:2px;background:var(--border)}.audit-marker{width:16px;height:16px;margin-top:.3rem;border:3px solid var(--brand-secondary);border-radius:50%;background:var(--surface)}.audit-content{padding:0 0 .2rem}.audit-heading time{color:var(--muted);font-size:.9rem}.audit-content>p{margin:.2rem 0;color:var(--muted)}@media(min-width:760px){.evidence-grid{grid-template-columns:1fr 1fr}}@media(min-width:900px){.layout{grid-template-columns:220px minmax(0,1fr)}.app-nav{position:sticky;top:0;align-self:start;display:flex;flex-direction:column;overflow:visible;padding:2rem 1rem 2rem 0;border-bottom:0}.app-nav hr{display:block;width:100%;border:0;border-top:1px solid var(--border)}.workspace-name{display:block;margin:0 0 .7rem;padding:.55rem .7rem;font-weight:800;color:var(--muted)}}@media(max-width:650px){.header-inner,.title-row,.panel-heading,.version-heading,.workflow-heading,.audit-heading{align-items:flex-start;flex-direction:column}.header-inner{padding-block:1rem}.facts div,.payload div{grid-template-columns:1fr;gap:0}.badge{white-space:normal}}@media(prefers-color-scheme:dark){:root{--surface:#0f252c;--surface-raised:#17353d;--surface-muted:#132e35;--text:#f3f5f2;--muted:#c3d0d2;--border:#35545b;--focus:#f3a889}.badge.success{background:#103f2b;color:#a8ebca}.badge.warning{background:#4d3706;color:#ffe39b}}`;
 }

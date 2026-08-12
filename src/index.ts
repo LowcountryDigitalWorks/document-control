@@ -12,6 +12,7 @@ import { AuthorizedRolesAccessAdminService } from "./application/authorized-role
 import { AuthorizedTemplateLifecycleAdminService } from "./application/authorized-template-lifecycle-admin-service";
 import { AuthorizedAuditLogReadService } from "./application/authorized-audit-log-read-service";
 import { AuthorizedDocumentDetailReadService } from "./application/authorized-document-detail-read-service";
+import { AuthorizedDocumentWorkflowService } from "./application/authorized-document-workflow-service";
 import { AuthorizedPortableExportService } from "./application/authorized-portable-export-service";
 import { AuthorizedReviewApprovalQueueReadService } from "./application/authorized-review-approval-queue-read-service";
 import { AuthorizedWorkspaceReadService } from "./application/authorized-workspace-read-service";
@@ -21,6 +22,11 @@ import {
   DocumentDetailReadService,
   DocumentNotFoundError,
 } from "./application/document-detail-read-service";
+import {
+  parseDocumentRetirementInput,
+  DocumentRetirementInputValidationError,
+} from "./application/document-retirement-input";
+import { DocumentWorkflowService } from "./application/document-workflow-service";
 import { serializeExport } from "./application/export";
 import { PortableExportReadService } from "./application/portable-export-read-service";
 import {
@@ -304,10 +310,15 @@ app.get("/demo/app/documents/:documentId", async (context) => {
       tenantId: demo.tenantId,
       documentId: context.req.param("documentId"),
     });
+    const notice =
+      new URL(context.req.url).searchParams.get("notice") === "retired"
+        ? "Document retired. Historical versions, approvals, workflows, provenance, and audit evidence remain preserved."
+        : undefined;
     return context.html(
       renderDocumentDetail(
         await createPersistedTenantTheme(database, context.env, demo.tenantId),
         detail,
+        notice,
       ),
     );
   } catch (error) {
@@ -318,6 +329,55 @@ app.get("/demo/app/documents/:documentId", async (context) => {
       return context.html(renderNotFound(createTheme(context.env)), 404);
     }
     throw error;
+  }
+});
+
+app.post("/demo/app/documents/:documentId/retire", async (context) => {
+  if (!guidedDemoEnabled(context.env)) return context.notFound();
+  if (!hasSameOrigin(context.req.url, context.req.header("Origin"))) {
+    return context.json({ error: "Same-origin demo request required." }, 403);
+  }
+  const sessionId = readGuidedDemoSession(context.req.header("Cookie"));
+  if (!sessionId) {
+    return context.json(
+      { error: "Synthetic evidence session missing. Reload the document." },
+      409,
+    );
+  }
+
+  try {
+    parseDocumentRetirementInput(
+      await readDocumentRetirementFormValues(context.req.raw),
+    );
+    const database = new D1DatabaseProvider(context.env.DOCUMENT_CONTROL_DB);
+    const demo = createGuidedDemoContext(sessionId);
+    await ensureGuidedDemoSeed(database, sessionId);
+    const evidenceReader = await ensureGuidedEvidenceReader(
+      database,
+      sessionId,
+    );
+    await createAuthorizedDocumentWorkflowService(database).retireDocument({
+      tenantId: demo.tenantId,
+      documentId: context.req.param("documentId"),
+      actorSubjectId: evidenceReader.subjectId,
+      auditEventId: `document-retirement-${crypto.randomUUID()}`,
+      occurredAt: new Date().toISOString(),
+    });
+    return context.redirect(
+      `/demo/app/documents/${encodeURIComponent(context.req.param("documentId"))}?notice=retired`,
+      303,
+    );
+  } catch (error) {
+    if (error instanceof DocumentRetirementInputValidationError) {
+      return context.text(error.message, 400);
+    }
+    if (error instanceof AuthorizationDeniedError) {
+      return context.html(renderNotFound(createTheme(context.env)), 404);
+    }
+    return context.text(
+      error instanceof Error ? error.message : "Document retirement failed.",
+      409,
+    );
   }
 });
 
@@ -1780,6 +1840,15 @@ function createAuthorizedDocumentDetailReadService(
   );
 }
 
+function createAuthorizedDocumentWorkflowService(
+  database: D1DatabaseProvider,
+): AuthorizedDocumentWorkflowService {
+  return new AuthorizedDocumentWorkflowService(
+    new DocumentWorkflowService(database),
+    new DatabaseAuthorizationPolicy(database),
+  );
+}
+
 function createAuthorizedReviewApprovalQueueReadService(
   database: D1DatabaseProvider,
 ): AuthorizedReviewApprovalQueueReadService {
@@ -1951,6 +2020,25 @@ async function readFormValues(
   for (const key of keys) {
     const value = formData.get(key);
     if (typeof value === "string") values.set(key, value);
+  }
+  return values;
+}
+
+async function readDocumentRetirementFormValues(
+  request: Request,
+): Promise<URLSearchParams> {
+  let formData: FormData;
+  try {
+    formData = await request.formData();
+  } catch {
+    throw new DocumentRetirementInputValidationError(
+      "A valid form body is required.",
+    );
+  }
+  const values = new URLSearchParams();
+  const confirmation = formData.get("confirmRetirement");
+  if (typeof confirmation === "string") {
+    values.set("confirmRetirement", confirmation);
   }
   return values;
 }
