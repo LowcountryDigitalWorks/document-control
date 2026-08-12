@@ -72,6 +72,12 @@ test("exports the current synthetic tenant application state", async ({
     (left, right) => left.versionNumber - right.versionNumber,
   );
   expect(exportedDocument?.currentVersionId).toBe(versions[1]?.id);
+  expect(versions[0]?.changeSummary).toBe(
+    "Initial version created from approved template.",
+  );
+  expect(versions[1]?.changeSummary).toBe(
+    "Synthetic controlled version change.",
+  );
   expect(exported.approvals[0]?.documentVersionId).toBe(versions[0]?.id);
   expect(exported.approvals[0]?.contentHash).toBe(versions[0]?.contentHash);
   expect(exported.approvals[0]?.documentVersionId).not.toBe(
