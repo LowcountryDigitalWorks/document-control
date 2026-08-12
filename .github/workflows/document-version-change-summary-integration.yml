@@ -24,7 +24,7 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Reconcile named-interface patch helper
+      - name: Reconcile targeted patch helper
         run: python scripts/fix-document-version-change-summary-patch.py
       - name: Apply permanent feature patch
         run: python scripts/patch-document-version-change-summary.py
