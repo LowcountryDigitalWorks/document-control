@@ -24,6 +24,14 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Capture unformatted Foundation II files
+        run: |
+          mkdir -p prf2-original/docs prf2-original/tests/unit
+          cp docs/OPERATIONS_RECOVERY.md prf2-original/docs/
+          cp docs/THREAT_MODEL.md prf2-original/docs/
+          cp tests/unit/github-actions-security.test.ts prf2-original/tests/unit/
+          cp tests/unit/migration-upgrade-path.test.ts prf2-original/tests/unit/
+          cp tests/unit/recovery-drill.test.ts prf2-original/tests/unit/
       - name: Format Foundation II files in the runner only
         run: >-
           pnpm exec prettier --write
@@ -32,15 +40,20 @@ jobs:
           tests/unit/github-actions-security.test.ts
           tests/unit/migration-upgrade-path.test.ts
           tests/unit/recovery-drill.test.ts
-      - name: Upload formatted files for development reconciliation
+      - name: Capture formatted Foundation II files
+        run: |
+          mkdir -p prf2-formatted/docs prf2-formatted/tests/unit
+          cp docs/OPERATIONS_RECOVERY.md prf2-formatted/docs/
+          cp docs/THREAT_MODEL.md prf2-formatted/docs/
+          cp tests/unit/github-actions-security.test.ts prf2-formatted/tests/unit/
+          cp tests/unit/migration-upgrade-path.test.ts prf2-formatted/tests/unit/
+          cp tests/unit/recovery-drill.test.ts prf2-formatted/tests/unit/
+      - name: Upload formatting reconciliation artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: prf2-formatted-files
+          name: prf2-format-reconciliation
           path: |
-            docs/OPERATIONS_RECOVERY.md
-            docs/THREAT_MODEL.md
-            tests/unit/github-actions-security.test.ts
-            tests/unit/migration-upgrade-path.test.ts
-            tests/unit/recovery-drill.test.ts
+            prf2-original
+            prf2-formatted
           if-no-files-found: error
           retention-days: 1
