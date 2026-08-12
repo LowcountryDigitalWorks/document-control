@@ -1,0 +1,35 @@
+name: Version Summary Test Format
+
+on:
+  push:
+    branches:
+      - feature/immutable-version-change-summary
+    paths:
+      - .github/workflows/version-summary-test-format.yml
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feature/immutable-version-change-summary
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Format strengthened export tests
+        run: pnpm exec prettier --write tests/e2e/backup-portability.spec.ts tests/unit/document-evidence-export.test.ts
+      - name: Commit formatted tests
+        run: |
+          git config user.name "Eddie-LowcountryDigitalWorks"
+          git config user.email "eddie@lowcountrydigitalworks.com"
+          git add tests/e2e/backup-portability.spec.ts tests/unit/document-evidence-export.test.ts
+          git diff --cached --check
+          git commit -m "Format version summary export coverage"
+          git push origin HEAD:feature/immutable-version-change-summary
