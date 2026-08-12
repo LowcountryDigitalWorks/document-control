@@ -22,7 +22,9 @@ test("opens immutable template evidence from the ordinary Templates list", async
   await expect(
     page.getByRole("link", { name: "Templates", exact: true }),
   ).toHaveAttribute("aria-current", "page");
-  const version = page.locator(".version-card").filter({ hasText: "Version 1" });
+  const version = page.locator(".version-card").filter({
+    has: page.getByText("Version 1", { exact: true }),
+  });
   await expect(version).toHaveCount(1);
   await expect(version).toContainText("Current version");
   await expect(version).toContainText("Published");
@@ -65,10 +67,12 @@ test("shows a new current Draft revision while preserving exact historical templ
     .getByRole("link", { name: "View template evidence" })
     .click();
 
-  const current = page.locator(".version-card").filter({ hasText: "Version 2" });
-  const historical = page
-    .locator(".version-card")
-    .filter({ hasText: "Version 1" });
+  const current = page.locator(".version-card").filter({
+    has: page.getByText("Version 2", { exact: true }),
+  });
+  const historical = page.locator(".version-card").filter({
+    has: page.getByText("Version 1", { exact: true }),
+  });
   await expect(current).toHaveCount(1);
   await expect(current).toContainText("Current version");
   await expect(current).toContainText("Draft");
