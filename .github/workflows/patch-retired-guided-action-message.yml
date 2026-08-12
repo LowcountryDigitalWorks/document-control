@@ -29,22 +29,16 @@ jobs:
           from pathlib import Path
           path = Path('src/demo/workflow-demo.ts')
           text = path.read_text()
-          old = '''  const demo = createGuidedDemoContext(sessionId);
-          const current = await loadGuidedDemoState(database, sessionId);
-          if (current.nextAction !== action) {
-          '''
-          new = '''  const demo = createGuidedDemoContext(sessionId);
-          const current = await loadGuidedDemoState(database, sessionId);
-          if (current.documentStatus === "retired") {
+          marker = '  if (current.nextAction !== action) {'
+          replacement = '''  if (current.documentStatus === "retired") {
             throw new Error(
               "Retired documents are historical and cannot be changed or receive new workflow activity.",
             );
           }
-          if (current.nextAction !== action) {
-          '''
-          if old not in text:
-              raise SystemExit('guided action guard marker not found')
-          path.write_text(text.replace(old, new, 1))
+          if (current.nextAction !== action) {'''
+          if text.count(marker) != 1:
+              raise SystemExit('guided action guard marker must occur exactly once')
+          path.write_text(text.replace(marker, replacement, 1))
           PY
       - run: pnpm exec prettier --write src/demo/workflow-demo.ts
       - run: pnpm check
