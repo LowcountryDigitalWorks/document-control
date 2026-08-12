@@ -19,7 +19,8 @@ Implemented synthetic/test-only product capabilities include:
 - workspace overview, Documents, Templates, Reviews, Approvals, Audit Log, and bounded search/filtering;
 - Backup & Portability export of persisted application state and external content references;
 - tenant presentation settings, provider-neutral tenant member lifecycle, workspace Roles & Access, and tenant-owned custom workspace roles with terminal retirement;
-- immutable Workflow Definition creation/versioning with exact-version draft cloning, server-side graph analysis, and unreachable-state rejection for new drafts;
+- immutable Workflow Definition creation/versioning;
+- exact-version workflow draft cloning, server-side graph analysis, and unreachable-state rejection for new drafts;
 - workspace Workflow Selection with exact default-version assignment;
 - controlled Template Lifecycle administration; and
 - controlled Workflow Definition lifecycle administration.
@@ -49,7 +50,7 @@ application. They intentionally cannot grant wildcard `*`, `tenant.manage`, `wor
 `role.manage`. Built-in administrator roles therefore remain the authority for access administration.
 Creating or editing a tenant-owned custom role requires both tenant-level `tenant.manage` and current
 workspace `role.manage`; assigning an existing eligible workspace role remains a `role.manage`
-operation. Tenant-owned custom roles may be terminally retired only after all assignments are removed.
+operation. Tenant-owned custom workspace roles may be terminally retired only after all assignments are removed.
 Retirement preserves the definition and permissions for audit/export history while preventing later
 editing, reactivation, or new assignment. Hard deletion remains intentionally unsupported.
 
