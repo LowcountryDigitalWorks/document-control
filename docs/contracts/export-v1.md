@@ -74,3 +74,7 @@ identity.
 Bundling binaries remains optional so a customer can export application state without being forced
 to duplicate documents that intentionally remain in customer-owned SharePoint or another approved
 content store.
+
+### Document-version change summary
+
+`documentVersions[].changeSummary` is an additive optional v1 field. Current exports include the bounded immutable summary stored with each exact document version. Parsers continue accepting older v1 packages that predate the field; when the field is present it must satisfy the current 3–500 character plain-text validation contract.

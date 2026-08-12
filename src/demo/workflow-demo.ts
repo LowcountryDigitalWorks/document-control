@@ -442,6 +442,7 @@ export async function runGuidedDemoAction(
         documentId: demo.documentId,
         versionId: demo.versionTwoId,
       }),
+      changeSummary: "Synthetic controlled version change.",
       actorSubjectId: demo.authorSubjectId,
       occurredAt,
       auditEventId: id("audit-version-two-created"),

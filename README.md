@@ -166,3 +166,7 @@ or a custom domain merely to exercise the synthetic application.
 - [Export contract](docs/contracts/export-v1.md)
 - [ADR 0001: Cloudflare-first modular monolith](docs/adr/0001-cloudflare-first-modular-monolith.md)
 - [Security policy](SECURITY.md)
+
+## Document version change traceability
+
+Every newly created controlled document version carries a bounded immutable change summary alongside its exact SHA-256 identity. The summary is operational metadata only—it does not imply in-app binary editing or upload—and is visible in document evidence and included in portable/evidence exports. Historical versions created before this capability are explicitly marked as such.

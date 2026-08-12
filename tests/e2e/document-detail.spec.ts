@@ -91,6 +91,9 @@ test("shows exact-version workflow, approval, template, and audit evidence", asy
   await page.getByRole("button", { name: "Create changed version 2" }).click();
   await page.goto("/demo/app/documents");
   await page.getByRole("link", { name: "View evidence" }).click();
+  await expect(
+    page.getByText("Synthetic controlled version change.", { exact: true }),
+  ).toBeVisible();
 
   await expect(
     page.getByText("Current approval required", { exact: true }),

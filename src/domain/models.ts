@@ -82,6 +82,7 @@ export interface DocumentVersion {
   contentHash: string;
   contentProvider: string;
   contentKey: string;
+  changeSummary?: string;
   createdBySubjectId: Identifier;
   createdAt: IsoTimestamp;
 }

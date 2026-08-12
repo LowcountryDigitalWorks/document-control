@@ -12,6 +12,7 @@ import type {
 } from "../domain/models";
 import { transitionWorkflow } from "../domain/workflow";
 import { buildDocumentVersionContentKey } from "../infrastructure/content-key";
+import { normalizeDocumentVersionChangeSummary } from "./document-version-change-summary";
 import type { DatabaseProvider, DatabaseStatement } from "./ports";
 
 export interface CreateDocumentFromTemplateCommand {
@@ -75,6 +76,7 @@ export interface CreateChangedVersionCommand {
   versionId: string;
   contentHash: string;
   contentKey: string;
+  changeSummary: string;
   actorSubjectId: string;
   occurredAt: string;
   auditEventId: string;
@@ -121,6 +123,7 @@ interface DocumentVersionRow {
   contentHash: string;
   contentProvider: string;
   contentKey: string;
+  changeSummary: string | null;
   createdBySubjectId: string;
   createdAt: string;
 }
@@ -204,6 +207,7 @@ export class DocumentWorkflowService {
       contentHash: command.contentHash,
       contentProvider: "r2",
       contentKey: command.contentKey,
+      changeSummary: "Initial version created from approved template.",
       createdBySubjectId: command.actorSubjectId,
       createdAt: command.occurredAt,
     };
@@ -245,6 +249,7 @@ export class DocumentWorkflowService {
           versionId: command.versionId,
           versionNumber: 1,
           contentHash: command.contentHash,
+          changeSummary: version.changeSummary,
           templateId: command.templateId,
           templateVersion: command.templateVersion,
           templateHash: template.contentHash,
@@ -597,6 +602,9 @@ export class DocumentWorkflowService {
       [command.tenantId, command.documentId],
     );
     const nextVersionNumber = rows[0]?.nextVersionNumber ?? 1;
+    const changeSummary = normalizeDocumentVersionChangeSummary(
+      command.changeSummary,
+    );
     const version: DocumentVersion = {
       id: command.versionId,
       tenantId: command.tenantId,
@@ -605,6 +613,7 @@ export class DocumentWorkflowService {
       contentHash: command.contentHash,
       contentProvider: "r2",
       contentKey: command.contentKey,
+      changeSummary,
       createdBySubjectId: command.actorSubjectId,
       createdAt: command.occurredAt,
     };
@@ -632,6 +641,7 @@ export class DocumentWorkflowService {
         payload: {
           versionNumber: nextVersionNumber,
           contentHash: command.contentHash,
+          changeSummary,
           previousVersionId: document.currentVersionId,
         },
       }),
@@ -889,6 +899,7 @@ const documentVersionSelect = `SELECT
   content_hash AS contentHash,
   content_provider AS contentProvider,
   content_key AS contentKey,
+  change_summary AS changeSummary,
   created_by_subject_id AS createdBySubjectId,
   created_at AS createdAt
 FROM document_versions`;
@@ -897,8 +908,8 @@ function insertVersionStatement(version: DocumentVersion): DatabaseStatement {
   return statement(
     `INSERT INTO document_versions
        (id, tenant_id, document_id, version_number, content_hash, content_provider,
-        content_key, created_by_subject_id, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        content_key, change_summary, created_by_subject_id, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       version.id,
       version.tenantId,
@@ -907,6 +918,7 @@ function insertVersionStatement(version: DocumentVersion): DatabaseStatement {
       version.contentHash,
       version.contentProvider,
       version.contentKey,
+      version.changeSummary,
       version.createdBySubjectId,
       version.createdAt,
     ],
@@ -974,6 +986,7 @@ function mapDocumentVersion(row: DocumentVersionRow): DocumentVersion {
     contentHash: row.contentHash,
     contentProvider: row.contentProvider,
     contentKey: row.contentKey,
+    changeSummary: row.changeSummary ?? undefined,
     createdBySubjectId: row.createdBySubjectId,
     createdAt: row.createdAt,
   };

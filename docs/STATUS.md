@@ -683,3 +683,11 @@ production authentication or public-demo hardening.
 - Record retention, deletion, legal hold, backup, recovery, and audit-retention requirements.
 - Production Cloudflare account resources and deployment naming.
 - Final LDW brand palette/assets; current theme values remain provisional configuration.
+
+### Immutable document-version change summaries (synthetic/test only)
+
+- Each newly created exact document version now records a bounded operational change summary explaining why that immutable version exists. Initial template-derived versions receive a server-controlled initial summary; changed versions require a trimmed 3–500 character summary and reject control characters.
+- Migration `0011_document_version_change_summary.sql` backfills older versions with an explicit pre-tracking historical marker, rejects new inserts that omit a real bounded summary, and makes the summary immutable after insert.
+- Document evidence pages and versioned `document-evidence/v1` downloads expose the summary beside the exact version/hash. Tenant portable export v1 carries it as an additive optional field so older v1 exports remain accepted.
+- The synthetic guided version-2 action supplies a fixed synthetic change reason; this release does not add a binary editor, file upload, content replacement, malware scanning, rich authoring, retention/legal-hold behavior, production identity, production Cloudflare resources, or paid services.
+- Unit/browser/export coverage validates trimming and bounds, migration backfill, raw-SQL omission rejection, immutability, evidence visibility, export preservation, and existing lifecycle behavior.

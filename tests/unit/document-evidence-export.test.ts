@@ -29,6 +29,7 @@ const detail: DocumentDetailEvidence = {
       versionNumber: 1,
       contentHash: "b".repeat(64),
       contentProvider: "r2",
+      changeSummary: "Synthetic controlled version change.",
       createdBySubjectId: "creator-internal",
       createdByName: "Casey Author",
       createdAt: "2026-08-12T14:00:00.000Z",
