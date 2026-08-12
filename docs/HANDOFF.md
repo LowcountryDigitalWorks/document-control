@@ -47,7 +47,7 @@ The synthetic/test-only application now covers:
 - persisted document workflow lifecycle;
 - provider-neutral authorization;
 - guided workflow execution;
-- workspace Overview, Documents, Templates, document evidence, Reviews, and Approvals;
+- workspace Overview, Documents, Templates, document evidence with versioned JSON manifest export, Reviews, and Approvals;
 - bounded metadata search/filtering;
 - Backup & Portability export;
 - Audit Log with bounded workspace CSV evidence export;
@@ -151,6 +151,14 @@ unless a deliberate migration changes that contract later.
 Lifecycle changes never rewrite workflow-definition content. Existing workflow instances, reviews,
 approvals, and audit evidence remain pinned to their original exact workflow version.
 
+## Document evidence manifest boundary
+
+- The document detail read model remains the authoritative source for per-document provenance, immutable versions/hashes, workflow/review evidence, approvals, and document-related audit events.
+- An authorized evidence reader may download a versioned `document-evidence/v1` JSON manifest for the same document. The route reuses the existing `document.read` plus `audit.read` authorization path and synthetic-session isolation.
+- The manifest includes stable document/workflow/review/approval identifiers, actor display names, exact hashes, source-template provenance, workflow-definition versions, timestamps, and at most six primitive audit payload fields per event.
+- Tenant ID, internal actor/creator subject IDs, content keys, binary content, nested/raw audit payload objects, and unrelated workspace/tenant records are excluded.
+- Evidence export is read-only, uses `Cache-Control: no-store`, and remains available for retired historical records. It is not a binary backup, legal archive, eDiscovery package, retention mechanism, or external records-management integration.
+
 ## Controlled document retirement
 
 - `document.retire` is a dedicated workspace permission granted by default to Tenant Administrator,
@@ -218,7 +226,7 @@ Do not imply these are implemented or approved:
 - upload orchestration across D1 and binary storage;
 - malware scanning, file-type/size policy, quarantine, or failure compensation;
 - production D1/R2/Worker provisioning or custom-domain attachment;
-- complete binary backup/restore, retention automation, legal hold, or disaster recovery;
+- complete binary backup/restore, retention automation, legal hold, disaster recovery, or external evidence-package archival;
 - drag-and-drop/graphical workflow authoring, conditional expressions, timers, scripting, or automatic migration beyond the current immutable versioning, exact-version draft cloning/analysis, and lifecycle controls;
 - template binary/content replacement or upload, new-template-family upload flows, and storage/scanning orchestration;
 - full-text/content-body search or external search infrastructure;

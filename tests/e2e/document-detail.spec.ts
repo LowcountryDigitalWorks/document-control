@@ -139,8 +139,88 @@ test("does not reveal another synthetic session's document detail", async ({
     await expect(secondPage.getByRole("heading", { level: 1 })).toHaveText(
       "That page is not here.",
     );
+
+    const exportResponse = await secondPage.request.get(
+      `http://127.0.0.1:8787${detailHref ?? ""}/evidence.json`,
+    );
+    expect(exportResponse.status()).toBe(404);
   } finally {
     await firstContext.close();
     await secondContext.close();
   }
+});
+
+test("exports a versioned per-document evidence manifest with exact historical approval semantics", async ({
+  page,
+}) => {
+  await approveVersionOne(page);
+  await page.goto("/demo/workflow");
+  await page.getByRole("button", { name: "Create changed version 2" }).click();
+  await page.goto("/demo/app/documents");
+  const detailHref = await page
+    .getByRole("link", { name: "View evidence" })
+    .getAttribute("href");
+  expect(detailHref).toBeTruthy();
+  await page.goto(detailHref ?? "/demo/app/documents");
+
+  const exportLink = page.getByRole("link", {
+    name: "Download evidence manifest (JSON)",
+  });
+  await expect(exportLink).toHaveAttribute(
+    "href",
+    `${detailHref}/evidence.json`,
+  );
+
+  const response = await page.request.get(`${detailHref}/evidence.json`);
+  expect(response.status()).toBe(200);
+  expect(response.headers()["cache-control"]).toBe("no-store");
+  expect(response.headers()["content-type"]).toContain("application/json");
+  expect(response.headers()["content-disposition"]).toContain(
+    'filename="document-evidence.json"',
+  );
+
+  const manifest = (await response.json()) as {
+    format: string;
+    document: {
+      title: string;
+      currentVersionId?: string;
+      sourceTemplate?: { versionNumber: number; contentHash: string };
+      versions: Array<{
+        versionNumber: number;
+        isCurrent: boolean;
+        exactApprovalApplies: boolean;
+        approvals: unknown[];
+      }>;
+      auditEvents: Array<{
+        eventType: string;
+        evidence: Record<string, unknown>;
+      }>;
+    };
+  };
+  expect(manifest.format).toBe("document-evidence/v1");
+  expect(manifest.document.title).toBe("Harbor Opening Checklist");
+  expect(manifest.document.sourceTemplate?.versionNumber).toBe(1);
+  expect(manifest.document.versions).toHaveLength(2);
+  expect(manifest.document.versions[0]).toMatchObject({
+    versionNumber: 1,
+    isCurrent: false,
+    exactApprovalApplies: true,
+  });
+  expect(manifest.document.versions[0]?.approvals).toHaveLength(1);
+  expect(manifest.document.versions[1]).toMatchObject({
+    versionNumber: 2,
+    isCurrent: true,
+    exactApprovalApplies: false,
+  });
+  expect(
+    manifest.document.auditEvents.some(
+      (event) => event.eventType === "document.version.created",
+    ),
+  ).toBe(true);
+
+  const serialized = JSON.stringify(manifest);
+  expect(serialized).not.toContain("actorSubjectId");
+  expect(serialized).not.toContain("createdBySubjectId");
+  expect(serialized).not.toContain("tenantId");
+  expect(serialized).not.toContain("payload");
 });
