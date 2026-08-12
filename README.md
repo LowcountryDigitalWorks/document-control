@@ -23,7 +23,7 @@ Implemented synthetic/test-only product capabilities include:
 - terminal, non-destructive controlled document retirement with preserved evidence;
 - exact-version workflow draft cloning, server-side graph analysis, and unreachable-state rejection for new drafts;
 - workspace Workflow Selection with exact default-version assignment;
-- controlled Template Lifecycle administration; and
+- controlled Template Lifecycle administration with exact-version unchanged-content Draft revision cloning; and
 - controlled Workflow Definition lifecycle administration.
 
 ### Identity and authorization
@@ -89,7 +89,7 @@ workflow-definition version they originally used regardless of later lifecycle c
   new versions or workflow activity.
 - Authoring may copy an exact historical workflow version into a new editable draft, but saving always
   inserts a new immutable version.
-- Templates are controlled/versioned records with lifecycle and provenance metadata.
+- Templates are controlled/versioned records with lifecycle and provenance metadata. A Template Manager may create a sequential immutable Draft revision from any exact historical version when intentionally reusing the same content identity; the source SHA-256/provider/key are copied unchanged and derivation is recorded in provenance/audit.
 - Approval records bind actor and timestamp to an exact document version, SHA-256 content hash,
   workflow instance, and workflow-definition version.
 - A later document version never inherits an earlier approval.
@@ -98,7 +98,7 @@ workflow-definition version they originally used regardless of later lifecycle c
 - The synthetic demo contains no customer data and accepts no arbitrary file uploads.
 - LDW is a configurable reference theme rather than a hard-coded product identity.
 
-Production authentication/SSO, invitation delivery, external identity provisioning/directory/group synchronization, customer uploads, production
+Production authentication/SSO, invitation delivery, external identity provisioning/directory/group synchronization, customer uploads, template binary/content replacement, production
 Cloudflare D1/R2 provisioning, public interactive-demo hardening, malware scanning, retention/legal
 hold, backup of external binary content, and paid services remain deliberately out of scope until
 separately designed and approved.

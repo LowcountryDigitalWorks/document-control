@@ -85,6 +85,105 @@ test("Template Manager supersedes a published version without changing existing 
   expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth);
 });
 
+test("Template Manager creates a linear Draft revision from exact historical content identity", async ({
+  page,
+}) => {
+  await openTemplateAdmin(page);
+  const sourceCard = page
+    .locator(".version-card")
+    .filter({ hasText: seededTemplateName })
+    .filter({ hasText: "Published" });
+  const sourceHash =
+    (await sourceCard.locator("dd code").nth(1).textContent()) ?? "";
+  const sourceReference =
+    (await sourceCard.locator("dd code").nth(2).textContent()) ?? "";
+
+  const revisionForm = sourceCard.locator(".revision-form");
+  await revisionForm
+    .locator('textarea[name="revisionNote"]')
+    .fill("Annual unchanged-content recertification");
+  await revisionForm.locator('input[name="confirmUnchangedContent"]').check();
+  await revisionForm
+    .getByRole("button", { name: "Create draft revision" })
+    .click();
+
+  await expect(page).toHaveURL(
+    /\/demo\/app\/admin\/templates\?notice=revision-created$/u,
+  );
+  await expect(page.getByRole("status")).toHaveText(
+    "Template Draft revision created from exact historical content identity.",
+  );
+  const draftCard = page
+    .locator(".version-card")
+    .filter({ hasText: seededTemplateName })
+    .filter({ hasText: "v2 · current revision" })
+    .filter({ hasText: "Draft" });
+  await expect(draftCard).toHaveCount(1);
+  await expect(draftCard).toContainText(sourceHash);
+  await expect(draftCard).toContainText(sourceReference);
+  await expect(draftCard).toContainText("content identity unchanged");
+  await expect(draftCard).toContainText(
+    "Annual unchanged-content recertification",
+  );
+  await expect(
+    page.getByRole("button", { name: "Create draft revision" }),
+  ).toHaveCount(0);
+  await expect(draftCard).toContainText("Revision in progress");
+
+  await page.goto("/demo/app/audit?q=template.version.created");
+  await expect(
+    page.getByText("Template · Version · Created", { exact: true }),
+  ).toBeVisible();
+
+  await page.goto("/demo/app/admin/templates");
+  const accessibility = await new AxeBuilder({ page }).analyze();
+  expect(accessibility.violations).toEqual([]);
+  const dimensions = await page.evaluate(() => ({
+    clientWidth: document.documentElement.clientWidth,
+    scrollWidth: document.documentElement.scrollWidth,
+  }));
+  expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth);
+});
+
+test("template revision creation requires explicit unchanged-content confirmation and same origin", async ({
+  page,
+}) => {
+  await openTemplateAdmin(page);
+  const sourceVersionId =
+    (await page
+      .locator('.revision-form input[name="sourceTemplateVersionId"]')
+      .first()
+      .getAttribute("value")) ?? "";
+
+  const unconfirmed = await page.request.post(
+    "/demo/app/admin/templates/revisions",
+    {
+      headers: { Origin: "http://127.0.0.1:8787" },
+      form: {
+        sourceTemplateVersionId: sourceVersionId,
+        revisionNote: "Annual unchanged-content recertification",
+      },
+    },
+  );
+  expect(unconfirmed.status()).toBe(400);
+  expect(await unconfirmed.text()).toContain(
+    "Confirm that this draft revision reuses the exact existing content identity.",
+  );
+
+  const crossOrigin = await page.request.post(
+    "/demo/app/admin/templates/revisions",
+    {
+      headers: { Origin: "https://example.test" },
+      form: {
+        sourceTemplateVersionId: sourceVersionId,
+        revisionNote: "Annual unchanged-content recertification",
+        confirmUnchangedContent: "confirmed",
+      },
+    },
+  );
+  expect(crossOrigin.status()).toBe(403);
+});
+
 test("retired current template version cannot create a new document", async ({
   page,
 }) => {
