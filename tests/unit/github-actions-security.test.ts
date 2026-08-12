@@ -5,10 +5,7 @@ const ciWorkflowUrl = new URL(
   "../../.github/workflows/ci.yml",
   import.meta.url,
 );
-const dependabotUrl = new URL(
-  "../../.github/dependabot.yml",
-  import.meta.url,
-);
+const dependabotUrl = new URL("../../.github/dependabot.yml", import.meta.url);
 
 describe("GitHub Actions supply-chain posture", () => {
   it("pins every permanent CI action to an immutable commit SHA", async () => {
@@ -27,7 +24,8 @@ describe("GitHub Actions supply-chain posture", () => {
 
   it("keeps checkout credentials disabled and the validation token read-only", async () => {
     const workflow = await readFile(ciWorkflowUrl, "utf8");
-    const checkoutCount = workflow.match(/uses: actions\/checkout@/gu)?.length ?? 0;
+    const checkoutCount =
+      workflow.match(/uses: actions\/checkout@/gu)?.length ?? 0;
     const disabledCredentialCount =
       workflow.match(/persist-credentials: false/gu)?.length ?? 0;
 
