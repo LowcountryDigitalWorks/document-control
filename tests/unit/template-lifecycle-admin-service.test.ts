@@ -66,6 +66,7 @@ async function createHarness(): Promise<{
     "0002_system_role_permissions.sql",
     "0003_workflow_definition_immutability.sql",
     "0004_template_version_lifecycle_integrity.sql",
+    "0009_template_revision_linearity.sql",
   ]) {
     database.exec(
       await readFile(
@@ -177,6 +178,126 @@ describe("TemplateLifecycleAdminService", () => {
     expect(
       database.prepare("SELECT COUNT(*) AS count FROM audit_events").get(),
     ).toEqual({ count: 4 });
+  });
+
+  it("creates linear unchanged-content Draft revisions from exact historical versions", async () => {
+    const { database, service } = await createHarness();
+    for (const [targetState, auditEventId, occurredAt] of [
+      ["review", "audit-v1-review", "2026-08-11T00:00:00.000Z"],
+      ["approved", "audit-v1-approved", "2026-08-11T00:01:00.000Z"],
+      ["published", "audit-v1-published", "2026-08-11T00:02:00.000Z"],
+    ] as const) {
+      await service.transitionVersion({
+        tenantId: "tenant-1",
+        workspaceId: "workspace-1",
+        templateVersionId: "template-version-1",
+        targetState,
+        actorSubjectId: "manager-1",
+        auditEventId,
+        occurredAt,
+      });
+    }
+
+    const second = await service.createRevision({
+      tenantId: "tenant-1",
+      workspaceId: "workspace-1",
+      sourceTemplateVersionId: "template-version-1",
+      templateVersionId: "template-version-2",
+      revisionNote: "Annual unchanged-content reissue",
+      actorSubjectId: "manager-1",
+      auditEventId: "audit-v2-created",
+      occurredAt: "2026-08-11T00:03:00.000Z",
+    });
+    expect(second.versionNumber).toBe(2);
+    expect(second.lifecycleState).toBe("draft");
+    expect(second.contentHash).toBe(hash);
+    expect(second.contentProvider).toBe("r2");
+    expect(second.contentKey).toBe(
+      "tenant-1/workspace-1/template/template-1/version/1/object",
+    );
+    expect(second.createdBySubjectId).toBe("manager-1");
+    expect(second.provenance).toContain("template version 1");
+    expect(second.provenance).toContain("content identity unchanged");
+    expect(second.provenance).toContain("Annual unchanged-content reissue");
+    expect(second.isCurrent).toBe(true);
+    expect(
+      database
+        .prepare(
+          "SELECT current_version FROM templates WHERE id = 'template-1'",
+        )
+        .get(),
+    ).toEqual({ current_version: 2 });
+
+    const event = database
+      .prepare(
+        "SELECT event_type, payload_json FROM audit_events WHERE id = 'audit-v2-created'",
+      )
+      .get() as { event_type: string; payload_json: string };
+    expect(event.event_type).toBe("template.version.created");
+    expect(JSON.parse(event.payload_json)).toMatchObject({
+      sourceTemplateVersionId: "template-version-1",
+      sourceVersionNumber: 1,
+      versionNumber: 2,
+      contentHash: hash,
+      contentIdentityReused: true,
+      revisionNote: "Annual unchanged-content reissue",
+    });
+
+    await expect(
+      service.createRevision({
+        tenantId: "tenant-1",
+        workspaceId: "workspace-1",
+        sourceTemplateVersionId: "template-version-1",
+        templateVersionId: "template-version-blocked",
+        revisionNote: "Should be blocked",
+        actorSubjectId: "manager-1",
+        auditEventId: "audit-blocked",
+        occurredAt: "2026-08-11T00:04:00.000Z",
+      }),
+    ).rejects.toThrow(
+      "Complete or retire the current Draft/Review template revision",
+    );
+
+    await service.transitionVersion({
+      tenantId: "tenant-1",
+      workspaceId: "workspace-1",
+      templateVersionId: "template-version-2",
+      targetState: "retired",
+      actorSubjectId: "manager-1",
+      auditEventId: "audit-v2-retired",
+      occurredAt: "2026-08-11T00:05:00.000Z",
+    });
+    const third = await service.createRevision({
+      tenantId: "tenant-1",
+      workspaceId: "workspace-1",
+      sourceTemplateVersionId: "template-version-1",
+      templateVersionId: "template-version-3",
+      revisionNote: "Restarted from published historical v1",
+      actorSubjectId: "manager-1",
+      auditEventId: "audit-v3-created",
+      occurredAt: "2026-08-11T00:06:00.000Z",
+    });
+    expect(third.versionNumber).toBe(3);
+    expect(third.contentHash).toBe(hash);
+
+    expect(() =>
+      database
+        .prepare(
+          `INSERT INTO template_versions
+             (id, tenant_id, template_id, version_number, lifecycle_state, content_hash,
+              content_provider, content_key, created_by_subject_id, provenance, created_at)
+           VALUES ('template-version-5', 'tenant-1', 'template-1', 5, 'retired', ?,
+                   'r2', 'invalid-gap', 'manager-1', 'raw gap', ?)`,
+        )
+        .run(hash, timestamp),
+    ).toThrow(/created in sequence/u);
+    expect(() =>
+      database
+        .prepare(
+          "UPDATE templates SET current_version = 1 WHERE id = 'template-1'",
+        )
+        .run(),
+    ).toThrow(/current revision must reference the latest version/u);
   });
 
   it("rejects direct content identity changes, deletion, and invalid lifecycle jumps", async () => {

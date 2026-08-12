@@ -58,7 +58,7 @@ The synthetic/test-only application now covers:
 - tenant-owned custom workspace role creation/editing with bounded operational permissions,
   tenant-wide assignment-impact acknowledgement, and terminal non-destructive retirement;
 - immutable Workflow Definition administration with exact-version draft cloning, server-side graph analysis, and unreachable-state rejection for newly submitted drafts;
-- controlled Template Lifecycle administration;
+- controlled Template Lifecycle administration with linear exact-version unchanged-content Draft revision creation;
 - workspace Workflow Selection/default-version administration; and
 - controlled Workflow Definition lifecycle administration; and
 - controlled document retirement with terminal historical-only semantics and preserved evidence.
@@ -164,6 +164,23 @@ approvals, and audit evidence remain pinned to their original exact workflow ver
 - Retirement is **not** deletion, retention enforcement, legal hold, binary cleanup, or storage disposal.
   Those production policies remain separately pending.
 
+## Template revision authoring boundary
+
+- A Template Manager may create a new sequential immutable **Draft** revision from any exact historical
+  version in the same tenant/workspace.
+- This slice supports intentional unchanged-content revisions only. The new revision reuses the exact
+  source SHA-256, content provider, and content key; it does not claim that binary content was edited,
+  uploaded, rescanned, or replaced.
+- Revision provenance records the exact source version/hash plus the manager's bounded revision note,
+  and `template.version.created` is appended to the audit stream.
+- A template family may have only one open Draft/Review revision at a time. Migration
+  `0009_template_revision_linearity.sql` independently enforces sequential insertion, the single-open
+  rule, and prevents `current_version` rollback/clearing.
+- `templates.current_version` advances to the newly created Draft revision, while already-created
+  documents keep their exact historical source-template provenance.
+- Actual template binary/content replacement remains a separate future boundary requiring content
+  identity creation plus the unresolved upload, scanning, storage, and failure-compensation decisions.
+
 ## Synthetic application boundary
 
 Interactive synthetic routes are disabled unless `DEMO_MUTATIONS_ENABLED=true`.
@@ -195,7 +212,7 @@ Do not imply these are implemented or approved:
 - production D1/R2/Worker provisioning or custom-domain attachment;
 - complete binary backup/restore, retention automation, legal hold, or disaster recovery;
 - drag-and-drop/graphical workflow authoring, conditional expressions, timers, scripting, or automatic migration beyond the current immutable versioning, exact-version draft cloning/analysis, and lifecycle controls;
-- template content upload/new-version authoring or new-template upload flows;
+- template binary/content replacement or upload, new-template-family upload flows, and storage/scanning orchestration;
 - full-text/content-body search or external search infrastructure;
 - PostgreSQL/SharePoint production adapters;
 - analytics, AI services, or paid SaaS dependencies.

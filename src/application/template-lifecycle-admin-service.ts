@@ -32,6 +32,17 @@ export interface TransitionTemplateVersionCommand {
   occurredAt: string;
 }
 
+export interface CreateTemplateRevisionCommand {
+  tenantId: string;
+  workspaceId: string;
+  sourceTemplateVersionId: string;
+  templateVersionId: string;
+  revisionNote: string;
+  actorSubjectId: string;
+  auditEventId: string;
+  occurredAt: string;
+}
+
 interface WorkspaceRow {
   tenantId: string;
   tenantName: string;
@@ -143,6 +154,113 @@ export class TemplateLifecycleAdminService {
       throw new Error("Transitioned template version could not be reloaded.");
     }
     return mapVersionRow(updated);
+  }
+
+  public async createRevision(
+    command: CreateTemplateRevisionCommand,
+  ): Promise<TemplateLifecycleVersionRecord> {
+    await this.loadWorkspace(command.tenantId, command.workspaceId);
+    const [source] = await this.database.query<TemplateVersionRow>(
+      templateVersionSelect(
+        `WHERE version.tenant_id = ?
+           AND template.workspace_id = ?
+           AND version.id = ?`,
+      ),
+      [command.tenantId, command.workspaceId, command.sourceTemplateVersionId],
+    );
+    if (!source) {
+      throw new Error(
+        "Source template version was not found in the requested workspace.",
+      );
+    }
+
+    const [openRevision] = await this.database.query<{ id: string }>(
+      `SELECT version.id
+       FROM template_versions version
+       JOIN templates template
+         ON template.id = version.template_id
+        AND template.tenant_id = version.tenant_id
+       WHERE version.tenant_id = ?
+         AND template.workspace_id = ?
+         AND version.template_id = ?
+         AND version.lifecycle_state IN ('draft', 'review')
+       LIMIT 1`,
+      [command.tenantId, command.workspaceId, source.templateId],
+    );
+    if (openRevision) {
+      throw new Error(
+        "Complete or retire the current Draft/Review template revision before creating another.",
+      );
+    }
+
+    const [sequence] = await this.database.query<{ nextVersion: number }>(
+      `SELECT COALESCE(MAX(version_number), 0) + 1 AS nextVersion
+       FROM template_versions
+       WHERE tenant_id = ? AND template_id = ?`,
+      [command.tenantId, source.templateId],
+    );
+    const nextVersion = Number(sequence?.nextVersion ?? 1);
+    const provenance =
+      `Derived from exact template version ${source.versionNumber} (${source.id}); ` +
+      `content identity unchanged from ${source.contentHash}. Revision note: ${command.revisionNote}`;
+
+    await this.database.executeBatch([
+      statement(
+        `INSERT INTO template_versions
+           (id, tenant_id, template_id, version_number, lifecycle_state,
+            content_hash, content_provider, content_key, created_by_subject_id,
+            provenance, created_at, published_at, superseded_at)
+         VALUES (?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?, NULL, NULL)`,
+        [
+          command.templateVersionId,
+          command.tenantId,
+          source.templateId,
+          nextVersion,
+          source.contentHash,
+          source.contentProvider,
+          source.contentKey,
+          command.actorSubjectId,
+          provenance,
+          command.occurredAt,
+        ],
+      ),
+      statement(
+        `UPDATE templates
+         SET current_version = ?
+         WHERE id = ? AND tenant_id = ? AND workspace_id = ?`,
+        [nextVersion, source.templateId, command.tenantId, command.workspaceId],
+      ),
+      revisionAuditStatement({
+        id: command.auditEventId,
+        tenantId: command.tenantId,
+        workspaceId: command.workspaceId,
+        actorSubjectId: command.actorSubjectId,
+        entityId: command.templateVersionId,
+        occurredAt: command.occurredAt,
+        payload: {
+          templateId: source.templateId,
+          versionNumber: nextVersion,
+          sourceTemplateVersionId: source.id,
+          sourceVersionNumber: source.versionNumber,
+          contentHash: source.contentHash,
+          contentIdentityReused: true,
+          revisionNote: command.revisionNote,
+        },
+      }),
+    ]);
+
+    const [created] = await this.database.query<TemplateVersionRow>(
+      templateVersionSelect(
+        `WHERE version.tenant_id = ?
+           AND template.workspace_id = ?
+           AND version.id = ?`,
+      ),
+      [command.tenantId, command.workspaceId, command.templateVersionId],
+    );
+    if (!created) {
+      throw new Error("Created template revision could not be reloaded.");
+    }
+    return mapVersionRow(created);
   }
 
   private async loadWorkspace(
@@ -282,6 +400,33 @@ function auditStatement(input: {
             (id, tenant_id, workspace_id, actor_subject_id, event_type,
              entity_type, entity_id, occurred_at, payload_json)
           VALUES (?, ?, ?, ?, 'template.version.lifecycle_transitioned',
+                  'template_version', ?, ?, ?)`,
+    parameters: [
+      input.id,
+      input.tenantId,
+      input.workspaceId,
+      input.actorSubjectId,
+      input.entityId,
+      input.occurredAt,
+      JSON.stringify(input.payload),
+    ],
+  };
+}
+
+function revisionAuditStatement(input: {
+  id: string;
+  tenantId: string;
+  workspaceId: string;
+  actorSubjectId: string;
+  entityId: string;
+  occurredAt: string;
+  payload: Readonly<Record<string, unknown>>;
+}): DatabaseStatement {
+  return {
+    sql: `INSERT INTO audit_events
+            (id, tenant_id, workspace_id, actor_subject_id, event_type,
+             entity_type, entity_id, occurred_at, payload_json)
+          VALUES (?, ?, ?, ?, 'template.version.created',
                   'template_version', ?, ?, ?)`,
     parameters: [
       input.id,

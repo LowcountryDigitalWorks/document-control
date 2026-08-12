@@ -1,5 +1,6 @@
 import type { AuthorizationPolicy } from "./authorization";
 import type {
+  CreateTemplateRevisionCommand,
   TemplateLifecycleAdminService,
   TemplateLifecycleCatalog,
   TemplateLifecycleVersionRecord,
@@ -23,6 +24,22 @@ export class AuthorizedTemplateLifecycleAdminService {
   ): Promise<TemplateLifecycleCatalog> {
     await this.assertTemplateManagementAllowed(context);
     return this.templates.getCatalog(context.tenantId, context.workspaceId);
+  }
+
+  public async createRevision(
+    context: TemplateLifecycleAuthorizationContext,
+    command: Omit<
+      CreateTemplateRevisionCommand,
+      "tenantId" | "workspaceId" | "actorSubjectId"
+    >,
+  ): Promise<TemplateLifecycleVersionRecord> {
+    await this.assertTemplateManagementAllowed(context);
+    return this.templates.createRevision({
+      ...command,
+      tenantId: context.tenantId,
+      workspaceId: context.workspaceId,
+      actorSubjectId: context.subjectId,
+    });
   }
 
   public async transitionVersion(

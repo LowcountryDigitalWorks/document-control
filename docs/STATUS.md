@@ -538,6 +538,23 @@ Turnstile/abuse controls, and operational cleanup are implemented and validated.
   authoring, malware scanning, storage orchestration, production authentication, production Cloudflare
   resources, customer data, or paid services.
 
+### Linear template revision authoring (synthetic/test only)
+
+- Template Managers can create a new sequential immutable Draft revision from any exact historical
+  template version when intentionally reusing the exact same content identity.
+- The new revision copies the source SHA-256, provider, and content key unchanged; bounded provenance
+  and `template.version.created` audit evidence record the exact source version/hash and revision note.
+- Only one Draft/Review revision may be open per template family. Migration
+  `0009_template_revision_linearity.sql` independently enforces sequential versions, the single-open
+  rule, and prevents `templates.current_version` rollback or clearing.
+- The synthetic administration flow requires explicit confirmation that no binary/content change is
+  being represented, remains same-origin/session protected, and does not accept file bytes.
+- Unit/browser coverage verifies exact historical cloning, unchanged content identity, audit evidence,
+  current-revision advancement, open-revision blocking, raw-SQL sequence/rollback guards, input
+  validation, cross-origin denial, accessibility, responsive behavior, and synthetic-session isolation.
+- This slice does **not** implement template binary editing/replacement, file upload, malware scanning,
+  storage orchestration, production identity/Cloudflare resources, customer data, or paid services.
+
 ### Controlled document retirement (synthetic/test only)
 
 - Approved documents with exact current-version approval evidence can be terminally retired through
@@ -597,8 +614,8 @@ production authentication or public-demo hardening.
   PR #19, Template Lifecycle integration reconciliation PR #20, workspace Workflow Selection
   administration PR #21, controlled Workflow Definition lifecycle administration PR #27,
   provider-neutral custom workspace roles PR #29, provider-neutral tenant member lifecycle PR #30,
-  terminal custom role retirement PR #31, workflow authoring improvements PR #32, and controlled
-  document retirement PR #33.
+  terminal custom role retirement PR #31, workflow authoring improvements PR #32, controlled
+  document retirement PR #33, and linear template revision authoring PR #34.
 - `main` is the authoritative integration branch after reviewed/validated pull requests are merged.
 - No production Cloudflare resources, custom domains, customer data, analytics, paid services, or
   public-upload capability have been introduced.
@@ -618,7 +635,7 @@ production authentication or public-demo hardening.
   custom-role hard deletion; member deletion; production invitation delivery; external identity
   provisioning; or identity-provider/group mapping/synchronization.
 - Drag-and-drop/graphical workflow authoring, conditional expressions, timers, scripting, or automatic migration beyond the current immutable versioning, exact-version draft cloning/analysis, workspace selection, and controlled lifecycle.
-- Template content upload/new-version authoring, new-template creation, or storage/scanning
+- Template binary/content replacement or upload, new-template-family upload creation, or storage/scanning
   orchestration.
 - Logo/favicon upload or external branding-asset URL management.
 - Rich document authoring, retention automation, legal hold, destructive document deletion, GRC frameworks, or AI functions.

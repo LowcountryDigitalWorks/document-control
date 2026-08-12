@@ -52,6 +52,7 @@ import { RolesAccessAdminService } from "./application/roles-access-admin-servic
 import { TemplateLifecycleAdminService } from "./application/template-lifecycle-admin-service";
 import {
   parseTemplateLifecycleInput,
+  parseTemplateRevisionInput,
   TemplateLifecycleInputValidationError,
 } from "./application/template-lifecycle-input";
 import { ReviewApprovalQueueReadService } from "./application/review-approval-queue-read-service";
@@ -1658,10 +1659,13 @@ app.get("/demo/app/admin/templates", async (context) => {
       tenantId: demo.tenantId,
       workspaceId: demo.workspaceId,
     });
+    const noticeValue = new URL(context.req.url).searchParams.get("notice");
     const notice =
-      new URL(context.req.url).searchParams.get("notice") === "transitioned"
+      noticeValue === "transitioned"
         ? "Template lifecycle transition recorded."
-        : undefined;
+        : noticeValue === "revision-created"
+          ? "Template Draft revision created from exact historical content identity."
+          : undefined;
     context.header("Cache-Control", "no-store");
     return context.html(
       renderTemplateLifecycleAdmin(
@@ -1675,6 +1679,66 @@ app.get("/demo/app/admin/templates", async (context) => {
       return context.html(renderNotFound(createTheme(context.env)), 404);
     }
     throw error;
+  }
+});
+
+app.post("/demo/app/admin/templates/revisions", async (context) => {
+  if (!guidedDemoEnabled(context.env)) return context.notFound();
+  if (!hasSameOrigin(context.req.url, context.req.header("Origin"))) {
+    return context.json({ error: "Same-origin demo request required." }, 403);
+  }
+  const sessionId = readGuidedDemoSession(context.req.header("Cookie"));
+  if (!sessionId) {
+    return context.json(
+      {
+        error:
+          "Synthetic administration session missing. Reload Template Lifecycle.",
+      },
+      409,
+    );
+  }
+
+  try {
+    const input = parseTemplateRevisionInput(
+      await readTemplateLifecycleFormValues(context.req.raw),
+    );
+    const database = new D1DatabaseProvider(context.env.DOCUMENT_CONTROL_DB);
+    const demo = createGuidedDemoContext(sessionId);
+    await ensureGuidedDemoSeed(database, sessionId);
+    const manager = await ensureGuidedTemplateManager(database, sessionId);
+    await createAuthorizedTemplateLifecycleAdminService(
+      database,
+    ).createRevision(
+      {
+        subjectId: manager.subjectId,
+        tenantId: demo.tenantId,
+        workspaceId: demo.workspaceId,
+      },
+      {
+        sourceTemplateVersionId: input.sourceTemplateVersionId,
+        templateVersionId: `template-revision-${crypto.randomUUID()}`,
+        revisionNote: input.revisionNote,
+        auditEventId: `template-revision-audit-${crypto.randomUUID()}`,
+        occurredAt: new Date().toISOString(),
+      },
+    );
+    return context.redirect(
+      "/demo/app/admin/templates?notice=revision-created",
+      303,
+    );
+  } catch (error) {
+    if (error instanceof TemplateLifecycleInputValidationError) {
+      return context.text(error.message, 400);
+    }
+    if (error instanceof AuthorizationDeniedError) {
+      return context.html(renderNotFound(createTheme(context.env)), 404);
+    }
+    return context.text(
+      error instanceof Error
+        ? error.message
+        : "Template revision creation failed.",
+      409,
+    );
   }
 });
 
@@ -2159,7 +2223,13 @@ async function readTemplateLifecycleFormValues(
     );
   }
   const values = new URLSearchParams();
-  for (const key of ["templateVersionId", "targetState"]) {
+  for (const key of [
+    "templateVersionId",
+    "targetState",
+    "sourceTemplateVersionId",
+    "revisionNote",
+    "confirmUnchangedContent",
+  ]) {
     const value = formData.get(key);
     if (typeof value === "string") values.set(key, value);
   }
