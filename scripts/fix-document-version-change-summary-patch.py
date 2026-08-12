@@ -15,4 +15,10 @@ if text.count(initial_old) != 1:
     raise SystemExit(f"Expected one initial-version patch block, found {text.count(initial_old)}")
 text = text.replace(initial_old, initial_new, 1)
 
+detail_old = '''replace_once(\n    "src/application/document-detail-read-service.ts",\n    \'\'\'  contentHash: string;\\n  contentProvider: string;\\n  createdBySubjectId: string;\\n\'\'\',\n    \'\'\'  contentHash: string;\\n  contentProvider: string;\\n  changeSummary: string;\\n  createdBySubjectId: string;\\n\'\'\',\n)'''
+detail_new = '''replace_once(\n    "src/application/document-detail-read-service.ts",\n    \'\'\'export interface DocumentVersionEvidence {\\n  id: string;\\n  versionNumber: number;\\n  contentHash: string;\\n  contentProvider: string;\\n  createdBySubjectId: string;\\n  createdByName: string;\\n  createdAt: string;\\n\'\'\',\n    \'\'\'export interface DocumentVersionEvidence {\\n  id: string;\\n  versionNumber: number;\\n  contentHash: string;\\n  contentProvider: string;\\n  changeSummary: string;\\n  createdBySubjectId: string;\\n  createdByName: string;\\n  createdAt: string;\\n\'\'\',\n)'''
+if text.count(detail_old) != 1:
+    raise SystemExit(f"Expected one generic DocumentVersionEvidence patch block, found {text.count(detail_old)}")
+text = text.replace(detail_old, detail_new, 1)
+
 path.write_text(text)
