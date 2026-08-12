@@ -654,7 +654,7 @@ production authentication or public-demo hardening.
   administration PR #21, controlled Workflow Definition lifecycle administration PR #27,
   provider-neutral custom workspace roles PR #29, provider-neutral tenant member lifecycle PR #30,
   terminal custom role retirement PR #31, workflow authoring improvements PR #32, controlled
-  document retirement PR #33, linear template revision authoring PR #34, bounded workspace audit CSV export PR #35, versioned per-document evidence manifest export PR #36, queue-native review and approval actions PR #37, and immutable document-version change summaries PR #38.
+  document retirement PR #33, linear template revision authoring PR #34, bounded workspace audit CSV export PR #35, versioned per-document evidence manifest export PR #36, queue-native review and approval actions PR #37, immutable document-version change summaries PR #38, and controlled template evidence detail PR #39.
 - `main` is the authoritative integration branch after reviewed/validated pull requests are merged.
 - No production Cloudflare resources, custom domains, customer data, analytics, paid services, or
   public-upload capability have been introduced.
