@@ -25,7 +25,9 @@ export async function createE2eD1Database(): Promise<D1Database> {
     .sort((left, right) => left.localeCompare(right));
 
   if (migrationNames.length === 0) {
-    throw new Error("No ordered D1/SQLite migrations were found for E2E setup.");
+    throw new Error(
+      "No ordered D1/SQLite migrations were found for E2E setup.",
+    );
   }
 
   for (const migrationName of migrationNames) {
