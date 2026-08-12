@@ -24,6 +24,8 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Reconcile patch helper
+        run: python scripts/fix-document-version-change-summary-patch.py
       - name: Apply permanent feature patch
         run: python scripts/patch-document-version-change-summary.py
       - name: Format permanent changes
@@ -39,7 +41,7 @@ jobs:
           git config user.name "Eddie-LowcountryDigitalWorks"
           git config user.email "eddie@lowcountrydigitalworks.com"
           git add README.md docs/HANDOFF.md docs/STATUS.md docs/contracts/export-v1.md migrations/0011_document_version_change_summary.sql src tests
-          git reset scripts/patch-document-version-change-summary.py
+          git reset scripts/patch-document-version-change-summary.py scripts/fix-document-version-change-summary-patch.py
           git diff --cached --check
           git commit -m "Add immutable document version change summaries"
           git push origin HEAD:feature/immutable-version-change-summary
