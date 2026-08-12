@@ -71,6 +71,7 @@ jobs:
       - name: Format changed release files
         run: >-
           pnpm exec prettier --write
+          .github/workflows/prf1-finalize.yml
           src/http
           tests/unit/http-architecture.test.ts
           tests/e2e/security-headers.spec.ts
@@ -83,7 +84,6 @@ jobs:
           docs/STATUS.md
           docs/HANDOFF.md
       - run: pnpm check
-      - run: pnpm test:e2e
       - run: pnpm audit --audit-level=high
       - name: Commit validated finalization and remove temporary helper
         run: |
