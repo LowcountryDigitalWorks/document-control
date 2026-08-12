@@ -1,0 +1,44 @@
+name: Queue Native Review Approval Actions Integration
+
+on:
+  push:
+    branches:
+      - feature/queue-native-review-approval-actions
+    paths:
+      - .github/workflows/queue-native-review-approval-actions-integration.yml
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feature/queue-native-review-approval-actions
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Apply permanent feature patch
+        run: python scripts/patch-queue-native-review-approval-actions.py
+      - name: Format permanent changes
+        run: pnpm exec prettier --write src tests README.md docs migrations
+      - name: Validate repository
+        run: pnpm check
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Validate queue actions browser flow
+        run: pnpm exec playwright test tests/e2e/reviews-approvals-queue.spec.ts
+      - name: Commit permanent feature
+        run: |
+          git config user.name "Eddie-LowcountryDigitalWorks"
+          git config user.email "eddie@lowcountrydigitalworks.com"
+          git add README.md docs/HANDOFF.md docs/STATUS.md migrations/0010_current_workflow_action_integrity.sql src/index.ts src/application/document-workflow-service.ts src/application/work-queue-action-input.ts src/ui/render-review-approval-queue.ts tests/e2e/reviews-approvals-queue.spec.ts tests/unit/document-workflow-service.test.ts tests/unit/work-queue-action-input.test.ts tests/unit/work-queue-action-integrity.test.ts
+          git diff --cached --check
+          git commit -m "Add queue-native review and approval actions"
+          git push origin HEAD:feature/queue-native-review-approval-actions
