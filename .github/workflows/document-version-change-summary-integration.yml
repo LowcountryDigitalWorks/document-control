@@ -28,6 +28,8 @@ jobs:
         run: python scripts/fix-document-version-change-summary-patch.py
       - name: Apply permanent feature patch
         run: python scripts/patch-document-version-change-summary.py
+      - name: Reconcile spread-based test caller
+        run: python scripts/reconcile-version-summary-test-callers.py
       - name: Format permanent changes
         run: pnpm exec prettier --write src tests README.md docs migrations
       - name: Validate repository
@@ -41,7 +43,7 @@ jobs:
           git config user.name "Eddie-LowcountryDigitalWorks"
           git config user.email "eddie@lowcountrydigitalworks.com"
           git add README.md docs/HANDOFF.md docs/STATUS.md docs/contracts/export-v1.md migrations/0011_document_version_change_summary.sql src tests
-          git reset scripts/patch-document-version-change-summary.py scripts/fix-document-version-change-summary-patch.py
+          git reset scripts/patch-document-version-change-summary.py scripts/fix-document-version-change-summary-patch.py scripts/reconcile-version-summary-test-callers.py
           git diff --cached --check
           git commit -m "Add immutable document version change summaries"
           git push origin HEAD:feature/immutable-version-change-summary
