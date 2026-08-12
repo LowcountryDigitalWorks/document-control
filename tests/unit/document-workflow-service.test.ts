@@ -315,6 +315,83 @@ describe("persisted document workflow service", () => {
     ]);
   });
 
+  it("rejects review evidence from a workflow bound to a superseded document version", async () => {
+    const database = await createDatabase();
+    seedFoundation(database);
+    const service = new DocumentWorkflowService(
+      new SqliteDatabaseProvider(database),
+    );
+
+    await service.createDocumentFromTemplate({
+      tenantId,
+      workspaceId,
+      documentId,
+      title: "Harbor Opening Checklist",
+      templateId: "template-sop",
+      templateVersion: 1,
+      versionId: "document-v1",
+      contentHash: `sha256:${"1".repeat(64)}`,
+      contentKey: buildDocumentVersionContentKey({
+        tenantId,
+        workspaceId,
+        documentId,
+        versionId: "document-v1",
+      }),
+      actorSubjectId: "subject-author",
+      occurredAt: "2026-08-10T19:01:00.000Z",
+      auditEventId: "audit-stale-review-document",
+    });
+    await service.startWorkflow({
+      tenantId,
+      documentId,
+      workflowInstanceId: "workflow-instance-v1",
+      workflowDefinitionId: "workflow-standard",
+      workflowDefinitionVersion: 1,
+      actorSubjectId: "subject-author",
+      occurredAt: "2026-08-10T19:02:00.000Z",
+      auditEventId: "audit-stale-review-workflow",
+    });
+    await service.transition({
+      tenantId,
+      workflowInstanceId: "workflow-instance-v1",
+      targetState: "review",
+      actorSubjectId: "subject-author",
+      occurredAt: "2026-08-10T19:03:00.000Z",
+      auditEventId: "audit-stale-review-submit",
+    });
+    await service.createChangedVersion({
+      tenantId,
+      documentId,
+      versionId: "document-v2",
+      contentHash: `sha256:${"2".repeat(64)}`,
+      contentKey: buildDocumentVersionContentKey({
+        tenantId,
+        workspaceId,
+        documentId,
+        versionId: "document-v2",
+      }),
+      actorSubjectId: "subject-author",
+      occurredAt: "2026-08-10T19:04:00.000Z",
+      auditEventId: "audit-stale-review-version-two",
+    });
+
+    await expect(
+      service.recordReview({
+        tenantId,
+        workflowInstanceId: "workflow-instance-v1",
+        reviewId: "review-stale",
+        actorSubjectId: "subject-reviewer",
+        decision: "accepted",
+        occurredAt: "2026-08-10T19:05:00.000Z",
+        auditEventId: "audit-stale-review-rejected",
+      }),
+    ).rejects.toThrow(/superseded workflow version/u);
+
+    expect(
+      database.prepare("SELECT COUNT(*) AS count FROM reviews").get(),
+    ).toEqual({ count: 0 });
+  });
+
   it("rolls back a multi-statement application change when one statement fails", async () => {
     const database = await createDatabase();
     seedFoundation(database);

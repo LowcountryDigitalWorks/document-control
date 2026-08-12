@@ -164,6 +164,17 @@ Turnstile/abuse controls, and operational cleanup are implemented and validated.
   Queue -> cleared after exact approval, confirms changed-version stale-work exclusion, checks axe
   accessibility/responsive overflow, and preserves independent-session isolation.
 
+### Queue-native review and approval actions (synthetic/test only)
+
+- Reviewer and Approver queue cards now complete work through the existing authorized `DocumentWorkflowService`; no parallel task or action persistence model is introduced.
+- Reviewer actions support **Accept** and **Request changes**. Requesting changes requires a bounded comment; acceptance may include an optional bounded comment. Existing review/audit records preserve the decision and evidence.
+- Approver actions require explicit confirmation that approval applies to the exact current version/hash shown by the queue before the existing exact-version approval service runs.
+- Queue POSTs retain the opaque synthetic session, server-controlled Reviewer/Approver identities, same-origin enforcement, and existing `document.review` / `document.approve` authorization. Browser-supplied tenant, workspace, actor, document version, hash, and approval identifiers are not trusted inputs.
+- `DocumentWorkflowService.recordReview` now rejects a workflow whose bound version is no longer the document's exact current version, matching the existing stale-version approval guard.
+- Migration `0010_current_workflow_action_integrity.sql` independently rejects raw review or approval evidence inserts whose workflow/document version is not the document's current version.
+- Unit/browser coverage verifies queue-native acceptance, queue-native exact approval, requested-changes comments, stale-review rejection, database stale-evidence rejection, cross-origin denial, accessibility, responsiveness, and existing session isolation.
+- This slice does **not** add production authentication, email/task notifications, assignment/delegation, due dates/escalations, customer uploads, production Cloudflare resources, analytics, or paid services.
+
 ### Authorized workspace search and filtering (synthetic/test only)
 
 - Documents support bounded server-side filtering by literal title substring, document status, and
@@ -634,7 +645,7 @@ production authentication or public-demo hardening.
   administration PR #21, controlled Workflow Definition lifecycle administration PR #27,
   provider-neutral custom workspace roles PR #29, provider-neutral tenant member lifecycle PR #30,
   terminal custom role retirement PR #31, workflow authoring improvements PR #32, controlled
-  document retirement PR #33, linear template revision authoring PR #34, bounded workspace audit CSV export PR #35, and versioned per-document evidence manifest export PR #36.
+  document retirement PR #33, linear template revision authoring PR #34, bounded workspace audit CSV export PR #35, versioned per-document evidence manifest export PR #36, and queue-native review and approval actions PR #37.
 - `main` is the authoritative integration branch after reviewed/validated pull requests are merged.
 - No production Cloudflare resources, custom domains, customer data, analytics, paid services, or
   public-upload capability have been introduced.
