@@ -403,6 +403,11 @@ export class DocumentWorkflowService {
       instance.documentId,
     );
     assertDocumentOpenForWork(document);
+    if (document.currentVersionId !== instance.documentVersionId) {
+      throw new Error(
+        "A superseded workflow version cannot receive review evidence for the current document.",
+      );
+    }
 
     const review: Review = {
       id: command.reviewId,

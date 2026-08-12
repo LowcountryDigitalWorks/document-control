@@ -54,12 +54,17 @@ test("moves the exact current version through reviewer and approver queues", asy
     page.getByText("0 items awaiting approval.", { exact: true }),
   ).toBeVisible();
 
-  await page.goto("/demo/workflow");
-  await page
-    .getByRole("button", { name: "Record reviewer acceptance" })
-    .click();
-
   await page.goto("/demo/app/reviews");
+  await reviewCard
+    .getByLabel(/Review comment/u)
+    .fill("Queue-native reviewer acceptance.");
+  await reviewCard.getByRole("button", { name: "Accept version 1" }).click();
+  await expect(
+    page.getByText(
+      "Review accepted. The exact current version moved to approval.",
+      { exact: true },
+    ),
+  ).toBeVisible();
   await expect(
     page.getByText("0 items awaiting review.", { exact: true }),
   ).toBeVisible();
@@ -76,9 +81,16 @@ test("moves the exact current version through reviewer and approver queues", asy
     approvalCard.getByText("Version 1", { exact: true }),
   ).toBeVisible();
 
-  await page.goto("/demo/workflow");
-  await page.getByRole("button", { name: "Approve exact version 1" }).click();
-  await page.goto("/demo/app/approvals");
+  await approvalCard.getByRole("checkbox").check();
+  await approvalCard
+    .getByRole("button", { name: "Approve exact version 1" })
+    .click();
+  await expect(
+    page.getByText(
+      "Exact current version approved. Approval evidence is preserved in the document record.",
+      { exact: true },
+    ),
+  ).toBeVisible();
   await expect(
     page.getByText("0 items awaiting approval.", { exact: true }),
   ).toBeVisible();
@@ -121,4 +133,66 @@ test("keeps review work isolated between synthetic sessions", async ({
     await firstContext.close();
     await secondContext.close();
   }
+});
+
+test("records requested changes from the reviewer queue and preserves the comment as evidence", async ({
+  page,
+}) => {
+  await createAndSubmitForReview(page);
+  await page.goto("/demo/app/reviews");
+  const reviewCard = page.locator(".queue-card").filter({
+    has: page.getByRole("heading", { name: "Harbor Opening Checklist" }),
+  });
+  await reviewCard
+    .getByLabel(/Review comment/u)
+    .fill("Please update the opening verification steps.");
+  await reviewCard.getByRole("button", { name: "Request changes" }).click();
+
+  await expect(
+    page.getByText(
+      "Changes requested. The workflow returned to Draft and the review item cleared.",
+      { exact: true },
+    ),
+  ).toBeVisible();
+  await expect(
+    page.getByText("0 items awaiting review.", { exact: true }),
+  ).toBeVisible();
+  await page.goto("/demo/app/approvals");
+  await expect(
+    page.getByText("0 items awaiting approval.", { exact: true }),
+  ).toBeVisible();
+  await page.goto("/demo/app/documents");
+  await page.getByRole("link", { name: "View evidence" }).click();
+  await expect(
+    page.getByText("changes requested", { exact: false }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Please update the opening verification steps.", {
+      exact: true,
+    }),
+  ).toBeVisible();
+});
+
+test("rejects cross-origin reviewer queue mutations", async ({ page }) => {
+  await createAndSubmitForReview(page);
+  await page.goto("/demo/app/reviews");
+  const action = await page
+    .locator(".queue-card form")
+    .first()
+    .getAttribute("action");
+  expect(action).toBeTruthy();
+
+  const response = await page.request.post(
+    action ?? "/demo/app/reviews/missing/decision",
+    {
+      headers: { Origin: "https://attacker.invalid" },
+      form: { decision: "accepted", comment: "Cross-origin attempt" },
+    },
+  );
+  expect(response.status()).toBe(403);
+
+  await page.reload();
+  await expect(
+    page.getByRole("heading", { name: "Harbor Opening Checklist" }),
+  ).toBeVisible();
 });

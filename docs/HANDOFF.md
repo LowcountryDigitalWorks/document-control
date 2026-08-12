@@ -47,7 +47,7 @@ The synthetic/test-only application now covers:
 - persisted document workflow lifecycle;
 - provider-neutral authorization;
 - guided workflow execution;
-- workspace Overview, Documents, Templates, document evidence with versioned JSON manifest export, Reviews, and Approvals;
+- workspace Overview, Documents, Templates, document evidence with versioned JSON manifest export, and queue-native Reviews & Approvals actions;
 - bounded metadata search/filtering;
 - Backup & Portability export;
 - Audit Log with bounded workspace CSV evidence export;
@@ -150,6 +150,16 @@ unless a deliberate migration changes that contract later.
 
 Lifecycle changes never rewrite workflow-definition content. Existing workflow instances, reviews,
 approvals, and audit evidence remain pinned to their original exact workflow version.
+
+## Reviews and Approvals action boundary
+
+- Review and approval work remains derived from the current persisted workflow instance; no second task/queue table exists.
+- Ordinary Reviewer/Approver queue cards may execute the same `recordReview` and `approveCurrentVersion` application services used by the guided lifecycle. Do not create an alternate mutation path.
+- Reviewer actions are limited to **Accept** and **Request changes** from this surface. Requested changes require a bounded comment; accepted reviews may include an optional comment.
+- Approval requires explicit exact-version confirmation and remains bound to the workflow instance, workflow-definition version, current document-version ID, and SHA-256 evidence.
+- Queue routes keep actor/tenant/workspace authority server controlled, require same-origin POSTs, and rely on the existing `document.review` / `document.approve` authorization facades.
+- The service and migration `0010_current_workflow_action_integrity.sql` both reject review/approval evidence for a superseded workflow version. Preserve this defense-in-depth invariant in future adapters or action surfaces.
+- This is still synthetic/test-only. Assignment/delegation, notifications, due dates, escalation, production authentication, and external workflow automation remain separate future decisions.
 
 ## Document evidence manifest boundary
 

@@ -59,6 +59,11 @@ import {
 } from "./application/template-lifecycle-input";
 import { ReviewApprovalQueueReadService } from "./application/review-approval-queue-read-service";
 import {
+  parseApprovalQueueActionInput,
+  parseReviewQueueActionInput,
+  WorkQueueActionInputValidationError,
+} from "./application/work-queue-action-input";
+import {
   parseDocumentFilters,
   parseTemplateFilters,
   WorkspaceFilterValidationError,
@@ -496,14 +501,74 @@ app.get("/demo/app/reviews", async (context) => {
     tenantId: demo.tenantId,
     workspaceId: demo.workspaceId,
   });
+  const noticeValue = new URL(context.req.url).searchParams.get("notice");
+  const notice =
+    noticeValue === "accepted"
+      ? "Review accepted. The exact current version moved to approval."
+      : noticeValue === "changes-requested"
+        ? "Changes requested. The workflow returned to Draft and the review item cleared."
+        : undefined;
   return context.html(
     renderReviewApprovalQueue(
       await createPersistedTenantTheme(database, context.env, demo.tenantId),
       demo.workspaceName,
       "review",
       items,
+      notice,
     ),
   );
+});
+
+app.post("/demo/app/reviews/:workflowInstanceId/decision", async (context) => {
+  if (!guidedDemoEnabled(context.env)) return context.notFound();
+  if (!hasSameOrigin(context.req.url, context.req.header("Origin"))) {
+    return context.json({ error: "Same-origin demo request required." }, 403);
+  }
+  const sessionId = readGuidedDemoSession(context.req.header("Cookie"));
+  if (!sessionId) {
+    return context.json(
+      { error: "Synthetic review session missing. Reload the Reviewer queue." },
+      409,
+    );
+  }
+
+  try {
+    const input = parseReviewQueueActionInput(
+      await readWorkQueueActionFormValues(context.req.raw, [
+        "decision",
+        "comment",
+      ]),
+    );
+    const database = new D1DatabaseProvider(context.env.DOCUMENT_CONTROL_DB);
+    const demo = createGuidedDemoContext(sessionId);
+    await ensureGuidedDemoSeed(database, sessionId);
+    const occurredAt = new Date().toISOString();
+    await createAuthorizedDocumentWorkflowService(database).recordReview({
+      tenantId: demo.tenantId,
+      workflowInstanceId: context.req.param("workflowInstanceId"),
+      reviewId: `queue-review-${crypto.randomUUID()}`,
+      actorSubjectId: demo.reviewerSubjectId,
+      decision: input.decision,
+      comment: input.comment,
+      occurredAt,
+      auditEventId: `queue-review-audit-${crypto.randomUUID()}`,
+    });
+    return context.redirect(
+      `/demo/app/reviews?notice=${input.decision === "accepted" ? "accepted" : "changes-requested"}`,
+      303,
+    );
+  } catch (error) {
+    if (error instanceof WorkQueueActionInputValidationError) {
+      return context.text(error.message, 400);
+    }
+    if (error instanceof AuthorizationDeniedError) {
+      return context.html(renderNotFound(createTheme(context.env)), 404);
+    }
+    return context.text(
+      error instanceof Error ? error.message : "Review action failed.",
+      409,
+    );
+  }
 });
 
 app.get("/demo/app/approvals", async (context) => {
@@ -527,14 +592,67 @@ app.get("/demo/app/approvals", async (context) => {
     tenantId: demo.tenantId,
     workspaceId: demo.workspaceId,
   });
+  const notice =
+    new URL(context.req.url).searchParams.get("notice") === "approved"
+      ? "Exact current version approved. Approval evidence is preserved in the document record."
+      : undefined;
   return context.html(
     renderReviewApprovalQueue(
       await createPersistedTenantTheme(database, context.env, demo.tenantId),
       demo.workspaceName,
       "approval",
       items,
+      notice,
     ),
   );
+});
+
+app.post("/demo/app/approvals/:workflowInstanceId/approve", async (context) => {
+  if (!guidedDemoEnabled(context.env)) return context.notFound();
+  if (!hasSameOrigin(context.req.url, context.req.header("Origin"))) {
+    return context.json({ error: "Same-origin demo request required." }, 403);
+  }
+  const sessionId = readGuidedDemoSession(context.req.header("Cookie"));
+  if (!sessionId) {
+    return context.json(
+      {
+        error: "Synthetic approval session missing. Reload the Approver queue.",
+      },
+      409,
+    );
+  }
+
+  try {
+    parseApprovalQueueActionInput(
+      await readWorkQueueActionFormValues(context.req.raw, ["confirmApproval"]),
+    );
+    const database = new D1DatabaseProvider(context.env.DOCUMENT_CONTROL_DB);
+    const demo = createGuidedDemoContext(sessionId);
+    await ensureGuidedDemoSeed(database, sessionId);
+    const occurredAt = new Date().toISOString();
+    await createAuthorizedDocumentWorkflowService(
+      database,
+    ).approveCurrentVersion({
+      tenantId: demo.tenantId,
+      workflowInstanceId: context.req.param("workflowInstanceId"),
+      approvalId: `queue-approval-${crypto.randomUUID()}`,
+      actorSubjectId: demo.approverSubjectId,
+      occurredAt,
+      auditEventId: `queue-approval-audit-${crypto.randomUUID()}`,
+    });
+    return context.redirect("/demo/app/approvals?notice=approved", 303);
+  } catch (error) {
+    if (error instanceof WorkQueueActionInputValidationError) {
+      return context.text(error.message, 400);
+    }
+    if (error instanceof AuthorizationDeniedError) {
+      return context.html(renderNotFound(createTheme(context.env)), 404);
+    }
+    return context.text(
+      error instanceof Error ? error.message : "Approval action failed.",
+      409,
+    );
+  }
 });
 
 app.get("/demo/app/audit", async (context) => {
@@ -2174,6 +2292,26 @@ async function readFormValues(
     formData = await request.formData();
   } catch {
     throw new RolesAccessInputValidationError("A valid form body is required.");
+  }
+  const values = new URLSearchParams();
+  for (const key of keys) {
+    const value = formData.get(key);
+    if (typeof value === "string") values.set(key, value);
+  }
+  return values;
+}
+
+async function readWorkQueueActionFormValues(
+  request: Request,
+  keys: readonly string[],
+): Promise<URLSearchParams> {
+  let formData: FormData;
+  try {
+    formData = await request.formData();
+  } catch {
+    throw new WorkQueueActionInputValidationError(
+      "A valid work queue form body is required.",
+    );
   }
   const values = new URLSearchParams();
   for (const key of keys) {
