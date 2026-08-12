@@ -16,7 +16,7 @@ Implemented synthetic/test-only product capabilities include:
 - provider-neutral identity, membership, roles, scoped permissions, and authorization;
 - create-from-controlled-template document workflows;
 - exact-version workflow instances, review evidence, approvals, and changed-version invalidation;
-- workspace overview, Documents, Templates, Reviews, Approvals, Audit Log, and bounded search/filtering;
+- workspace overview, Documents, Templates, Reviews, Approvals, Audit Log, bounded search/filtering, and bounded CSV audit evidence export;
 - Backup & Portability export of persisted application state and external content references;
 - tenant presentation settings, provider-neutral tenant member lifecycle, workspace Roles & Access, and tenant-owned custom workspace roles with terminal retirement;
 - immutable Workflow Definition creation/versioning;
@@ -93,7 +93,7 @@ workflow-definition version they originally used regardless of later lifecycle c
 - Approval records bind actor and timestamp to an exact document version, SHA-256 content hash,
   workflow instance, and workflow-definition version.
 - A later document version never inherits an earlier approval.
-- Audit records are append-only.
+- Audit records are append-only. The synthetic workspace Audit Log can export the same authorized, filter-matched, 100-record summarized evidence view as CSV without exposing unrestricted raw payload JSON.
 - Application data has a versioned, validated portable JSON export contract.
 - The synthetic demo contains no customer data and accepts no arbitrary file uploads.
 - LDW is a configurable reference theme rather than a hard-coded product identity.

@@ -126,3 +126,49 @@ test("keeps workspace audit history isolated between synthetic sessions", async 
     await secondContext.close();
   }
 });
+
+test("exports the current bounded audit view as safe CSV", async ({ page }) => {
+  await completeChangedVersionLifecycle(page);
+  await page.goto("/demo/app/audit?q=workflow");
+
+  const exportLink = page.getByRole("link", {
+    name: "Export current view (CSV)",
+  });
+  await expect(exportLink).toHaveAttribute(
+    "href",
+    "/demo/app/audit/export.csv?q=workflow",
+  );
+
+  const response = await page.request.get(
+    "/demo/app/audit/export.csv?q=workflow",
+  );
+  expect(response.status()).toBe(200);
+  expect(response.headers()["content-type"]).toContain("text/csv");
+  expect(response.headers()["cache-control"]).toBe("no-store");
+  expect(response.headers()["content-disposition"]).toContain(
+    'filename="workspace-audit-log.csv"',
+  );
+
+  const csv = (await response.text()).replace(/^\uFEFF/u, "");
+  const rows = csv.trimEnd().split("\r\n");
+  expect(rows).toHaveLength(3);
+  expect(rows[0]).toBe(
+    '"occurred_at","event_type","entity_type","entity_id","actor","evidence_summary"',
+  );
+  expect(csv).toContain('"workflow.started"');
+  expect(csv).toContain('"workflow.transitioned"');
+  expect(csv).not.toContain('"document.created_from_template"');
+});
+
+test("applies the same audit filter validation to CSV export", async ({
+  page,
+}) => {
+  await page.goto("/demo/app/audit");
+  const response = await page.request.get(
+    `/demo/app/audit/export.csv?q=${"x".repeat(101)}`,
+  );
+  expect(response.status()).toBe(400);
+  expect(await response.text()).toBe(
+    "Audit search text must be 100 characters or fewer.",
+  );
+});

@@ -11,6 +11,7 @@ export function renderAuditLog(
   filters: AuditLogFilters = {},
 ): string {
   const filtered = Boolean(filters.query);
+  const exportHref = `/demo/app/audit/export.csv${filters.query ? `?q=${encodeURIComponent(filters.query)}` : ""}`;
   const content =
     items.length === 0
       ? `<section class="empty" aria-labelledby="empty-title">
@@ -69,9 +70,10 @@ export function renderAuditLog(
         <div class="filter-actions">
           <button class="button" type="submit">Search audit log</button>
           <a href="/demo/app/audit">Clear</a>
+          <a class="button secondary" href="${escapeHtml(exportHref)}">Export current view (CSV)</a>
         </div>
       </form>
-      <p class="result-summary" aria-live="polite">${items.length} ${items.length === 1 ? "event" : "events"}${filtered ? " matched" : " shown"}. The ledger view is capped at 100 records.</p>
+      <p class="result-summary" aria-live="polite">${items.length} ${items.length === 1 ? "event" : "events"}${filtered ? " matched" : " shown"}. The ledger view and CSV export use the same 100-record cap and summarized evidence.</p>
       ${content}
     </main>
   </div>
