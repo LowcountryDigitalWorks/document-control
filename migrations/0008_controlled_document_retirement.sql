@@ -14,9 +14,25 @@ WHERE is_system = 1
 
 CREATE TRIGGER documents_retirement_requires_approved
 BEFORE UPDATE OF status ON documents
-WHEN NEW.status = 'retired' AND OLD.status <> 'approved'
+WHEN NEW.status = 'retired'
+  AND (
+    OLD.status <> 'approved'
+    OR OLD.current_version_id IS NULL
+    OR NOT EXISTS (
+      SELECT 1
+      FROM document_versions version
+      JOIN approvals approval
+        ON approval.tenant_id = version.tenant_id
+       AND approval.document_id = version.document_id
+       AND approval.document_version_id = version.id
+       AND approval.content_hash = version.content_hash
+      WHERE version.tenant_id = OLD.tenant_id
+        AND version.document_id = OLD.id
+        AND version.id = OLD.current_version_id
+    )
+  )
 BEGIN
-  SELECT RAISE(ABORT, 'Documents can only be retired from approved status.');
+  SELECT RAISE(ABORT, 'Documents can only be retired with exact current-version approval evidence.');
 END;
 
 CREATE TRIGGER documents_retirement_terminal
