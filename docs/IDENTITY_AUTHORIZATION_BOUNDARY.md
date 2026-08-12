@@ -106,9 +106,22 @@ Before production identity integration, explicitly decide and document:
 - Provider/group removal must not silently leave stale privileged application bindings.
 - Access-administration events must remain auditable.
 
+## Production identity gate
+
+Production authentication remains a later gate after Production Readiness Foundation I and the
+Operations & Supply-Chain Foundation. Before production access is enabled, the **Production Identity
+& Tenant Boundary** must address the identity-related threats recorded in
+[`THREAT_MODEL.md`](THREAT_MODEL.md), including malicious/compromised IdP claims, confused-deputy
+mapping, session theft/fixation, CSRF, stale authorization after suspension/revocation, administrator
+compromise, authenticated tenant context, and cross-tenant hostile-ID testing.
+
+A future provider must still terminate in the application-owned authorization chain documented here;
+no IdP choice authorizes direct provider-group-to-permission behavior.
+
 ## Current non-goals
 
 This document does not select or configure a production identity provider, create an Entra
 application registration, connect Active Directory, enable SSO, implement SCIM/group sync, or add
-production credentials. Those remain future deployment decisions with separate security, rollback,
-and ownership review.
+production credentials. Production login sessions and production tenant provisioning are also not
+implemented. Those remain future deployment decisions with separate security, rollback, ownership,
+and validation review.
