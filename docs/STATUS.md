@@ -132,6 +132,16 @@ Turnstile/abuse controls, and operational cleanup are implemented and validated.
   current and requires a new approval, while independent sessions cannot read one another's detail
   records.
 
+### Versioned per-document evidence manifest export (synthetic/test only)
+
+- `/demo/app/documents/:documentId/evidence.json` downloads a versioned `document-evidence/v1` metadata manifest assembled from the existing authorized document-detail read model.
+- Export reuses the same `document.read` plus `audit.read` authorization checks and synthetic-session isolation as the HTML evidence view; it does not add tenant-wide export authority.
+- The manifest preserves exact source-template provenance, document version IDs/numbers/hashes, current-version status, workflow-definition IDs/versions/states, review/approval evidence, timestamps, and bounded primitive audit evidence.
+- Internal actor/creator subject IDs, tenant ID, content keys, binary objects, nested/raw audit payloads, and unrelated records are deliberately excluded. At most six primitive audit fields per event are included, matching the bounded evidence posture of the UI.
+- Downloads use `Cache-Control: no-store` and a fixed safe filename. Retired documents remain exportable because retirement is historical-only rather than deletion.
+- Unit/browser coverage verifies exact historical approval semantics across a changed current version, safe field exclusion, bounded audit evidence, response headers, accessibility of the export link, and cross-session denial.
+- This slice does **not** add binary bundling, content download, eDiscovery/legal-hold packaging, retention/archive policy, production authentication, customer uploads, Cloudflare resources, external integrations, or paid services.
+
 ### Reviews and Approvals queues (synthetic/test only)
 
 - `ReviewApprovalQueueReadService` derives work directly from persisted workflow instances; it does
@@ -624,7 +634,7 @@ production authentication or public-demo hardening.
   administration PR #21, controlled Workflow Definition lifecycle administration PR #27,
   provider-neutral custom workspace roles PR #29, provider-neutral tenant member lifecycle PR #30,
   terminal custom role retirement PR #31, workflow authoring improvements PR #32, controlled
-  document retirement PR #33, linear template revision authoring PR #34, and bounded workspace audit CSV export PR #35.
+  document retirement PR #33, linear template revision authoring PR #34, bounded workspace audit CSV export PR #35, and versioned per-document evidence manifest export PR #36.
 - `main` is the authoritative integration branch after reviewed/validated pull requests are merged.
 - No production Cloudflare resources, custom domains, customer data, analytics, paid services, or
   public-upload capability have been introduced.
@@ -649,7 +659,7 @@ production authentication or public-demo hardening.
 - Logo/favicon upload or external branding-asset URL management.
 - Rich document authoring, retention automation, legal hold, destructive document deletion, GRC frameworks, or AI functions.
 - PostgreSQL and SharePoint adapters; the provider boundaries remain the extension points.
-- Bundled R2/SharePoint binaries in portable exports.
+- Bundled R2/SharePoint binaries in portable exports or external archival/eDiscovery evidence packages.
 - Production backup scheduling, restore orchestration, disaster recovery, or retention automation.
 - External audit/SIEM integration or archival, unrestricted raw audit-payload export, or production log-retention policy.
 

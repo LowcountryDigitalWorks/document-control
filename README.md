@@ -15,7 +15,7 @@ Implemented synthetic/test-only product capabilities include:
 - tenant/workspace-aware document and immutable version records;
 - provider-neutral identity, membership, roles, scoped permissions, and authorization;
 - create-from-controlled-template document workflows;
-- exact-version workflow instances, review evidence, approvals, and changed-version invalidation;
+- exact-version workflow instances, review evidence, approvals, changed-version invalidation, and versioned per-document evidence manifests;
 - workspace overview, Documents, Templates, Reviews, Approvals, Audit Log, bounded search/filtering, and bounded CSV audit evidence export;
 - Backup & Portability export of persisted application state and external content references;
 - tenant presentation settings, provider-neutral tenant member lifecycle, workspace Roles & Access, and tenant-owned custom workspace roles with terminal retirement;
@@ -92,6 +92,7 @@ workflow-definition version they originally used regardless of later lifecycle c
 - Templates are controlled/versioned records with lifecycle and provenance metadata. A Template Manager may create a sequential immutable Draft revision from any exact historical version when intentionally reusing the same content identity; the source SHA-256/provider/key are copied unchanged and derivation is recorded in provenance/audit.
 - Approval records bind actor and timestamp to an exact document version, SHA-256 content hash,
   workflow instance, and workflow-definition version.
+- Authorized document evidence can be downloaded as a versioned metadata manifest containing exact provenance, version/hash, workflow/review/approval, and bounded audit evidence without bundling binary content, content keys, internal actor subject IDs, or unrestricted audit payloads.
 - A later document version never inherits an earlier approval.
 - Audit records are append-only. The synthetic workspace Audit Log can export the same authorized, filter-matched, 100-record summarized evidence view as CSV without exposing unrestricted raw payload JSON.
 - Application data has a versioned, validated portable JSON export contract.

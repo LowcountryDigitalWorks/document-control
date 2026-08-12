@@ -27,6 +27,7 @@ import {
   parseDocumentRetirementInput,
   DocumentRetirementInputValidationError,
 } from "./application/document-retirement-input";
+import { serializeDocumentEvidenceManifest } from "./application/document-evidence-export";
 import { DocumentWorkflowService } from "./application/document-workflow-service";
 import { serializeExport } from "./application/export";
 import { PortableExportReadService } from "./application/portable-export-read-service";
@@ -322,6 +323,53 @@ app.get("/demo/app/documents/:documentId", async (context) => {
         detail,
         notice,
       ),
+    );
+  } catch (error) {
+    if (
+      error instanceof AuthorizationDeniedError ||
+      error instanceof DocumentNotFoundError
+    ) {
+      return context.html(renderNotFound(createTheme(context.env)), 404);
+    }
+    throw error;
+  }
+});
+
+app.get("/demo/app/documents/:documentId/evidence.json", async (context) => {
+  if (!guidedDemoEnabled(context.env)) {
+    return context.html(renderNotFound(createTheme(context.env)), 404);
+  }
+
+  const session = resolveGuidedDemoSession(
+    context.req.header("Cookie"),
+    context.req.url,
+  );
+  if (session.setCookie) {
+    context.header("Set-Cookie", session.setCookie);
+  }
+  const database = new D1DatabaseProvider(context.env.DOCUMENT_CONTROL_DB);
+  const demo = createGuidedDemoContext(session.sessionId);
+  await ensureGuidedDemoSeed(database, session.sessionId);
+  const evidenceReader = await ensureGuidedEvidenceReader(
+    database,
+    session.sessionId,
+  );
+  const read = createAuthorizedDocumentDetailReadService(database);
+
+  try {
+    const detail = await read.getDocumentDetail({
+      subjectId: evidenceReader.subjectId,
+      tenantId: demo.tenantId,
+      documentId: context.req.param("documentId"),
+    });
+    context.header("Cache-Control", "no-store");
+    context.header("Content-Type", "application/json; charset=utf-8");
+    context.header(
+      "Content-Disposition",
+      'attachment; filename="document-evidence.json"',
+    );
+    return context.body(
+      serializeDocumentEvidenceManifest(detail, new Date().toISOString()),
     );
   } catch (error) {
     if (
