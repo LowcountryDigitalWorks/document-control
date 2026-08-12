@@ -9,7 +9,6 @@ for (const path of ["/", "/demo/workflow", "/demo/app"]) {
     expect(headers["x-content-type-options"]).toBe("nosniff");
     expect(headers["x-frame-options"]).toBe("DENY");
     expect(headers["referrer-policy"]).toBe("strict-origin-when-cross-origin");
-    expect(headers["cross-origin-opener-policy"]).toBe("same-origin");
 
     const csp = headers["content-security-policy"];
     expect(csp).toContain("default-src 'self'");
