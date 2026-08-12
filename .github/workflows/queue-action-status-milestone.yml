@@ -18,7 +18,9 @@ jobs:
         with:
           ref: feature/queue-native-review-approval-actions
       - name: Record PR 37 milestone
-        run: sed -i 's/and versioned per-document evidence manifest export PR #36\./versioned per-document evidence manifest export PR #36, and queue-native review and approval actions PR #37./' docs/STATUS.md
+        run: |
+          sed -i 's/and versioned per-document evidence manifest export PR #36\./versioned per-document evidence manifest export PR #36, and queue-native review and approval actions PR #37./' docs/STATUS.md
+          grep -F 'queue-native review and approval actions PR #37.' docs/STATUS.md
       - name: Commit milestone
         run: |
           git config user.name "Eddie-LowcountryDigitalWorks"
