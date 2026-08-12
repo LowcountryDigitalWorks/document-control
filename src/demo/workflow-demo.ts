@@ -353,6 +353,11 @@ export async function runGuidedDemoAction(
 ): Promise<GuidedDemoState> {
   const demo = createGuidedDemoContext(sessionId);
   const current = await loadGuidedDemoState(database, sessionId);
+  if (current.documentStatus === "retired") {
+    throw new Error(
+      "Retired documents are historical and cannot be changed or receive new workflow activity.",
+    );
+  }
   if (current.nextAction !== action) {
     throw new Error(
       "That demo action is not valid for the current document state.",
