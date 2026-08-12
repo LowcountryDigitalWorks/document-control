@@ -21,4 +21,10 @@ if text.count(detail_old) != 1:
     raise SystemExit(f"Expected one generic DocumentVersionEvidence patch block, found {text.count(detail_old)}")
 text = text.replace(detail_old, detail_new, 1)
 
+portable_old = '''replace_once(\n    "src/application/portable-export-read-service.ts",\n    \'\'\'              content_provider AS contentProvider,\\n              content_key AS contentKey,\\n              created_by_subject_id AS createdBySubjectId,\\n\'\'\',\n    \'\'\'              content_provider AS contentProvider,\\n              content_key AS contentKey,\\n              change_summary AS changeSummary,\\n              created_by_subject_id AS createdBySubjectId,\\n\'\'\',\n)'''
+portable_new = '''replace_once(\n    "src/application/portable-export-read-service.ts",\n    \'\'\'              version_number AS versionNumber,\\n              content_hash AS contentHash,\\n              content_provider AS contentProvider,\\n              content_key AS contentKey,\\n              created_by_subject_id AS createdBySubjectId,\\n              created_at AS createdAt\\n       FROM document_versions\\n\'\'\',\n    \'\'\'              version_number AS versionNumber,\\n              content_hash AS contentHash,\\n              content_provider AS contentProvider,\\n              content_key AS contentKey,\\n              change_summary AS changeSummary,\\n              created_by_subject_id AS createdBySubjectId,\\n              created_at AS createdAt\\n       FROM document_versions\\n\'\'\',\n)'''
+if text.count(portable_old) != 1:
+    raise SystemExit(f"Expected one generic portable document-version query patch, found {text.count(portable_old)}")
+text = text.replace(portable_old, portable_new, 1)
+
 path.write_text(text)
