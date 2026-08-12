@@ -1,25 +1,40 @@
 -- Template revision creation remains immutable and linear.
 -- New revision content may initially reuse an exact historical content identity, but the
 -- version record itself is still immutable once inserted.
+-- Exact-ID INSERT OR IGNORE retries are intentionally excluded from the creation guards so
+-- idempotent seed/import replay remains safe; uniqueness/immutability constraints still govern
+-- those already-existing rows.
 
 CREATE TRIGGER template_versions_linear_insert
 BEFORE INSERT ON template_versions
-WHEN NEW.version_number <> COALESCE(
-  (
-    SELECT MAX(version_number) + 1
+WHEN NOT EXISTS (
+    SELECT 1
     FROM template_versions
     WHERE tenant_id = NEW.tenant_id
-      AND template_id = NEW.template_id
-  ),
-  1
-)
+      AND id = NEW.id
+  )
+  AND NEW.version_number <> COALESCE(
+    (
+      SELECT MAX(version_number) + 1
+      FROM template_versions
+      WHERE tenant_id = NEW.tenant_id
+        AND template_id = NEW.template_id
+    ),
+    1
+  )
 BEGIN
   SELECT RAISE(ABORT, 'Template versions must be created in sequence.');
 END;
 
 CREATE TRIGGER template_versions_single_open_revision
 BEFORE INSERT ON template_versions
-WHEN NEW.lifecycle_state IN ('draft', 'review')
+WHEN NOT EXISTS (
+    SELECT 1
+    FROM template_versions
+    WHERE tenant_id = NEW.tenant_id
+      AND id = NEW.id
+  )
+  AND NEW.lifecycle_state IN ('draft', 'review')
   AND EXISTS (
     SELECT 1
     FROM template_versions
