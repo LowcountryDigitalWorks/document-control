@@ -437,6 +437,7 @@ export class PortableExportReadService {
               content_hash AS contentHash,
               content_provider AS contentProvider,
               content_key AS contentKey,
+              change_summary AS changeSummary,
               created_by_subject_id AS createdBySubjectId,
               created_at AS createdAt
        FROM document_versions

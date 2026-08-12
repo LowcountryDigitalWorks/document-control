@@ -645,7 +645,7 @@ production authentication or public-demo hardening.
   administration PR #21, controlled Workflow Definition lifecycle administration PR #27,
   provider-neutral custom workspace roles PR #29, provider-neutral tenant member lifecycle PR #30,
   terminal custom role retirement PR #31, workflow authoring improvements PR #32, controlled
-  document retirement PR #33, linear template revision authoring PR #34, bounded workspace audit CSV export PR #35, versioned per-document evidence manifest export PR #36, and queue-native review and approval actions PR #37.
+  document retirement PR #33, linear template revision authoring PR #34, bounded workspace audit CSV export PR #35, versioned per-document evidence manifest export PR #36, queue-native review and approval actions PR #37, and immutable document-version change summaries PR #38.
 - `main` is the authoritative integration branch after reviewed/validated pull requests are merged.
 - No production Cloudflare resources, custom domains, customer data, analytics, paid services, or
   public-upload capability have been introduced.
@@ -683,3 +683,11 @@ production authentication or public-demo hardening.
 - Record retention, deletion, legal hold, backup, recovery, and audit-retention requirements.
 - Production Cloudflare account resources and deployment naming.
 - Final LDW brand palette/assets; current theme values remain provisional configuration.
+
+### Immutable document-version change summaries (synthetic/test only)
+
+- Each newly created exact document version now records a bounded operational change summary explaining why that immutable version exists. Initial template-derived versions receive a server-controlled initial summary; changed versions require a trimmed 3–500 character summary and reject control characters.
+- Migration `0011_document_version_change_summary.sql` backfills older versions with an explicit pre-tracking historical marker, rejects new inserts that omit a real bounded summary, and makes the summary immutable after insert.
+- Document evidence pages and versioned `document-evidence/v1` downloads expose the summary beside the exact version/hash. Tenant portable export v1 carries it as an additive optional field so older v1 exports remain accepted.
+- The synthetic guided version-2 action supplies a fixed synthetic change reason; this release does not add a binary editor, file upload, content replacement, malware scanning, rich authoring, retention/legal-hold behavior, production identity, production Cloudflare resources, or paid services.
+- Unit/browser/export coverage validates trimming and bounds, migration backfill, raw-SQL omission rejection, immutability, evidence visibility, export preservation, and existing lifecycle behavior.

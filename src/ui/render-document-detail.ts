@@ -186,6 +186,7 @@ function renderVersion(version: DocumentVersionEvidence): string {
         <p class="eyebrow">Version ${version.versionNumber}</p>
         <h3>${version.isCurrent ? "Current version" : "Historical version"}</h3>
         <p>Created by ${escapeHtml(version.createdByName)} · ${escapeHtml(formatTimestamp(version.createdAt))}</p>
+        <p><strong>Change summary:</strong> ${escapeHtml(version.changeSummary)}</p>
       </div>
       <span class="badge ${version.exactApprovalApplies ? "success" : "warning"}">
         ${version.exactApprovalApplies ? "Exact approval applies" : "Approval required"}

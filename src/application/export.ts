@@ -16,6 +16,7 @@ import type {
   WorkflowInstance,
   Workspace,
 } from "../domain/models";
+import { normalizeDocumentVersionChangeSummary } from "./document-version-change-summary";
 
 export const exportFormat = "ldw.document-control.export" as const;
 export const exportVersion = 1 as const;
@@ -262,6 +263,9 @@ export function validatePortableExport(data: PortableExportV1): void {
       "document version document",
     );
     assertReferenced(subjects, version.createdBySubjectId, "document creator");
+    if (version.changeSummary !== undefined) {
+      normalizeDocumentVersionChangeSummary(version.changeSummary);
+    }
   }
 
   for (const document of data.documents) {

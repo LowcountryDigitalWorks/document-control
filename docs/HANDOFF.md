@@ -285,3 +285,11 @@ At the start of a replacement development chat:
    relevant design and change-control boundary.
 
 Do not resume from old milestone numbers or old “next slice” text without live repository inspection.
+
+## Immutable document-version change-summary boundary
+
+- Migration `0011_document_version_change_summary.sql` adds a bounded change summary to exact document versions, backfills pre-feature versions with an explicit historical marker, rejects new inserts that omit a real summary, and prevents later summary rewrites.
+- Initial template-derived versions receive a server-controlled initial-version summary; changed versions must provide a trimmed 3–500 character summary with control characters rejected before persistence.
+- The summary is metadata about why an exact version exists. It does not represent rich authoring, file replacement, upload, malware scanning, or content transformation.
+- Document detail and `document-evidence/v1` show the summary next to the exact version/hash. Tenant portable export v1 includes the additive optional `changeSummary` field so older v1 packages remain valid.
+- New recurring cost is $0; no production resources are introduced.

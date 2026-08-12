@@ -82,6 +82,15 @@ async function createDatabase(): Promise<DatabaseSync> {
   );
   const database = new DatabaseSync(":memory:");
   database.exec(migration);
+  database.exec(
+    await readFile(
+      new URL(
+        "../../migrations/0011_document_version_change_summary.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  );
   return database;
 }
 
@@ -288,6 +297,7 @@ describe("persisted document workflow service", () => {
       versionId: "document-v2",
       contentHash: `sha256:${"2".repeat(64)}`,
       contentKey: versionTwoKey,
+      changeSummary: "Synthetic controlled version change.",
       actorSubjectId: "subject-author",
       occurredAt: "2026-08-10T19:06:00.000Z",
       auditEventId: "audit-version-two-created",
@@ -370,6 +380,7 @@ describe("persisted document workflow service", () => {
         documentId,
         versionId: "document-v2",
       }),
+      changeSummary: "Synthetic controlled version change.",
       actorSubjectId: "subject-author",
       occurredAt: "2026-08-10T19:04:00.000Z",
       auditEventId: "audit-stale-review-version-two",

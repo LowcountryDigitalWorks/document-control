@@ -52,6 +52,7 @@ export interface DocumentVersionEvidence {
   versionNumber: number;
   contentHash: string;
   contentProvider: string;
+  changeSummary: string;
   createdBySubjectId: string;
   createdByName: string;
   createdAt: string;
@@ -116,6 +117,7 @@ interface VersionRow {
   versionNumber: number;
   contentHash: string;
   contentProvider: string;
+  changeSummary: string;
   createdBySubjectId: string;
   createdByName: string;
   createdAt: string;
@@ -205,6 +207,7 @@ export class DocumentDetailReadService {
          version.version_number AS versionNumber,
          version.content_hash AS contentHash,
          version.content_provider AS contentProvider,
+         version.change_summary AS changeSummary,
          version.created_by_subject_id AS createdBySubjectId,
          creator.display_name AS createdByName,
          version.created_at AS createdAt
@@ -275,6 +278,7 @@ export class DocumentDetailReadService {
         versionNumber: version.versionNumber,
         contentHash: version.contentHash,
         contentProvider: version.contentProvider,
+        changeSummary: version.changeSummary,
         createdBySubjectId: version.createdBySubjectId,
         createdByName: version.createdByName,
         createdAt: version.createdAt,

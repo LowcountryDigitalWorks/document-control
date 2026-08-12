@@ -29,6 +29,7 @@ const detail: DocumentDetailEvidence = {
       versionNumber: 1,
       contentHash: "b".repeat(64),
       contentProvider: "r2",
+      changeSummary: "Synthetic controlled version change.",
       createdBySubjectId: "creator-internal",
       createdByName: "Casey Author",
       createdAt: "2026-08-12T14:00:00.000Z",
@@ -98,6 +99,9 @@ describe("document evidence manifest export", () => {
     expect(manifest.format).toBe("document-evidence/v1");
     expect(manifest.document.sourceTemplate?.contentHash).toBe("a".repeat(64));
     expect(manifest.document.versions[0]?.contentHash).toBe("b".repeat(64));
+    expect(manifest.document.versions[0]?.changeSummary).toBe(
+      "Synthetic controlled version change.",
+    );
     expect(
       manifest.document.versions[0]?.approvals[0]?.workflowDefinitionVersion,
     ).toBe(1);
@@ -110,6 +114,7 @@ describe("document evidence manifest export", () => {
       detail,
       "2026-08-12T15:00:00.000Z",
     );
+    expect(serialized).toContain("Synthetic controlled version change.");
     expect(serialized).not.toContain("tenant-internal");
     expect(serialized).not.toContain("creator-internal");
     expect(serialized).not.toContain("approver-internal");

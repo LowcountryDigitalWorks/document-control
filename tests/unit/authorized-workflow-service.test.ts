@@ -153,6 +153,7 @@ describe("authorized document workflow facade", () => {
         versionId: "version-2",
         contentHash: `sha256:${"2".repeat(64)}`,
         contentKey: "unused-after-denial",
+        changeSummary: "Synthetic controlled version change.",
       }),
     ).rejects.toBeInstanceOf(AuthorizationDeniedError);
     expect(policy.requests[0]).toMatchObject({

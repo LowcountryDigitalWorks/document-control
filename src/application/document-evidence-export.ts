@@ -22,6 +22,7 @@ export interface DocumentEvidenceManifestV1 {
       versionNumber: number;
       contentHash: string;
       contentProvider: string;
+      changeSummary: string;
       createdByName: string;
       createdAt: string;
       isCurrent: boolean;
@@ -86,6 +87,7 @@ export function createDocumentEvidenceManifest(
         versionNumber: version.versionNumber,
         contentHash: version.contentHash,
         contentProvider: version.contentProvider,
+        changeSummary: version.changeSummary,
         createdByName: version.createdByName,
         createdAt: version.createdAt,
         isCurrent: version.isCurrent,

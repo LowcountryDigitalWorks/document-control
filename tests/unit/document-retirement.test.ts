@@ -70,6 +70,7 @@ async function createHarness(): Promise<{
     "0001_initial.sql",
     "0002_system_role_permissions.sql",
     "0008_controlled_document_retirement.sql",
+    "0011_document_version_change_summary.sql",
   ]) {
     database.exec(
       await readFile(
@@ -101,11 +102,11 @@ async function createHarness(): Promise<{
        NULL, NULL, NULL, 'none', '${timestamp}', '${timestamp}');
     INSERT INTO document_versions
       (id, tenant_id, document_id, version_number, content_hash, content_provider,
-       content_key, created_by_subject_id, created_at)
+       content_key, change_summary, created_by_subject_id, created_at)
     VALUES
       ('${versionId}', '${tenantId}', '${documentId}', 1, '${hash}', 'r2',
        'tenants/${tenantId}/workspaces/${workspaceId}/documents/${documentId}/versions/${versionId}/content',
-       'owner-1', '${timestamp}');
+       'Approved record baseline for retirement testing.', 'owner-1', '${timestamp}');
     UPDATE documents SET current_version_id = '${versionId}' WHERE id = '${documentId}';
     INSERT INTO workflow_definitions (id, tenant_id, name, version, definition_json, created_at)
     VALUES
@@ -174,6 +175,7 @@ describe("controlled document retirement", () => {
           documentId,
           versionId: "document-approved-v2",
         }),
+        changeSummary: "Synthetic controlled version change.",
         actorSubjectId: "owner-1",
         auditEventId: "audit-version-after-retire",
         occurredAt: timestamp,
@@ -189,10 +191,10 @@ describe("controlled document retirement", () => {
       database.exec(`
         INSERT INTO document_versions
           (id, tenant_id, document_id, version_number, content_hash, content_provider,
-           content_key, created_by_subject_id, created_at)
+           content_key, change_summary, created_by_subject_id, created_at)
         VALUES
           ('direct-v2', '${tenantId}', '${documentId}', 2, 'sha256:${"c".repeat(64)}', 'r2',
-           'direct-key', 'owner-1', '${timestamp}');
+           'direct-key', 'Direct version attempt after retirement.', 'owner-1', '${timestamp}');
       `),
     ).toThrow(/cannot receive new versions/iu);
     expect(() =>
