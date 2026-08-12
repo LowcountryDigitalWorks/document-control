@@ -1,0 +1,39 @@
+name: Version Summary Status Milestone
+
+on:
+  push:
+    branches:
+      - feature/immutable-version-change-summary
+    paths:
+      - .github/workflows/version-summary-status-milestone.yml
+
+permissions:
+  contents: write
+
+jobs:
+  document:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feature/immutable-version-change-summary
+      - name: Record PR 38 milestone
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('docs/STATUS.md')
+          text = path.read_text()
+          old = 'and queue-native review and approval actions PR #37.'
+          new = 'queue-native review and approval actions PR #37, and immutable document-version change summaries PR #38.'
+          if text.count(old) != 1:
+              raise SystemExit(f'expected one milestone marker, found {text.count(old)}')
+          path.write_text(text.replace(old, new, 1))
+          PY
+      - name: Commit milestone
+        run: |
+          git config user.name "Eddie-LowcountryDigitalWorks"
+          git config user.email "eddie@lowcountrydigitalworks.com"
+          git add docs/STATUS.md
+          git diff --cached --check
+          git commit -m "Record version summary release milestone"
+          git push origin HEAD:feature/immutable-version-change-summary
