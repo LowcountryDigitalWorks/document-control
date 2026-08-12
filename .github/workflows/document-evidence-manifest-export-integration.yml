@@ -24,6 +24,22 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Reconcile helper with current STATUS wording
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path("scripts/patch-document-evidence-manifest-export.py")
+          text = path.read_text()
+          old = '''    '- Bundled R2/SharePoint binary content in exports.\\n',
+    '- Bundled R2/SharePoint binary content in exports or external archival/eDiscovery evidence packages.\\n',
+'''
+          new = '''    '- Bundled R2/SharePoint binaries in portable exports.\\n',
+    '- Bundled R2/SharePoint binaries in portable exports or external archival/eDiscovery evidence packages.\\n',
+'''
+          if text.count(old) != 1:
+              raise SystemExit("Expected stale STATUS helper marker not found exactly once")
+          path.write_text(text.replace(old, new, 1))
+          PY
       - name: Apply permanent feature patch
         run: python scripts/patch-document-evidence-manifest-export.py
       - name: Format permanent changes
