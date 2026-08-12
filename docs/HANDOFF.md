@@ -302,3 +302,14 @@ Do not resume from old milestone numbers or old “next slice” text without li
 - The summary is metadata about why an exact version exists. It does not represent rich authoring, file replacement, upload, malware scanning, or content transformation.
 - Document detail and `document-evidence/v1` show the summary next to the exact version/hash. Tenant portable export v1 includes the additive optional `changeSummary` field so older v1 packages remain valid.
 - New recurring cost is $0; no production resources are introduced.
+
+## Production Readiness Foundation I boundary
+
+The repository has entered a production-readiness phase. Do not resume adding unrelated synthetic feature breadth merely because the synthetic application can support it.
+
+- D1/SQLite is the accepted initial production metadata/state-store architecture. Domain/business rules remain provider-independent, but the current application persistence implementation is materially SQL/SQLite coupled because `DatabaseProvider` exposes raw SQL. A different provider is not a drop-in PostgreSQL capability. See ADR 0002.
+- `src/index.ts` should remain the minimal Worker composition entrypoint. HTTP application assembly and bounded route groups live under `src/http/`; route modules must receive application dependencies rather than instantiate D1/R2 infrastructure directly.
+- `docs/THREAT_MODEL.md` is the authoritative production-readiness threat baseline. Keep current mitigations distinct from planned controls and never convert a planned mitigation into a capability claim before implementation and validation.
+- The intended sequence is Production Readiness Foundation I; Operations & Supply-Chain Foundation; Production Identity & Tenant Boundary; Content Ingestion Architecture; an explicitly approved controlled staging vertical slice; then later retention, backup/recovery, and customer-readiness gates. A sequence label does not authorize its implementation.
+- Production authentication/SSO/session management, production tenant provisioning, arbitrary customer uploads, malware scanning/quarantine, production Cloudflare resources, retention/legal hold, complete backup/restore, customer data, PHI, PostgreSQL, and paid runtime services remain outside the current repository capability and authorization boundary.
+- Continue to preserve existing tenant isolation, membership/role/permission authorization, exact-version/hash approval evidence, immutable template/workflow history, append-only audit evidence, same-origin synthetic mutation controls, and synthetic-session isolation while production boundaries are introduced incrementally.
