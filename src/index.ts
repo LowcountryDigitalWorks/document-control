@@ -16,6 +16,7 @@ import { AuthorizedDocumentDetailReadService } from "./application/authorized-do
 import { AuthorizedDocumentWorkflowService } from "./application/authorized-document-workflow-service";
 import { AuthorizedPortableExportService } from "./application/authorized-portable-export-service";
 import { AuthorizedReviewApprovalQueueReadService } from "./application/authorized-review-approval-queue-read-service";
+import { AuthorizedTemplateDetailReadService } from "./application/authorized-template-detail-read-service";
 import { AuthorizedWorkspaceReadService } from "./application/authorized-workspace-read-service";
 import { AuthorizedWorkflowDefinitionAdminService } from "./application/authorized-workflow-definition-admin-service";
 import { AuthorizedWorkspaceWorkflowSelectionService } from "./application/authorized-workspace-workflow-selection-service";
@@ -51,6 +52,10 @@ import {
   RolesAccessInputValidationError,
 } from "./application/roles-access-input";
 import { RolesAccessAdminService } from "./application/roles-access-admin-service";
+import {
+  TemplateDetailReadService,
+  TemplateNotFoundError,
+} from "./application/template-detail-read-service";
 import { TemplateLifecycleAdminService } from "./application/template-lifecycle-admin-service";
 import {
   parseTemplateLifecycleInput,
@@ -113,6 +118,7 @@ import { renderGuidedDemo } from "./ui/render-guided-demo";
 import { renderMemberAdmin } from "./ui/render-member-admin";
 import { renderReviewApprovalQueue } from "./ui/render-review-approval-queue";
 import { renderRolesAccessAdmin } from "./ui/render-roles-access-admin";
+import { renderTemplateDetail } from "./ui/render-template-detail";
 import { renderTemplateLifecycleAdmin } from "./ui/render-template-lifecycle-admin";
 import { renderWorkflowDefinitionAdmin } from "./ui/render-workflow-definition-admin";
 import { renderWorkspaceWorkflowSelection } from "./ui/render-workspace-workflow-selection";
@@ -478,6 +484,48 @@ app.get("/demo/app/templates", async (context) => {
       filters,
     ),
   );
+});
+
+app.get("/demo/app/templates/:templateId", async (context) => {
+  if (!guidedDemoEnabled(context.env)) {
+    return context.html(renderNotFound(createTheme(context.env)), 404);
+  }
+
+  const session = resolveGuidedDemoSession(
+    context.req.header("Cookie"),
+    context.req.url,
+  );
+  if (session.setCookie) {
+    context.header("Set-Cookie", session.setCookie);
+  }
+  const database = new D1DatabaseProvider(context.env.DOCUMENT_CONTROL_DB);
+  const demo = createGuidedDemoContext(session.sessionId);
+  await ensureGuidedDemoSeed(database, session.sessionId);
+  const read = createAuthorizedTemplateDetailReadService(database);
+
+  try {
+    const detail = await read.getTemplateDetail({
+      subjectId: demo.authorSubjectId,
+      tenantId: demo.tenantId,
+      workspaceId: demo.workspaceId,
+      templateId: context.req.param("templateId"),
+    });
+    context.header("Cache-Control", "no-store");
+    return context.html(
+      renderTemplateDetail(
+        await createPersistedTenantTheme(database, context.env, demo.tenantId),
+        detail,
+      ),
+    );
+  } catch (error) {
+    if (
+      error instanceof AuthorizationDeniedError ||
+      error instanceof TemplateNotFoundError
+    ) {
+      return context.html(renderNotFound(createTheme(context.env)), 404);
+    }
+    throw error;
+  }
 });
 
 app.get("/demo/app/reviews", async (context) => {
@@ -2104,6 +2152,15 @@ function createAuthorizedWorkspaceReadService(
 ): AuthorizedWorkspaceReadService {
   return new AuthorizedWorkspaceReadService(
     new WorkspaceReadService(database),
+    new DatabaseAuthorizationPolicy(database),
+  );
+}
+
+function createAuthorizedTemplateDetailReadService(
+  database: D1DatabaseProvider,
+): AuthorizedTemplateDetailReadService {
+  return new AuthorizedTemplateDetailReadService(
+    new TemplateDetailReadService(database),
     new DatabaseAuthorizationPolicy(database),
   );
 }

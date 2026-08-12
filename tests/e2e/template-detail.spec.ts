@@ -18,7 +18,9 @@ test("opens immutable template evidence from the ordinary Templates list", async
   await expect(evidenceLink).toBeVisible();
   await evidenceLink.click();
 
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText(templateName);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(
+    templateName,
+  );
   await expect(
     page.getByRole("link", { name: "Templates", exact: true }),
   ).toHaveAttribute("aria-current", "page");

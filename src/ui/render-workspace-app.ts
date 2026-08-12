@@ -134,6 +134,7 @@ export function renderWorkspaceTemplates(
                 <div><dt>Provenance</dt><dd>${escapeHtml(template.provenance ?? "Not recorded")}</dd></div>
               </dl>
               ${template.contentHash ? `<p class="hash">${escapeHtml(shortHash(template.contentHash))}</p>` : ""}
+              <a class="text-link" href="/demo/app/templates/${encodeURIComponent(template.id)}">View template evidence</a>
             </article>`,
           )
           .join("")}</div>`;

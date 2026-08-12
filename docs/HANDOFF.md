@@ -47,7 +47,7 @@ The synthetic/test-only application now covers:
 - persisted document workflow lifecycle;
 - provider-neutral authorization;
 - guided workflow execution;
-- workspace Overview, Documents, Templates, document evidence with versioned JSON manifest export, and queue-native Reviews & Approvals actions;
+- workspace Overview, Documents, Templates with read-only immutable version evidence, document evidence with versioned JSON manifest export, and queue-native Reviews & Approvals actions;
 - bounded metadata search/filtering;
 - Backup & Portability export;
 - Audit Log with bounded workspace CSV evidence export;
@@ -168,6 +168,15 @@ approvals, and audit evidence remain pinned to their original exact workflow ver
 - The manifest includes stable document/workflow/review/approval identifiers, actor display names, exact hashes, source-template provenance, workflow-definition versions, timestamps, and at most six primitive audit payload fields per event.
 - Tenant ID, internal actor/creator subject IDs, content keys, binary content, nested/raw audit payload objects, and unrelated workspace/tenant records are excluded.
 - Evidence export is read-only, uses `Cache-Control: no-store`, and remains available for retired historical records. It is not a binary backup, legal archive, eDiscovery package, retention mechanism, or external records-management integration.
+
+## Controlled template evidence boundary
+
+- Ordinary authorized template readers can open `/demo/app/templates/:templateId` from the normal Templates list and inspect the immutable version lineage without entering Template Lifecycle administration.
+- The read path requires existing workspace-scoped `template.read` and remains tenant/workspace/template bounded; authorization denial and not-found use the same 404 response.
+- Evidence includes exact version number, lifecycle state, SHA-256 identity, provenance, creator display name, creation timestamp, published/superseded timestamps, and the current-version marker.
+- Content provider/key values, creator subject IDs, audit payloads, document-usage records, and unrelated tenant/workspace records are deliberately excluded from this view.
+- This surface is read-only. Lifecycle mutation remains in the separately authorized Template Lifecycle administration service and no new mutation path is introduced.
+- The template evidence page is not a binary download, template export, upload/content-replacement flow, retention/archive mechanism, or production integration.
 
 ## Controlled document retirement
 

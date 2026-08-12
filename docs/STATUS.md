@@ -115,6 +115,15 @@ Turnstile/abuse controls, and operational cleanup are implemented and validated.
 - Browser coverage verifies navigation, persisted read-after-write behavior, accessibility, responsive
   overflow, and cross-session isolation on desktop and mobile.
 
+### Controlled template evidence detail (synthetic/test only)
+
+- The ordinary Templates list links each controlled template to a read-only `/demo/app/templates/:templateId` evidence view.
+- `TemplateDetailReadService` returns the complete immutable version lineage newest-first, including exact version number, lifecycle state, SHA-256 identity, provenance, creator display name, lifecycle timestamps, and current-version status.
+- `AuthorizedTemplateDetailReadService` requires existing workspace-scoped `template.read` before persistence executes; the query independently constrains tenant, workspace, and template ID.
+- Storage provider/key metadata, creator subject IDs, audit payloads, document usage, and unrelated records are not projected into the evidence model.
+- Authorization denial and cross-session/wrong-workspace template IDs use the same not-found response, preserving synthetic tenant/session isolation.
+- This slice adds no schema migration, lifecycle mutation, template upload/content replacement, binary download/export, production authentication, Cloudflare resources, analytics, or paid services.
+
 ### Authorized document detail and evidence (synthetic/test only)
 
 - A tenant/document-scoped detail read model exposes source-template provenance, exact version

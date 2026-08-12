@@ -53,11 +53,17 @@ class SqliteDatabaseProvider implements DatabaseProvider {
 async function createService(): Promise<TemplateDetailReadService> {
   const database = new DatabaseSync(":memory:");
   database.exec(
-    await readFile(new URL("../../migrations/0001_initial.sql", import.meta.url), "utf8"),
+    await readFile(
+      new URL("../../migrations/0001_initial.sql", import.meta.url),
+      "utf8",
+    ),
   );
   database.exec(
     await readFile(
-      new URL("../../migrations/0002_system_role_permissions.sql", import.meta.url),
+      new URL(
+        "../../migrations/0002_system_role_permissions.sql",
+        import.meta.url,
+      ),
       "utf8",
     ),
   );

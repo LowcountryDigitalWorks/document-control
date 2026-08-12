@@ -16,7 +16,7 @@ Implemented synthetic/test-only product capabilities include:
 - provider-neutral identity, membership, roles, scoped permissions, and authorization;
 - create-from-controlled-template document workflows;
 - exact-version workflow instances, review evidence, approvals, changed-version invalidation, and versioned per-document evidence manifests;
-- workspace overview, Documents, Templates, queue-native Reviews & Approvals actions, Audit Log, bounded search/filtering, and bounded CSV audit evidence export;
+- workspace overview, Documents, Templates with immutable version evidence, queue-native Reviews & Approvals actions, Audit Log, bounded search/filtering, and bounded CSV audit evidence export;
 - Backup & Portability export of persisted application state and external content references;
 - tenant presentation settings, provider-neutral tenant member lifecycle, workspace Roles & Access, and tenant-owned custom workspace roles with terminal retirement;
 - immutable Workflow Definition creation/versioning;
@@ -90,6 +90,7 @@ workflow-definition version they originally used regardless of later lifecycle c
 - Authoring may copy an exact historical workflow version into a new editable draft, but saving always
   inserts a new immutable version.
 - Templates are controlled/versioned records with lifecycle and provenance metadata. A Template Manager may create a sequential immutable Draft revision from any exact historical version when intentionally reusing the same content identity; the source SHA-256/provider/key are copied unchanged and derivation is recorded in provenance/audit.
+- Authorized template readers can inspect every immutable version, lifecycle state, exact SHA-256 identity, provenance, creator display name, and lifecycle timestamp without receiving storage keys, internal creator subject IDs, or lifecycle mutation controls.
 - Review and approval actions can be completed from their ordinary authorized queues; stale workflow versions are rejected by the application service and database integrity triggers.
 - Approval records bind actor and timestamp to an exact document version, SHA-256 content hash,
   workflow instance, and workflow-definition version.
