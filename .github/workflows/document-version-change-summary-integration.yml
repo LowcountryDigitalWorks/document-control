@@ -28,7 +28,7 @@ jobs:
         run: python scripts/fix-document-version-change-summary-patch.py
       - name: Apply permanent feature patch
         run: python scripts/patch-document-version-change-summary.py
-      - name: Reconcile spread-based test caller
+      - name: Reconcile test schema and callers
         run: python scripts/reconcile-version-summary-test-callers.py
       - name: Format permanent changes
         run: pnpm exec prettier --write src tests README.md docs migrations
