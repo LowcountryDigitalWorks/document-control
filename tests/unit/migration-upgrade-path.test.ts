@@ -7,8 +7,7 @@ import {
 } from "../../scripts/migration-files";
 
 const timestamp = "2026-08-12T12:00:00.000Z";
-const historicalSummary =
-  "Historical version recorded before change-summary tracking.";
+const priorChangeSummary = "Upgrade path state before session persistence.";
 
 const expectedMigrationNames = [
   "0001_initial.sql",
@@ -22,6 +21,7 @@ const expectedMigrationNames = [
   "0009_template_revision_linearity.sql",
   "0010_current_workflow_action_integrity.sql",
   "0011_document_version_change_summary.sql",
+  "0012_authenticated_session_verifiers.sql",
 ] as const;
 
 type SqlParameter = string | number | null;
@@ -86,7 +86,7 @@ function seedPriorSupportedState(database: DatabaseSync): void {
   );
   run(
     database,
-    "INSERT INTO document_versions (id, tenant_id, document_id, version_number, content_hash, content_provider, content_key, created_by_subject_id, created_at) VALUES (?, ?, ?, 1, ?, 'r2', ?, ?, ?)",
+    "INSERT INTO document_versions (id, tenant_id, document_id, version_number, content_hash, content_provider, content_key, created_by_subject_id, created_at, change_summary) VALUES (?, ?, ?, 1, ?, 'r2', ?, ?, ?, ?)",
     "version-upgrade-1",
     "tenant-upgrade-a",
     "document-upgrade",
@@ -94,6 +94,7 @@ function seedPriorSupportedState(database: DatabaseSync): void {
     "tenants/tenant-upgrade-a/workspaces/workspace-upgrade-a/documents/document-upgrade/versions/version-upgrade-1/content",
     "subject-upgrade",
     timestamp,
+    priorChangeSummary,
   );
   run(
     database,
@@ -141,10 +142,24 @@ describe("ordered D1/SQLite migration upgrade path", () => {
     const database = new DatabaseSync(":memory:");
     applyMigrationFiles(database, await loadOrderedMigrations());
 
-    const columns = database
+    const versionColumns = database
       .prepare("PRAGMA table_info(document_versions)")
       .all() as { name: string }[];
-    expect(columns.map((column) => column.name)).toContain("change_summary");
+    expect(versionColumns.map((column) => column.name)).toContain(
+      "change_summary",
+    );
+
+    const sessionColumns = database
+      .prepare("PRAGMA table_info(authenticated_sessions)")
+      .all() as { name: string }[];
+    expect(sessionColumns.map((column) => column.name)).toEqual([
+      "verifier",
+      "subject_id",
+      "authenticated_at",
+      "created_at",
+      "expires_at",
+      "revoked_at",
+    ]);
 
     const trigger = database
       .prepare(
@@ -157,7 +172,7 @@ describe("ordered D1/SQLite migration upgrade path", () => {
     database.close();
   });
 
-  it("upgrades the immediately prior supported schema while preserving records and invariants", async () => {
+  it("upgrades 0011 to the session-verifier schema while preserving records and invariants", async () => {
     const migrations = await loadOrderedMigrations();
     const database = new DatabaseSync(":memory:");
 
@@ -177,13 +192,44 @@ describe("ordered D1/SQLite migration upgrade path", () => {
     expect(version).toEqual({
       id: "version-upgrade-1",
       content_hash: `sha256:${"1".repeat(64)}`,
-      change_summary: historicalSummary,
+      change_summary: priorChangeSummary,
     });
 
     const audit = database
       .prepare("SELECT event_type FROM audit_events WHERE id = ?")
       .get("audit-upgrade-1") as { event_type: string };
     expect(audit.event_type).toBe("document.created");
+
+    run(
+      database,
+      "INSERT INTO authenticated_sessions (verifier, subject_id, authenticated_at, created_at, expires_at) VALUES (?, ?, ?, ?, ?)",
+      "a".repeat(64),
+      "subject-upgrade",
+      timestamp,
+      timestamp,
+      "2026-08-12T13:00:00.000Z",
+    );
+    const session = database
+      .prepare(
+        "SELECT verifier, subject_id FROM authenticated_sessions WHERE verifier = ?",
+      )
+      .get("a".repeat(64)) as { verifier: string; subject_id: string };
+    expect(session).toEqual({
+      verifier: "a".repeat(64),
+      subject_id: "subject-upgrade",
+    });
+
+    expect(() =>
+      run(
+        database,
+        "INSERT INTO authenticated_sessions (verifier, subject_id, authenticated_at, created_at, expires_at) VALUES (?, ?, ?, ?, ?)",
+        "raw-browser-token-is-not-a-verifier",
+        "subject-upgrade",
+        timestamp,
+        timestamp,
+        "2026-08-12T13:00:00.000Z",
+      ),
+    ).toThrow();
 
     expect(() =>
       run(
