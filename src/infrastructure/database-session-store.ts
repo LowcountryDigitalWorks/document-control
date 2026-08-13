@@ -36,8 +36,8 @@ export class DatabaseSessionStore implements SessionStore {
     assertStoredSession(session);
     await this.database.execute(
       `INSERT INTO authenticated_sessions
-         (verifier, subject_id, authenticated_at, created_at, expires_at, revoked_at)
-       VALUES (?, ?, ?, ?, ?, NULL)`,
+         (verifier, subject_id, authenticated_at, created_at, expires_at, revoked_at, replaced_by_verifier)
+       VALUES (?, ?, ?, ?, ?, NULL, NULL)`,
       [
         session.verifier,
         session.subjectId,
@@ -53,7 +53,7 @@ export class DatabaseSessionStore implements SessionStore {
     assertTimestamp(revokedAt, "Session revocation timestamp");
     const result = await this.database.execute(
       `UPDATE authenticated_sessions
-       SET revoked_at = ?
+       SET revoked_at = ?, replaced_by_verifier = NULL
        WHERE verifier = ?
          AND revoked_at IS NULL
          AND expires_at > ?`,
@@ -75,19 +75,25 @@ export class DatabaseSessionStore implements SessionStore {
     const results = await this.database.executeBatch([
       {
         sql: `UPDATE authenticated_sessions
-              SET revoked_at = ?
+              SET revoked_at = ?, replaced_by_verifier = ?
               WHERE verifier = ?
                 AND revoked_at IS NULL
                 AND expires_at > ?`,
-        parameters: [revokedAt, currentVerifier, revokedAt],
+        parameters: [
+          revokedAt,
+          replacement.verifier,
+          currentVerifier,
+          revokedAt,
+        ],
       },
       {
         sql: `INSERT INTO authenticated_sessions
-                (verifier, subject_id, authenticated_at, created_at, expires_at, revoked_at)
-              SELECT ?, ?, ?, ?, ?, NULL
+                (verifier, subject_id, authenticated_at, created_at, expires_at, revoked_at, replaced_by_verifier)
+              SELECT ?, ?, ?, ?, ?, NULL, NULL
               FROM authenticated_sessions current
               WHERE current.verifier = ?
                 AND current.revoked_at = ?
+                AND current.replaced_by_verifier = ?
                 AND current.expires_at > ?`,
         parameters: [
           replacement.verifier,
@@ -97,6 +103,7 @@ export class DatabaseSessionStore implements SessionStore {
           replacement.expiresAt,
           currentVerifier,
           revokedAt,
+          replacement.verifier,
           revokedAt,
         ],
       },
