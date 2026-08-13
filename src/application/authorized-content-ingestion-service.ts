@@ -2,10 +2,10 @@ import type { AuthorizationPolicy } from "./authorization";
 import type {
   ContentIngestionRecord,
   ContentIngestionSelector,
+  ContentIngestionService,
   InitiateContentIngestionInput,
   ReceiveContentInput,
 } from "./content-ingestion";
-import { ContentIngestionService } from "./content-ingestion";
 import type { ContentObject } from "./ports";
 
 export class AuthorizedContentIngestionService {
@@ -14,7 +14,9 @@ export class AuthorizedContentIngestionService {
     private readonly authorization: AuthorizationPolicy,
   ) {}
 
-  public async initiate(input: InitiateContentIngestionInput): Promise<ContentIngestionRecord> {
+  public async initiate(
+    input: InitiateContentIngestionInput,
+  ): Promise<ContentIngestionRecord> {
     await this.authorization.assertAllowed({
       subjectId: input.actorSubjectId,
       tenantId: input.tenantId,
@@ -24,7 +26,9 @@ export class AuthorizedContentIngestionService {
     return this.ingestion.initiate(input);
   }
 
-  public async receiveAndValidate(input: ReceiveContentInput): Promise<ContentIngestionRecord> {
+  public async receiveAndValidate(
+    input: ReceiveContentInput,
+  ): Promise<ContentIngestionRecord> {
     await this.authorization.assertAllowed({
       subjectId: input.actorSubjectId,
       tenantId: input.tenantId,
@@ -34,7 +38,9 @@ export class AuthorizedContentIngestionService {
     return this.ingestion.receiveAndValidate(input);
   }
 
-  public async recover(input: ContentIngestionSelector): Promise<ContentIngestionRecord> {
+  public async recover(
+    input: ContentIngestionSelector,
+  ): Promise<ContentIngestionRecord> {
     await this.authorization.assertAllowed({
       subjectId: input.actorSubjectId,
       tenantId: input.tenantId,
