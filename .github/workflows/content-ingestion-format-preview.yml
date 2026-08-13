@@ -1,4 +1,4 @@
-name: Temporary Content Ingestion Format Preview
+name: Temporary Content Ingestion Candidate Validation
 
 on:
   push:
@@ -9,12 +9,13 @@ permissions:
   contents: read
 
 jobs:
-  preview:
+  validate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: release/content-ingestion-architecture-1
+          fetch-depth: 0
           persist-credentials: false
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
@@ -24,7 +25,73 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Apply intended finalization in runner only
         run: python scripts/content-ingestion-release-finalize.py --apply
-      - name: Format in runner only
+      - name: Format candidate in runner only
         run: pnpm format
-      - name: Show exact formatted diff
-        run: git diff --no-ext-diff -- . ':!pnpm-lock.yaml'
+      - name: Prettier
+        run: pnpm format:check
+      - name: ESLint
+        run: pnpm lint
+      - name: Strict TypeScript
+        run: pnpm typecheck
+      - name: Full-history secret scan
+        run: pnpm secrets:scan | tee /tmp/secrets.log
+      - name: Unit and invariant tests
+        run: pnpm test:unit | tee /tmp/unit.log
+      - name: Worker dry-run build
+        run: pnpm build
+      - name: Dependency audit
+        run: pnpm audit --audit-level=high
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Browser and accessibility validation
+        run: pnpm test:e2e | tee /tmp/browser.log
+      - name: Record exact validation results
+        run: |
+          python scripts/content-ingestion-release-finalize.py --record
+          pnpm exec prettier --write docs/STATUS.md docs/HANDOFF.md
+          pnpm format:check
+      - name: Collect candidate snapshot
+        run: |
+          mkdir -p /tmp/candidate-snapshot
+          cp --parents \
+            docs/ARCHITECTURE.md \
+            docs/HANDOFF.md \
+            docs/OPERATIONS_RECOVERY.md \
+            docs/STATUS.md \
+            docs/THREAT_MODEL.md \
+            docs/adr/0004-content-ingestion-staged-state-and-integrity.md \
+            migrations/0013_content_ingestions.sql \
+            migrations/0014_content_ingestion_audit_triggers.sql \
+            src/application/authorized-content-ingestion-service.ts \
+            src/application/content-ingestion-events.ts \
+            src/application/content-ingestion-model.ts \
+            src/application/content-ingestion-receive.ts \
+            src/application/content-ingestion-recovery.ts \
+            src/application/content-ingestion-service.ts \
+            src/application/content-ingestion-storage.ts \
+            src/application/content-ingestion-validation-flow.ts \
+            src/application/content-ingestion-validation.ts \
+            src/application/content-ingestion.ts \
+            src/infrastructure/content-key.ts \
+            src/infrastructure/crypto-content-ingestion-identifier-generator.ts \
+            src/infrastructure/database-content-ingestion-repository.ts \
+            src/infrastructure/database-content-ingestion-row.ts \
+            src/infrastructure/database-content-ingestion-transitions.ts \
+            tests/unit/content-ingestion-authorization.test.ts \
+            tests/unit/content-ingestion-database-support.ts \
+            tests/unit/content-ingestion-database.test.ts \
+            tests/unit/content-ingestion-lifecycle.test.ts \
+            tests/unit/content-ingestion-memory-support.ts \
+            tests/unit/content-ingestion-recovery.test.ts \
+            tests/unit/content-ingestion-storage-reconciliation.test.ts \
+            tests/unit/content-store.test.ts \
+            tests/unit/migration-upgrade-path.test.ts \
+            /tmp/candidate-snapshot
+          cp /tmp/unit.log /tmp/browser.log /tmp/secrets.log /tmp/candidate-snapshot/
+      - name: Upload finalized candidate snapshot
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: content-ingestion-candidate-snapshot
+          path: /tmp/candidate-snapshot
+          if-no-files-found: error
+          retention-days: 1
