@@ -1,6 +1,6 @@
-import {
+import type {
+  AuthenticatedPrincipal,
   IdentityMappingService,
-  type AuthenticatedPrincipal,
 } from "./authentication";
 
 export interface AuthenticatedSession {
