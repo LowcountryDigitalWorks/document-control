@@ -50,9 +50,9 @@ function run(
 }
 
 function row(database: DatabaseSync, table: RecoveryTable, id: string): Row {
-  const result = database.prepare(`SELECT * FROM ${table} WHERE id = ?`).get(id) as
-    | Row
-    | undefined;
+  const result = database
+    .prepare(`SELECT * FROM ${table} WHERE id = ?`)
+    .get(id) as Row | undefined;
   if (!result) throw new Error(`Expected ${table} row ${id}.`);
   return result;
 }
@@ -279,14 +279,20 @@ function capture(database: DatabaseSync) {
   };
 }
 
-function restore(database: DatabaseSync, state: ReturnType<typeof capture>): void {
+function restore(
+  database: DatabaseSync,
+  state: ReturnType<typeof capture>,
+): void {
   insertRow(database, "identity_subjects", state.subject);
   insertRow(database, "tenants", state.tenant);
   insertRow(database, "tenant_memberships", state.membership);
   insertRow(database, "workspaces", state.workspace);
   insertRow(database, "role_bindings", state.binding);
 
-  insertRow(database, "templates", { ...state.template, current_version: null });
+  insertRow(database, "templates", {
+    ...state.template,
+    current_version: null,
+  });
   insertRow(database, "template_versions", state.templateVersion);
   run(
     database,
@@ -364,7 +370,9 @@ describe("local synthetic recovery drill", () => {
       restored
         .prepare("PRAGMA table_info(document_versions)")
         .all()
-        .some((column) => (column as { name: string }).name === "change_summary"),
+        .some(
+          (column) => (column as { name: string }).name === "change_summary",
+        ),
     ).toBe(true);
 
     source.close();
