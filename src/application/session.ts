@@ -4,7 +4,15 @@ import type {
 } from "./authentication";
 
 export interface AuthenticatedSession {
-  sessionId: string;
+  bearerToken: string;
+  subjectId: string;
+  authenticatedAt: string;
+  createdAt: string;
+  expiresAt: string;
+}
+
+export interface StoredAuthenticatedSession {
+  verifier: string;
   subjectId: string;
   authenticatedAt: string;
   createdAt: string;
@@ -20,18 +28,23 @@ export interface AuthenticatedRequestContext {
 }
 
 export interface SessionStore {
-  find(sessionId: string): Promise<AuthenticatedSession | null>;
-  save(session: AuthenticatedSession): Promise<void>;
-  revoke(sessionId: string, revokedAt: string): Promise<boolean>;
+  find(verifier: string): Promise<StoredAuthenticatedSession | null>;
+  save(session: StoredAuthenticatedSession): Promise<void>;
+  revoke(verifier: string, revokedAt: string): Promise<boolean>;
   replace(
-    currentSessionId: string,
-    replacement: AuthenticatedSession,
+    currentVerifier: string,
+    replacement: StoredAuthenticatedSession,
     revokedAt: string,
   ): Promise<boolean>;
+  cleanup(inactiveBefore: string): Promise<number>;
 }
 
 export interface SessionIdGenerator {
   generate(): Promise<string>;
+}
+
+export interface SessionTokenVerifier {
+  derive(bearerToken: string): Promise<string>;
 }
 
 export interface Clock {
@@ -60,12 +73,14 @@ export class AuthenticationRequiredError extends Error {
 
 const maxSessionLifetimeMs = 24 * 60 * 60 * 1000;
 const opaqueSessionIdPattern = /^[0-9a-f]{64}$/u;
+const sessionVerifierPattern = /^[0-9a-f]{64}$/u;
 
 export class SessionService {
   public constructor(
     private readonly identityMapping: IdentityMappingService,
     private readonly store: SessionStore,
     private readonly idGenerator: SessionIdGenerator,
+    private readonly tokenVerifier: SessionTokenVerifier,
     private readonly clock: Clock,
     private readonly sessionLifetimeMs: number,
     private readonly audit?: SessionSecurityAuditSink,
@@ -84,27 +99,28 @@ export class SessionService {
   ): Promise<AuthenticatedSession> {
     const mapped = await this.identityMapping.resolve(principal);
     const now = this.clock.now();
-    const sessionId = await this.generateOpaqueSessionId();
-    const session: AuthenticatedSession = {
-      sessionId,
+    const bearerToken = await this.generateOpaqueSessionId();
+    const verifier = await this.deriveVerifier(bearerToken);
+    const stored: StoredAuthenticatedSession = {
+      verifier,
       subjectId: mapped.identity.subjectId,
       authenticatedAt: mapped.principal.authenticatedAt,
       createdAt: now.toISOString(),
       expiresAt: new Date(now.getTime() + this.sessionLifetimeMs).toISOString(),
     };
-    await this.store.save(session);
+    await this.store.save(stored);
     await this.recordSecurityEvent(
       "session.established",
-      session.subjectId,
+      stored.subjectId,
       now,
     );
-    return session;
+    return toAuthenticatedSession(bearerToken, stored);
   }
 
   public async resolve(
-    sessionId: string,
+    bearerToken: string,
   ): Promise<AuthenticatedRequestContext> {
-    const session = await this.requireActiveSession(sessionId);
+    const { session } = await this.requireActiveSession(bearerToken);
     return {
       subjectId: session.subjectId,
       authenticatedAt: session.authenticatedAt,
@@ -113,44 +129,60 @@ export class SessionService {
     };
   }
 
-  public async revoke(sessionId: string): Promise<void> {
-    const session = await this.requireActiveSession(sessionId);
+  public async revoke(bearerToken: string): Promise<void> {
+    const { session, verifier } = await this.requireActiveSession(bearerToken);
     const now = this.clock.now();
-    const revoked = await this.store.revoke(
-      session.sessionId,
-      now.toISOString(),
-    );
+    const revoked = await this.store.revoke(verifier, now.toISOString());
     if (!revoked) throw new AuthenticationRequiredError();
     await this.recordSecurityEvent("session.revoked", session.subjectId, now);
   }
 
-  public async rotate(sessionId: string): Promise<AuthenticatedSession> {
-    const current = await this.requireActiveSession(sessionId);
+  public async rotate(bearerToken: string): Promise<AuthenticatedSession> {
+    const { session: current, verifier: currentVerifier } =
+      await this.requireActiveSession(bearerToken);
     const now = this.clock.now();
-    const replacement: AuthenticatedSession = {
-      sessionId: await this.generateOpaqueSessionId(),
+    const replacementBearerToken = await this.generateOpaqueSessionId();
+    const replacementVerifier = await this.deriveVerifier(
+      replacementBearerToken,
+    );
+    if (replacementVerifier === currentVerifier) {
+      throw new Error("Session token generator produced a duplicate verifier.");
+    }
+    const replacement: StoredAuthenticatedSession = {
+      verifier: replacementVerifier,
       subjectId: current.subjectId,
       authenticatedAt: current.authenticatedAt,
       createdAt: now.toISOString(),
       expiresAt: current.expiresAt,
     };
     const replaced = await this.store.replace(
-      current.sessionId,
+      currentVerifier,
       replacement,
       now.toISOString(),
     );
     if (!replaced) throw new AuthenticationRequiredError();
     await this.recordSecurityEvent("session.rotated", current.subjectId, now);
-    return replacement;
+    return toAuthenticatedSession(replacementBearerToken, replacement);
   }
 
-  private async requireActiveSession(
-    sessionId: string,
-  ): Promise<AuthenticatedSession> {
-    if (!isOpaqueSessionIdentifier(sessionId)) {
+  public async cleanupInactiveSessions(
+    inactiveBefore: Date = this.clock.now(),
+  ): Promise<number> {
+    if (!Number.isFinite(inactiveBefore.getTime())) {
+      throw new Error("Session cleanup timestamp is invalid.");
+    }
+    return this.store.cleanup(inactiveBefore.toISOString());
+  }
+
+  private async requireActiveSession(bearerToken: string): Promise<{
+    session: StoredAuthenticatedSession;
+    verifier: string;
+  }> {
+    if (!isOpaqueSessionIdentifier(bearerToken)) {
       throw new AuthenticationRequiredError();
     }
-    const session = await this.store.find(sessionId);
+    const verifier = await this.deriveVerifier(bearerToken);
+    const session = await this.store.find(verifier);
     if (
       !session ||
       session.revokedAt !== undefined ||
@@ -158,17 +190,25 @@ export class SessionService {
     ) {
       throw new AuthenticationRequiredError();
     }
-    return session;
+    return { session, verifier };
   }
 
   private async generateOpaqueSessionId(): Promise<string> {
-    const sessionId = await this.idGenerator.generate();
-    if (!isOpaqueSessionIdentifier(sessionId)) {
+    const bearerToken = await this.idGenerator.generate();
+    if (!isOpaqueSessionIdentifier(bearerToken)) {
       throw new Error(
         "Session ID generator returned an invalid opaque identifier.",
       );
     }
-    return sessionId;
+    return bearerToken;
+  }
+
+  private async deriveVerifier(bearerToken: string): Promise<string> {
+    const verifier = await this.tokenVerifier.derive(bearerToken);
+    if (!isSessionVerifier(verifier)) {
+      throw new Error("Session verifier returned an invalid digest.");
+    }
+    return verifier;
   }
 
   private async recordSecurityEvent(
@@ -184,6 +224,23 @@ export class SessionService {
   }
 }
 
+function toAuthenticatedSession(
+  bearerToken: string,
+  session: StoredAuthenticatedSession,
+): AuthenticatedSession {
+  return {
+    bearerToken,
+    subjectId: session.subjectId,
+    authenticatedAt: session.authenticatedAt,
+    createdAt: session.createdAt,
+    expiresAt: session.expiresAt,
+  };
+}
+
 export function isOpaqueSessionIdentifier(value: string): boolean {
   return opaqueSessionIdPattern.test(value);
+}
+
+export function isSessionVerifier(value: string): boolean {
+  return sessionVerifierPattern.test(value);
 }
