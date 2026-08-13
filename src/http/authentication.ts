@@ -70,10 +70,10 @@ export function createAuthenticatedSessionCookie(
     throw new Error("Authenticated-session cookie lifetime is invalid.");
   }
   const secure = new URL(requestUrl).protocol === "https:" ? "; Secure" : "";
-  return `${authenticatedSessionCookieName}=${sessionId}; Path=/; Max-Age=${maxAgeSeconds}; HttpOnly; SameSite=Strict${secure}`;
+  return `${authenticatedSessionCookieName}=${sessionId}; Path=/app; Max-Age=${maxAgeSeconds}; HttpOnly; SameSite=Lax${secure}`;
 }
 
 export function clearAuthenticatedSessionCookie(requestUrl: string): string {
   const secure = new URL(requestUrl).protocol === "https:" ? "; Secure" : "";
-  return `${authenticatedSessionCookieName}=; Path=/; Max-Age=0; HttpOnly; SameSite=Strict${secure}`;
+  return `${authenticatedSessionCookieName}=; Path=/app; Max-Age=0; HttpOnly; SameSite=Lax${secure}`;
 }
