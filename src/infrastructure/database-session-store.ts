@@ -56,7 +56,7 @@ export class DatabaseSessionStore implements SessionStore {
        SET revoked_at = ?, replaced_by_verifier = NULL
        WHERE verifier = ?
          AND revoked_at IS NULL
-         AND expires_at > ?`,
+         AND julianday(expires_at) > julianday(?)`,
       [revokedAt, verifier, revokedAt],
     );
     return result.changes === 1;
@@ -78,7 +78,7 @@ export class DatabaseSessionStore implements SessionStore {
               SET revoked_at = ?, replaced_by_verifier = ?
               WHERE verifier = ?
                 AND revoked_at IS NULL
-                AND expires_at > ?`,
+                AND julianday(expires_at) > julianday(?)`,
         parameters: [
           revokedAt,
           replacement.verifier,
@@ -94,7 +94,7 @@ export class DatabaseSessionStore implements SessionStore {
               WHERE current.verifier = ?
                 AND current.revoked_at = ?
                 AND current.replaced_by_verifier = ?
-                AND current.expires_at > ?`,
+                AND julianday(current.expires_at) > julianday(?)`,
         parameters: [
           replacement.verifier,
           replacement.subjectId,
@@ -116,8 +116,8 @@ export class DatabaseSessionStore implements SessionStore {
     assertTimestamp(inactiveBefore, "Session cleanup timestamp");
     const result = await this.database.execute(
       `DELETE FROM authenticated_sessions
-       WHERE expires_at <= ?
-          OR (revoked_at IS NOT NULL AND revoked_at <= ?)`,
+       WHERE julianday(expires_at) <= julianday(?)
+          OR (revoked_at IS NOT NULL AND julianday(revoked_at) <= julianday(?))`,
       [inactiveBefore, inactiveBefore],
     );
     return result.changes;
