@@ -16,8 +16,11 @@ export function readOidcCallbackInput(
   const transactionId = readOidcAuthorizationTransactionCookie(cookieHeader);
   if (!transactionId) return null;
   const url = new URL(requestUrl);
-  const state = url.searchParams.get("state");
-  const authorizationCode = url.searchParams.get("code");
+  const states = url.searchParams.getAll("state");
+  const authorizationCodes = url.searchParams.getAll("code");
+  if (states.length !== 1 || authorizationCodes.length !== 1) return null;
+  const [state] = states;
+  const [authorizationCode] = authorizationCodes;
   if (!state || !authorizationCode) return null;
   return { transactionId, state, authorizationCode };
 }
@@ -26,19 +29,18 @@ export function readOidcAuthorizationTransactionCookie(
   cookieHeader: string | undefined,
 ): string | null {
   if (!cookieHeader) return null;
+  let transactionId: string | null = null;
   for (const part of cookieHeader.split(";")) {
     const separator = part.indexOf("=");
     if (separator < 0) continue;
     const name = part.slice(0, separator).trim();
+    if (name !== oidcAuthorizationTransactionCookieName) continue;
+    if (transactionId !== null) return null;
     const value = part.slice(separator + 1).trim();
-    if (
-      name === oidcAuthorizationTransactionCookieName &&
-      opaqueTransactionPattern.test(value)
-    ) {
-      return value;
-    }
+    if (!opaqueTransactionPattern.test(value)) return null;
+    transactionId = value;
   }
-  return null;
+  return transactionId;
 }
 
 export function createOidcAuthorizationTransactionCookie(
