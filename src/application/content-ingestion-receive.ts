@@ -12,10 +12,7 @@ import {
   type ReceiveContentInput,
 } from "./content-ingestion-model";
 import { ingestionEvent } from "./content-ingestion-events";
-import {
-  failIngestion,
-  loadExistingCandidate,
-} from "./content-ingestion-storage";
+import { loadExistingCandidate } from "./content-ingestion-storage";
 import { validateStagedCandidate } from "./content-ingestion-validation-flow";
 
 export async function receiveAndValidateCandidate(
@@ -77,15 +74,7 @@ export async function receiveAndValidateCandidate(
         contentHash,
       });
     } catch {
-      await failIngestion(
-        repository,
-        identifiers,
-        candidate,
-        input.actorSubjectId,
-        input.occurredAt,
-        "storage_write_failed",
-      );
-      return reload(repository, candidate);
+      throw new ContentIngestionRecoveryRequiredError();
     }
   }
 
