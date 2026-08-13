@@ -1,4 +1,4 @@
-name: Temporary Content Ingestion Format Artifact
+name: Temporary Content Ingestion Finalizer
 
 on:
   push:
@@ -6,50 +6,31 @@ on:
       - release/content-ingestion-architecture-1
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  format:
+  finalize:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: release/content-ingestion-architecture-1
-          persist-credentials: false
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Format repository in runner only
-        run: pnpm format
-      - name: Verify formatting
-        run: pnpm format:check
-      - name: Collect exact formatted files
+      - name: Format and verify candidate
         run: |
-          mkdir -p /tmp/formatted
-          cp --parents \
-            src/application/content-ingestion-model.ts \
-            src/application/content-ingestion-receive.ts \
-            src/application/content-ingestion-service.ts \
-            src/application/content-ingestion-storage.ts \
-            src/infrastructure/crypto-content-ingestion-identifier-generator.ts \
-            src/infrastructure/database-content-ingestion-repository.ts \
-            src/infrastructure/database-content-ingestion-row.ts \
-            src/infrastructure/database-content-ingestion-transitions.ts \
-            tests/unit/content-ingestion-authorization.test.ts \
-            tests/unit/content-ingestion-database-support.ts \
-            tests/unit/content-ingestion-database.test.ts \
-            tests/unit/content-ingestion-memory-support.ts \
-            tests/unit/content-ingestion-recovery.test.ts \
-            tests/unit/content-store.test.ts \
-            tests/unit/migration-upgrade-path.test.ts \
-            /tmp/formatted
-      - name: Upload exact formatted files
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: content-ingestion-formatted-files
-          path: /tmp/formatted
-          if-no-files-found: error
-          retention-days: 1
+          pnpm format
+          pnpm format:check
+      - name: Remove temporary finalizer and commit exact formatted tree
+        run: |
+          rm .github/workflows/content-ingestion-format-artifact.yml
+          git config user.name "Eddie-LowcountryDigitalWorks"
+          git config user.email "eddie@lowcountrydigitalworks.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "chore: finalize content ingestion candidate formatting"
+          git push origin HEAD:release/content-ingestion-architecture-1
