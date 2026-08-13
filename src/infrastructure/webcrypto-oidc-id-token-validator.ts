@@ -1,3 +1,4 @@
+import type { AuthenticatedPrincipal } from "../application/authentication";
 import {
   OidcAuthenticationError,
   type OidcIdTokenValidator,
@@ -64,7 +65,7 @@ export class WebCryptoOidcIdTokenValidator implements OidcIdTokenValidator {
     provider: OidcProviderConfiguration;
     idToken: string;
     expectedNonceVerifier: string;
-  }): Promise<import("../application/authentication").AuthenticatedPrincipal> {
+  }): Promise<AuthenticatedPrincipal> {
     const trust = this.trust.get(input.provider.id);
     if (
       !trust ||
@@ -117,7 +118,7 @@ export class WebCryptoOidcIdTokenValidator implements OidcIdTokenValidator {
     const signingInput = new TextEncoder().encode(
       `${encodedHeader}.${encodedPayload}`,
     );
-    let signatureValid = false;
+    let signatureValid: boolean;
     try {
       signatureValid = await crypto.subtle.verify(
         "RSASSA-PKCS1-v1_5",
@@ -126,7 +127,7 @@ export class WebCryptoOidcIdTokenValidator implements OidcIdTokenValidator {
         signingInput,
       );
     } catch {
-      signatureValid = false;
+      throw new OidcAuthenticationError("invalid_signature");
     }
     if (!signatureValid) {
       throw new OidcAuthenticationError("invalid_signature");
