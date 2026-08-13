@@ -159,6 +159,7 @@ describe("ordered D1/SQLite migration upgrade path", () => {
       "created_at",
       "expires_at",
       "revoked_at",
+      "replaced_by_verifier",
     ]);
 
     const trigger = database
@@ -166,7 +167,8 @@ describe("ordered D1/SQLite migration upgrade path", () => {
         "SELECT name FROM sqlite_master WHERE type = 'trigger' AND name = ?",
       )
       .get("document_versions_change_summary_immutable") as
-      { name: string } | undefined;
+      | { name: string }
+      | undefined;
     expect(trigger?.name).toBe("document_versions_change_summary_immutable");
 
     database.close();
