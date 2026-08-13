@@ -1,35 +1,45 @@
-name: Identity Boundary Finalizer
+name: Identity Authentication Format Diagnostic
 
 on:
   push:
     branches: [release/production-identity-tenant-boundary-1]
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
-  group: identity-boundary-finalizer
+  group: identity-auth-format-diagnostic
   cancel-in-progress: true
 
 jobs:
-  finalize:
+  diagnose:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: python scripts/identity-boundary-reconcile.py
-      - run: pnpm format
-      - run: pnpm check
-      - name: Commit permanent candidate and remove temporary finalizer
+      - name: Compare consecutive Prettier passes
         run: |
-          git rm .github/workflows/identity-boundary-reconcile.yml scripts/identity-boundary-reconcile.py
-          git add src tests docs
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "Finalize production identity and tenant boundary I"
-          git push origin HEAD:release/production-identity-tenant-boundary-1
+          mkdir -p diagnostic
+          cp src/application/authentication.ts diagnostic/before.ts
+          pnpm exec prettier --write src/application/authentication.ts
+          cp src/application/authentication.ts diagnostic/first.ts
+          sha256sum diagnostic/before.ts diagnostic/first.ts
+          pnpm exec prettier --write src/application/authentication.ts
+          cp src/application/authentication.ts diagnostic/second.ts
+          sha256sum diagnostic/second.ts
+          diff -u diagnostic/first.ts diagnostic/second.ts > diagnostic/first-second.diff || true
+          pnpm exec prettier --check src/application/authentication.ts > diagnostic/check.txt 2>&1 || true
+          cat diagnostic/check.txt
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: identity-auth-format-diagnostic
+          path: diagnostic
+          if-no-files-found: error
+          retention-days: 1
