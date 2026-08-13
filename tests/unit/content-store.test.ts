@@ -25,10 +25,12 @@ class FakeR2Bucket {
       customMetadata?: Record<string, string>;
     },
   ): Promise<R2Object | null> {
-    if (options?.onlyIf?.etagDoesNotMatch === "*" && this.objects.has(key)) return null;
+    if (options?.onlyIf?.etagDoesNotMatch === "*" && this.objects.has(key))
+      return null;
     this.objects.set(key, {
       bytes: value.slice(0),
-      contentType: options?.httpMetadata?.contentType ?? "application/octet-stream",
+      contentType:
+        options?.httpMetadata?.contentType ?? "application/octet-stream",
       contentHash: options?.customMetadata?.contentHash ?? "",
     });
     return {} as R2Object;
@@ -64,9 +66,17 @@ describe("content storage invariants", () => {
       versionId: "version-1",
     });
     await store.create(key, { bytes, contentType: "text/plain", contentHash });
-    await expect(store.create(key, { bytes, contentType: "text/plain", contentHash })).rejects.toThrow(/already exists/);
-    await expect(store.get(key, contentHash)).resolves.toMatchObject({ contentType: "text/plain", contentHash });
-    bucket.tamper(key, new TextEncoder().encode("tampered document bytes").buffer);
+    await expect(
+      store.create(key, { bytes, contentType: "text/plain", contentHash }),
+    ).rejects.toThrow(/already exists/);
+    await expect(store.get(key, contentHash)).resolves.toMatchObject({
+      contentType: "text/plain",
+      contentHash,
+    });
+    bucket.tamper(
+      key,
+      new TextEncoder().encode("tampered document bytes").buffer,
+    );
     await expect(store.get(key, contentHash)).rejects.toThrow(/hash mismatch/);
   });
 
@@ -74,38 +84,52 @@ describe("content storage invariants", () => {
     const bucket = new FakeR2Bucket();
     const store = new R2ContentStore(bucket as unknown as R2Bucket);
     const bytes = new TextEncoder().encode("content").buffer;
-    await expect(store.create("safe/key", {
-      bytes,
-      contentType: "text/plain",
-      contentHash: `sha256:${"f".repeat(64)}`,
-    })).rejects.toThrow(/do not match/);
+    await expect(
+      store.create("safe/key", {
+        bytes,
+        contentType: "text/plain",
+        contentHash: `sha256:${"f".repeat(64)}`,
+      }),
+    ).rejects.toThrow(/do not match/);
   });
 
   it("centralizes tenant/workspace/version key construction", () => {
-    expect(buildTemplateVersionContentKey({
-      tenantId: "tenant-demo",
-      workspaceId: "workspace-demo",
-      templateId: "template-demo",
-      versionId: "version-1",
-    })).toBe("tenants/tenant-demo/workspaces/workspace-demo/templates/template-demo/versions/version-1/content");
+    expect(
+      buildTemplateVersionContentKey({
+        tenantId: "tenant-demo",
+        workspaceId: "workspace-demo",
+        templateId: "template-demo",
+        versionId: "version-1",
+      }),
+    ).toBe(
+      "tenants/tenant-demo/workspaces/workspace-demo/templates/template-demo/versions/version-1/content",
+    );
 
-    expect(buildContentIngestionContentKey({
-      tenantId: "tenant-demo",
-      workspaceId: "workspace-demo",
-      ingestionId: "intake-1",
-    })).toBe("tenants/tenant-demo/workspaces/workspace-demo/content-ingestions/intake-1/staged-content");
+    expect(
+      buildContentIngestionContentKey({
+        tenantId: "tenant-demo",
+        workspaceId: "workspace-demo",
+        ingestionId: "intake-1",
+      }),
+    ).toBe(
+      "tenants/tenant-demo/workspaces/workspace-demo/content-ingestions/intake-1/staged-content",
+    );
 
-    expect(() => buildContentIngestionContentKey({
-      tenantId: "tenant-demo",
-      workspaceId: "workspace-demo",
-      ingestionId: "../escape",
-    })).toThrow(/Unsafe content-key segment/);
+    expect(() =>
+      buildContentIngestionContentKey({
+        tenantId: "tenant-demo",
+        workspaceId: "workspace-demo",
+        ingestionId: "../escape",
+      }),
+    ).toThrow(/Unsafe content-key segment/);
 
-    expect(() => buildDocumentVersionContentKey({
-      tenantId: "../escape",
-      workspaceId: "workspace-demo",
-      documentId: "document-demo",
-      versionId: "version-1",
-    })).toThrow(/Unsafe content-key segment/);
+    expect(() =>
+      buildDocumentVersionContentKey({
+        tenantId: "../escape",
+        workspaceId: "workspace-demo",
+        documentId: "document-demo",
+        versionId: "version-1",
+      }),
+    ).toThrow(/Unsafe content-key segment/);
   });
 });

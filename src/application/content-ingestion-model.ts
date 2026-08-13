@@ -90,14 +90,49 @@ export interface ContentIngestionAuditEvent {
 
 export interface ContentIngestionRepository {
   countInFlight(tenantId: string, workspaceId: string): Promise<number>;
-  find(tenantId: string, workspaceId: string, ingestionId: string): Promise<ContentIngestionRecord | null>;
-  initiate(record: ContentIngestionRecord, event: ContentIngestionAuditEvent): Promise<void>;
-  recordReceived(record: ContentIngestionRecord, contentHash: string, byteLength: number, event: ContentIngestionAuditEvent): Promise<void>;
-  markStaged(record: ContentIngestionRecord, stagedAt: string, event: ContentIngestionAuditEvent): Promise<void>;
+  find(
+    tenantId: string,
+    workspaceId: string,
+    ingestionId: string,
+  ): Promise<ContentIngestionRecord | null>;
+  initiate(
+    record: ContentIngestionRecord,
+    event: ContentIngestionAuditEvent,
+  ): Promise<void>;
+  recordReceived(
+    record: ContentIngestionRecord,
+    contentHash: string,
+    byteLength: number,
+    event: ContentIngestionAuditEvent,
+  ): Promise<void>;
+  markStaged(
+    record: ContentIngestionRecord,
+    stagedAt: string,
+    event: ContentIngestionAuditEvent,
+  ): Promise<void>;
   markValidationPending(record: ContentIngestionRecord): Promise<void>;
-  markAccepted(record: ContentIngestionRecord, acceptedMediaType: string, acceptedAt: string, event: ContentIngestionAuditEvent): Promise<void>;
-  markRejected(record: ContentIngestionRecord, failureCode: "unsupported_content" | "malformed_content", rejectedAt: string, event: ContentIngestionAuditEvent): Promise<void>;
-  markProcessingFailed(record: ContentIngestionRecord, failureCode: "storage_write_failed" | "stored_content_missing" | "stored_content_integrity_failed" | "validation_failed", failedAt: string, event: ContentIngestionAuditEvent): Promise<void>;
+  markAccepted(
+    record: ContentIngestionRecord,
+    acceptedMediaType: string,
+    acceptedAt: string,
+    event: ContentIngestionAuditEvent,
+  ): Promise<void>;
+  markRejected(
+    record: ContentIngestionRecord,
+    failureCode: "unsupported_content" | "malformed_content",
+    rejectedAt: string,
+    event: ContentIngestionAuditEvent,
+  ): Promise<void>;
+  markProcessingFailed(
+    record: ContentIngestionRecord,
+    failureCode:
+      | "storage_write_failed"
+      | "stored_content_missing"
+      | "stored_content_integrity_failed"
+      | "validation_failed",
+    failedAt: string,
+    event: ContentIngestionAuditEvent,
+  ): Promise<void>;
 }
 
 export interface InitiateContentIngestionInput {
@@ -131,13 +166,20 @@ export class ContentIngestionNotAvailableError extends Error {}
 export class ContentIngestionRetryMismatchError extends Error {}
 export class ContentIngestionRecoveryRequiredError extends Error {}
 
-export function requireFound(record: ContentIngestionRecord | null): ContentIngestionRecord {
-  if (!record) throw new ContentIngestionNotAvailableError("Content is not available.");
+export function requireFound(
+  record: ContentIngestionRecord | null,
+): ContentIngestionRecord {
+  if (!record)
+    throw new ContentIngestionNotAvailableError("Content is not available.");
   return record;
 }
 
 export function isTerminal(state: ContentIngestionState): boolean {
-  return state === "accepted" || state === "rejected" || state === "processing_failed";
+  return (
+    state === "accepted" ||
+    state === "rejected" ||
+    state === "processing_failed"
+  );
 }
 
 export type AcceptedContent = ContentObject;

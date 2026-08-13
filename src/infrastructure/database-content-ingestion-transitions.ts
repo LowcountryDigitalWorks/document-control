@@ -17,9 +17,18 @@ export async function insertContentIngestion(
        last_event_id, last_actor_subject_id, last_event_at)
      VALUES (?, ?, ?, ?, ?, ?, 'intake_initiated', ?, ?, ?, ?, ?, ?)`,
     [
-      record.id, record.tenantId, record.workspaceId, record.initiatingSubjectId,
-      record.displayFilename, record.declaredMediaType, record.storageProvider,
-      record.storageKey, record.createdAt, event.id, event.actorSubjectId, event.occurredAt,
+      record.id,
+      record.tenantId,
+      record.workspaceId,
+      record.initiatingSubjectId,
+      record.displayFilename,
+      record.declaredMediaType,
+      record.storageProvider,
+      record.storageKey,
+      record.createdAt,
+      event.id,
+      event.actorSubjectId,
+      event.occurredAt,
     ],
   );
   assertChanged(result);
@@ -38,8 +47,13 @@ export async function updateContentIngestionWithEvent(
        last_event_id = ?, last_actor_subject_id = ?, last_event_at = ?
      WHERE id = ? AND tenant_id = ? AND workspace_id = ? AND ${guard}`,
     [
-      ...parameters, event.id, event.actorSubjectId, event.occurredAt,
-      record.id, record.tenantId, record.workspaceId,
+      ...parameters,
+      event.id,
+      event.actorSubjectId,
+      event.occurredAt,
+      record.id,
+      record.tenantId,
+      record.workspaceId,
     ],
   );
   assertChanged(result);

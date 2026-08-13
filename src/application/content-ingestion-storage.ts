@@ -45,7 +45,10 @@ export async function loadExistingCandidate(
   occurredAt: string,
 ): Promise<ContentObject | null | undefined> {
   try {
-    const existing = await store.get(record.storageKey, record.contentHash ?? "");
+    const existing = await store.get(
+      record.storageKey,
+      record.contentHash ?? "",
+    );
     if (existing && existing.bytes.byteLength !== record.byteLength) {
       await failIngestion(
         repository,

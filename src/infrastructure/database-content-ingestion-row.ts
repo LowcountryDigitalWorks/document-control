@@ -34,6 +34,8 @@ export const contentIngestionSelect = `SELECT
   staged_at AS stagedAt, accepted_at AS acceptedAt, rejected_at AS rejectedAt, failed_at AS failedAt
 FROM content_ingestions`;
 
-export function mapContentIngestionRecord(row: ContentIngestionRow): ContentIngestionRecord {
+export function mapContentIngestionRecord(
+  row: ContentIngestionRow,
+): ContentIngestionRecord {
   return { ...row };
 }

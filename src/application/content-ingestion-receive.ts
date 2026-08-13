@@ -115,6 +115,7 @@ async function reload(
     record.workspaceId,
     record.id,
   );
-  if (!current) throw new Error("Content intake disappeared during processing.");
+  if (!current)
+    throw new Error("Content intake disappeared during processing.");
   return current;
 }

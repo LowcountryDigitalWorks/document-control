@@ -43,7 +43,8 @@ export class MemoryStore implements ContentStore {
     if ((await sha256(new Uint8Array(object.bytes))) !== object.contentHash)
       throw new Error("hash");
     this.objects.set(key, { ...object, bytes: object.bytes.slice(0) });
-    if (this.persistThenFailCreate) throw new Error("ambiguous storage outcome");
+    if (this.persistThenFailCreate)
+      throw new Error("ambiguous storage outcome");
   }
 }
 

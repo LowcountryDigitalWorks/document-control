@@ -40,10 +40,14 @@ export class ContentIngestionService {
     input: InitiateContentIngestionInput,
   ): Promise<ContentIngestionRecord> {
     const displayFilename = normalizeDisplayFilename(input.displayFilename);
-    const declaredMediaType = normalizeDeclaredMediaType(input.declaredMediaType);
+    const declaredMediaType = normalizeDeclaredMediaType(
+      input.declaredMediaType,
+    );
     if (
-      (await this.repository.countInFlight(input.tenantId, input.workspaceId)) >=
-      CONTENT_INGESTION_MAX_IN_FLIGHT_PER_WORKSPACE
+      (await this.repository.countInFlight(
+        input.tenantId,
+        input.workspaceId,
+      )) >= CONTENT_INGESTION_MAX_IN_FLIGHT_PER_WORKSPACE
     ) {
       throw new ContentIngestionInputError(
         "The workspace has reached the bounded in-flight intake limit.",
