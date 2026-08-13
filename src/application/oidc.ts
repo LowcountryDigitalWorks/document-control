@@ -157,14 +157,14 @@ export class OidcAuthorizationService {
   ): Promise<OidcAuthorizationStart> {
     const provider = this.providers.get(providerId);
     if (!provider) {
-      await this.reject("unknown_provider");
+      return this.reject("unknown_provider");
     }
 
     let normalizedReturnTo: string;
     try {
       normalizedReturnTo = normalizeReturnTarget(returnTo);
     } catch {
-      await this.reject("invalid_return_target", provider.id);
+      return this.reject("invalid_return_target", provider.id);
     }
 
     const now = this.clock.now();
@@ -232,29 +232,29 @@ export class OidcAuthorizationService {
       input.authorizationCode.length > maxAuthorizationCodeLength ||
       containsControlCharacter(input.authorizationCode)
     ) {
-      await this.reject("invalid_callback");
+      return this.reject("invalid_callback");
     }
 
     const transaction = await this.transactions.find(input.transactionId);
     if (!transaction) {
-      await this.reject("transaction_missing");
+      return this.reject("transaction_missing");
     }
     const provider = this.providers.get(transaction.providerId);
     if (!provider) {
-      await this.reject("unknown_provider", transaction.providerId);
+      return this.reject("unknown_provider", transaction.providerId);
     }
 
     const now = this.clock.now();
     if (transaction.consumedAt !== undefined) {
-      await this.reject("transaction_replayed", provider.id);
+      return this.reject("transaction_replayed", provider.id);
     }
     if (Date.parse(transaction.expiresAt) <= now.getTime()) {
-      await this.reject("transaction_expired", provider.id);
+      return this.reject("transaction_expired", provider.id);
     }
 
     const presentedStateVerifier = await this.security.sha256Hex(input.state);
     if (presentedStateVerifier !== transaction.stateVerifier) {
-      await this.reject("state_mismatch", provider.id);
+      return this.reject("state_mismatch", provider.id);
     }
 
     const consumed = await this.transactions.consume(
@@ -262,7 +262,7 @@ export class OidcAuthorizationService {
       now.toISOString(),
     );
     if (!consumed) {
-      await this.reject("transaction_replayed", provider.id);
+      return this.reject("transaction_replayed", provider.id);
     }
 
     let tokenResponse: { idToken: string };
@@ -273,7 +273,7 @@ export class OidcAuthorizationService {
         pkceVerifier: transaction.pkceVerifier,
       });
     } catch {
-      await this.reject("code_exchange_rejected", provider.id);
+      return this.reject("code_exchange_rejected", provider.id);
     }
 
     let principal: AuthenticatedPrincipal;
@@ -285,7 +285,7 @@ export class OidcAuthorizationService {
       });
     } catch (error) {
       if (error instanceof OidcAuthenticationError) {
-        await this.reject(error.reasonCode, provider.id);
+        return this.reject(error.reasonCode, provider.id);
       }
       throw error;
     }
