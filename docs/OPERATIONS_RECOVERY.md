@@ -348,3 +348,58 @@ Provider/client secrets, signing keys, access/refresh/ID tokens, MFA material, s
 
 Foundation II provisions no production resource, purchases no security product, adds no runtime
 service, and introduces no recurring service cost. Expected new recurring cost is **$0**.
+
+## Production Identity & Tenant Boundary II — session operations and recovery
+
+Migration `0012_authenticated_session_verifiers.sql` adds security-sensitive authenticated-session
+metadata to the accepted D1/SQLite state architecture. The table stores verifier digests, internal
+subject references, timestamps, revocation state, and verifier-only rotation linkage. It does **not**
+store raw browser bearer tokens.
+
+### Session validity versus cleanup
+
+Operational cleanup must never be used as an authentication mechanism. A row is invalid immediately
+when revoked or expired even when it remains physically present. Cleanup may later delete:
+
+- rows whose `expires_at` is at or before the cleanup cutoff; and
+- revoked rows whose `revoked_at` is at or before the cleanup cutoff.
+
+No cleanup schedule is selected by this release. A delayed cleanup job may increase stored-row count
+but must not extend access.
+
+### Rotation and failure handling
+
+D1 rotation is a transactional batch. The first statement conditionally revokes the active old
+verifier and records the exact intended replacement verifier. The second inserts the replacement only
+when that marker matches. D1 transaction rollback is required so duplicate/collision failure cannot
+leave a partially revoked old credential.
+
+If session persistence is unavailable, authentication fails closed rather than falling back to a KV,
+cache, browser claim, or stale replica as authoritative truth.
+
+### Backup and restore
+
+Authenticated sessions are credentials, not business records. Recovery must recreate the current
+`authenticated_sessions` schema, but stale restored session rows should not be treated as durable
+business state to preserve. The preferred production recovery posture is to invalidate recovered
+session rows and require reauthentication after a D1 restore/disaster-recovery event unless a later
+approved design proves fresher authoritative revocation state.
+
+Never copy raw bearer tokens, authorization codes, ID/access/refresh tokens, state, nonce, PKCE
+verifier, provider private keys, or client credentials into backup evidence, recovery logs, or portable
+application exports. The portable business-data export remains separate from authenticated-session
+state.
+
+A post-restore application check must verify that protected requests fail closed when no valid current
+session exists and that live membership/role authorization still applies after reauthentication.
+
+### Migration assurance
+
+The supported migration assurance advances to:
+
+- empty supported database -> all ordered migrations through `0012`; and
+- immediately prior supported schema `0011` -> apply `0012` -> current schema.
+
+The upgrade test preserves representative tenant/document/audit records and prior invariants while
+also proving the verifier-only schema accepts a valid fixed verifier and rejects a raw/non-verifier
+identifier. Released migrations remain immutable and forward-only.

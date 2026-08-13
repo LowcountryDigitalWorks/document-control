@@ -16,6 +16,7 @@ import { TenantContextDeniedError } from "../../src/application/tenant-context";
 import { DatabaseAuthorizationPolicy } from "../../src/infrastructure/database-authorization-policy";
 import { DatabaseIdentityMappingStore } from "../../src/infrastructure/database-identity-mapping-store";
 import { DatabaseTenantContextResolver } from "../../src/infrastructure/database-tenant-context-resolver";
+import { Sha256SessionTokenVerifier } from "../../src/infrastructure/sha256-session-token-verifier";
 import { InMemorySessionStore } from "../../src/local-auth/in-memory-session-store";
 import {
   applyMigrationFiles,
@@ -156,13 +157,14 @@ describe("authenticated tenant and authorization boundary", () => {
           return "c".repeat(64);
         },
       },
+      new Sha256SessionTokenVerifier(),
       clock,
       30 * 60 * 1000,
     );
     const tenantContext = new DatabaseTenantContextResolver(provider);
     const authorization = new DatabaseAuthorizationPolicy(provider);
     const session = await sessions.establish(principal);
-    const authenticated = await sessions.resolve(session.sessionId);
+    const authenticated = await sessions.resolve(session.bearerToken);
 
     await expect(
       tenantContext.resolve(authenticated.subjectId, "tenant-a", "workspace-a"),
@@ -184,7 +186,7 @@ describe("authenticated tenant and authorization boundary", () => {
       database,
       "UPDATE tenant_memberships SET status = 'suspended' WHERE id = 'membership-a'",
     );
-    await expect(sessions.resolve(session.sessionId)).resolves.toMatchObject({
+    await expect(sessions.resolve(session.bearerToken)).resolves.toMatchObject({
       subjectId: "subject-authenticated",
     });
     await expect(

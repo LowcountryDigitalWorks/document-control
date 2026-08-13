@@ -41,19 +41,18 @@ export function readAuthenticatedSessionCookie(
   cookieHeader: string | undefined,
 ): string | null {
   if (!cookieHeader) return null;
+  let sessionId: string | null = null;
   for (const part of cookieHeader.split(";")) {
     const separator = part.indexOf("=");
     if (separator < 0) continue;
     const name = part.slice(0, separator).trim();
+    if (name !== authenticatedSessionCookieName) continue;
+    if (sessionId !== null) return null;
     const value = part.slice(separator + 1).trim();
-    if (
-      name === authenticatedSessionCookieName &&
-      isOpaqueSessionIdentifier(value)
-    ) {
-      return value;
-    }
+    if (!isOpaqueSessionIdentifier(value)) return null;
+    sessionId = value;
   }
-  return null;
+  return sessionId;
 }
 
 export function createAuthenticatedSessionCookie(
@@ -70,10 +69,10 @@ export function createAuthenticatedSessionCookie(
     throw new Error("Authenticated-session cookie lifetime is invalid.");
   }
   const secure = new URL(requestUrl).protocol === "https:" ? "; Secure" : "";
-  return `${authenticatedSessionCookieName}=${sessionId}; Path=/; Max-Age=${maxAgeSeconds}; HttpOnly; SameSite=Strict${secure}`;
+  return `${authenticatedSessionCookieName}=${sessionId}; Path=/app; Max-Age=${maxAgeSeconds}; HttpOnly; SameSite=Lax${secure}`;
 }
 
 export function clearAuthenticatedSessionCookie(requestUrl: string): string {
   const secure = new URL(requestUrl).protocol === "https:" ? "; Secure" : "";
-  return `${authenticatedSessionCookieName}=; Path=/; Max-Age=0; HttpOnly; SameSite=Strict${secure}`;
+  return `${authenticatedSessionCookieName}=; Path=/app; Max-Age=0; HttpOnly; SameSite=Lax${secure}`;
 }

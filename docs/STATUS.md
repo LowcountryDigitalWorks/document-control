@@ -741,3 +741,37 @@ production authentication or public-demo hardening.
 - Session security events are minimized to established/revoked/rotated plus internal subject and timestamp. No production audit sink is selected.
 - The existing `/demo` experience remains separate with `ldw_guided_demo_session` and synthetic identities. It is not production authentication.
 - No live Entra/OIDC/SAML provider, production credentials, production session store, SCIM/JIT, tenant provisioning, production Cloudflare resources, customer upload, customer data, PHI, PostgreSQL, or paid service is introduced. Expected recurring cost remains `$0`.
+
+## Production Identity & Tenant Boundary II — OIDC Security & Durable Session Architecture
+
+Authorized from exact base `137bd2658763c12be36dfb385c6c3f4aecdb3c68` on branch
+`release/production-identity-tenant-boundary-2`.
+
+Implemented production-readiness architecture:
+
+- Authorization Code OIDC contracts with cryptographic state, nonce, mandatory PKCE S256, bounded
+  same-application return target, short server-side callback transaction state, one-time consumption,
+  and replay denial;
+- provider-bound signed ID-token validation using platform Web Crypto, exact issuer/client audience,
+  immutable subject, expiration/not-before/issued-at, nonce, and trusted configured public JWK material;
+- runtime-generated synthetic RSA fixtures with no provider network call or repository-stored private key;
+- revised session contract that returns a 256-bit bearer only to the client boundary while persisting
+  only a domain-separated SHA-256 verifier;
+- D1/SQLite authoritative durable session store with immediate expiry/revocation semantics,
+  transactional verifier-bound rotation, collision rollback, and non-authoritative asynchronous cleanup;
+- migration `0012_authenticated_session_verifiers.sql` plus clean-create and `0011 -> 0012` upgrade
+  assurance;
+- ADR 0003 accepting verifier-only D1 durable session state;
+- OIDC transaction and authenticated-session cookies with bounded paths/lifetimes, HttpOnly,
+  `SameSite=Lax`, HTTPS `Secure`, logout clearing, and no OIDC token material;
+- test-only authenticated Hono composition proving signed OIDC -> internal mapping -> durable session ->
+  authentication middleware -> live tenant membership -> live role permission, including tenant
+  crossing, suspension, role-removal, unknown-mapping, demo-cookie, and logout denial cases.
+
+The permanent Worker remains non-live: no OIDC start/callback route is registered in normal
+`src/http/app.ts`, no production authorization-transaction store or provider client is selected, and no
+live provider, app registration, production credential, Cloudflare resource, customer data, PHI,
+upload path, or paid service is introduced. Expected new recurring cost remains `$0`.
+
+Exact frozen-head CI evidence is recorded in PR #43 after final validation; this status section does
+not substitute for that exact-head PR evidence.

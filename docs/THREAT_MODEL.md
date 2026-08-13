@@ -436,3 +436,47 @@ ruleset changes; external SIEM/archive/runtime integration is proposed; or an in
 invalidates an assumption here.
 
 Every review must continue distinguishing implemented controls from planned mitigations.
+
+## Production Identity & Tenant Boundary II — OIDC/session threat controls
+
+Boundary II implements non-live controls for the authentication threats that were previously future
+production gates. These controls are architecture/test evidence, not a claim that a live identity
+provider or production login is enabled.
+
+### OIDC protocol threats
+
+| Threat                                | Boundary II control                                                                                                                                        |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| forged/unsigned assertion             | only configured RS256 is accepted; signature is verified with platform Web Crypto against trusted configured public JWK material before claims are trusted |
+| issuer confusion                      | callback transaction selects a known provider and exact issuer equality is required                                                                        |
+| token substitution/wrong client       | expected audience/client is required; multi-audience assertions require matching `azp`                                                                     |
+| stale/future assertion                | `exp`, optional `nbf`, and bounded/fresh `iat` are validated fail-closed                                                                                   |
+| identity alias/email takeover         | immutable `sub` maps through the existing application-owned issuer+subject identity mapping; email/name are non-authoritative                              |
+| login CSRF                            | cryptographic state is stored as a server-side verifier and must match the callback                                                                        |
+| token replay/cross-login substitution | OIDC nonce is bound to the authorization transaction and validated after signature verification                                                            |
+| authorization-code interception       | PKCE S256 challenge/verifier is mandatory in the contract; implicit flow is not supported                                                                  |
+| callback replay                       | authorization transaction is short-lived and one-time; it is consumed before code exchange                                                                 |
+| open redirect                         | only bounded same-application relative `/app...` return targets are accepted                                                                               |
+| protocol-secret disclosure            | transaction/audit models exclude authorization code, tokens, raw state/nonce, session bearer/verifier, private signing key, and client credential          |
+
+### Durable-session threats
+
+| Threat                                 | Boundary II control                                                                                                           |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| D1 disclosure yields usable cookie     | raw 256-bit bearer is never persisted; D1 stores only a domain-separated SHA-256 verifier                                     |
+| session fixation/reuse                 | authentication issues an independent opaque bearer; rotation invalidates the prior verifier without extending original expiry |
+| concurrent/partial rotation            | D1 transactional batch binds the winning old-session revoke to the exact replacement verifier; collision rolls back           |
+| revoked session survives cleanup delay | revocation is authoritative row state checked at lookup; cleanup timing is irrelevant to validity                             |
+| expired session survives cleanup delay | expiry is checked at lookup; cleanup is storage hygiene only                                                                  |
+| cache consistency bypass               | no KV/cache/secondary index is accepted as authentication truth                                                               |
+| session grants stale authorization     | tenant membership, role bindings, permission, and scope remain live authorization checks after authentication                 |
+| demo credential crosses trust boundary | `ldw_guided_demo_session` remains distinct and cannot satisfy `ldw_authenticated_session` middleware                          |
+
+### Residual live-provider threats and gates
+
+A live deployment still requires explicit review of provider registration ownership, discovery/JWKS
+retrieval and signing-key rotation, redirect URI control, provider/client credentials, production
+transaction-state persistence, MFA/Conditional Access expectations, provider logout/disabled-user
+revocation, tenant provisioning and deprovisioning, break-glass access, audit/monitoring, deployment
+secrets, and controlled staging. Boundary II does not lower any customer-data, upload, malware,
+retention/legal-hold, recovery, or deployment gate.

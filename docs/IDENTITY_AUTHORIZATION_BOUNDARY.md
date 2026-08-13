@@ -163,3 +163,105 @@ Local/test cookie delivery is HttpOnly, Secure on HTTPS, explicitly time-bounded
 The `/demo` experience keeps its own `ldw_guided_demo_session` cookie, synthetic identities, and server-derived synthetic tenant/workspace context. The new authentication middleware is not registered in `src/http/app.ts` and the demo cookie is not accepted as a production-authenticated session.
 
 Before live production identity, separately select and validate provider/protocol, signature/issuer/audience/state/nonce checks, app registration/redirect ownership, production session storage, provider logout/revocation, provider/client credentials, MFA/conditional access, provisioning/SCIM/group mapping and deprovisioning, production cookie/CSRF redirect semantics, break-glass administration, monitoring, and audit sink behavior.
+
+## Production Identity & Tenant Boundary II — OIDC security and durable sessions
+
+Boundary II adds the non-live protocol and persistence architecture between a future standards-based
+OIDC provider and the provider-neutral authentication boundary established in Boundary I. It does not
+enable a live provider or production login.
+
+### OIDC authorization-code boundary
+
+The supported protocol contract is Authorization Code flow with PKCE. `OidcAuthorizationService`
+creates a short-lived server-side authorization transaction, emits cryptographically random `state`
+and OIDC `nonce`, creates an S256 PKCE verifier/challenge pair, and builds the provider authorization
+request from a preconfigured provider record. Implicit flow is not supported.
+
+The callback transaction stores only the opaque transaction identifier, provider identifier,
+SHA-256 state verifier, SHA-256 nonce verifier, server-side PKCE verifier, bounded same-application
+return target, timestamps, and one-time consumed state. Transactions expire within at most ten
+minutes, are consumed before authorization-code exchange, and cannot be replayed. The permanent
+adapter in this release is intentionally in-memory/local only; a live or distributed deployment must
+select an appropriate server-side transaction store before activation.
+
+Return targets must be relative `/app...` paths. Absolute URLs, scheme-relative targets, backslash
+variants, and paths outside the authenticated application boundary are rejected. Provider state never
+carries an arbitrary redirect URL.
+
+### Signed ID-token validation
+
+`WebCryptoOidcIdTokenValidator` validates only after the callback transaction selects the configured
+provider. Provider configuration supplies the exact allowed issuer, expected client/audience, and
+already-trusted public JWK material. This release accepts only RS256 synthetic assertions and delegates
+signature verification to platform Web Crypto; it does not implement a signature algorithm or accept
+unsigned/`none` assertions.
+
+After signature verification, the validator requires exact issuer, expected audience (and `azp` for
+multi-audience assertions), valid expiration, optional not-before, bounded/fresh issued-at, immutable
+subject, and the expected nonce verifier. Email/name claims remain presentation-only metadata and do
+not grant application authority. Raw ID/access/refresh tokens are not placed in the normalized
+principal or authorization request.
+
+The permanent test suite generates ephemeral RSA signing keys at test runtime and needs no provider
+network access or repository-stored private key. No live JWKS fetch or key-rotation mechanism is
+selected by this release.
+
+### Durable bearer/verifier session model
+
+Boundary II replaces the local raw-session-store contract with a split credential model:
+
+`256-bit browser bearer token -> domain-separated SHA-256 verifier -> authoritative D1 session row`
+
+Only the browser/session-delivery boundary receives the raw bearer. `SessionStore` receives and looks
+up the 64-lowercase-hex verifier. D1 therefore does not persist a directly usable session cookie.
+Session security events contain neither raw bearer nor verifier.
+
+`DatabaseSessionStore` is the accepted initial durable session implementation under ADR 0003. The
+D1 row is authoritative for existence, subject binding, expiry, and explicit revocation. Rotation is
+one D1 transactional batch: the old row is conditionally revoked and bound to the exact replacement
+verifier, then the replacement is inserted only for that winning rotation. A verifier collision fails
+the batch rather than leaving a partially rotated credential.
+
+Expiry/revocation is checked on every lookup. Cleanup may remove expired or revoked rows later, but
+cleanup timing never extends validity and no KV/cache/TTL state becomes authentication truth.
+
+A structurally valid session still grants no Document Control permission by itself. Current active
+membership, role binding, permission, and tenant/workspace/resource scope remain live application
+authorization checks.
+
+### Cookie, callback, and CSRF posture
+
+The OIDC authorization-transaction cookie carries only the opaque transaction identifier and is
+`HttpOnly`, `SameSite=Lax`, bounded to the short transaction lifetime, `Secure` under HTTPS, and
+scoped to `/auth/oidc/callback`.
+
+The authenticated bearer cookie is separate (`ldw_authenticated_session`), `HttpOnly`,
+`SameSite=Lax`, bounded to the session lifetime, `Secure` under HTTPS, and scoped to `/app`. The
+synthetic demo cookie remains a third, separate credential and cannot authenticate the production-style
+middleware. Logout revokes the authoritative verifier and clears the authenticated cookie.
+
+`SameSite=Lax` is selected for the top-level authorization redirect model; it does not weaken ordinary
+same-origin mutation CSRF controls. Authenticated mutation routes must preserve the existing
+same-origin/CSRF protections independently of login redirects.
+
+### Failure and audit behavior
+
+Signature, issuer, audience, time, subject, state, nonce, PKCE, replay, transaction-expiry, internal
+identity mapping, membership, role, tenant, and session failures fail closed. External authentication
+failures are intentionally bounded and do not expose claims, tokens, verifier values, tenant existence,
+or provider internals.
+
+OIDC security events are minimized to authentication success or rejection, provider identifier where
+known, bounded reason code, and timestamp. Session security events remain established/revoked/rotated
+plus internal subject and timestamp. Authorization codes, access/ID/refresh tokens, raw bearer tokens,
+session verifiers, state, nonce, PKCE verifier, private keys, and client credentials are forbidden from
+these audit models.
+
+### Remaining live-provider decisions
+
+Before controlled authenticated staging, separately approve the actual provider/application
+registration, discovery/JWKS trust and key-rotation model, issuer/client/redirect configuration,
+provider credentials if any, production authorization-transaction persistence, provider logout and
+disabled-user behavior, final session/idle policy, MFA/Conditional Access expectations, tenant
+provisioning, SCIM/JIT/group mapping/deprovisioning, break-glass administration, production audit and
+monitoring, and deployment/resource ownership. No such live integration is enabled by Boundary II.

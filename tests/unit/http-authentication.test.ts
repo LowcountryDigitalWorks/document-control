@@ -15,6 +15,7 @@ import {
   createAuthenticationMiddleware,
   type AuthenticatedHttpEnvironment,
 } from "../../src/http/authentication";
+import { Sha256SessionTokenVerifier } from "../../src/infrastructure/sha256-session-token-verifier";
 import { InMemorySessionStore } from "../../src/local-auth/in-memory-session-store";
 
 const principal: AuthenticatedPrincipal = {
@@ -43,6 +44,7 @@ function createHarness() {
         return counter.toString(16).padStart(64, "0");
       },
     },
+    new Sha256SessionTokenVerifier(),
     clock,
     30 * 60 * 1000,
   );
@@ -71,12 +73,22 @@ describe("HTTP authenticated-session boundary", () => {
     expect(missing.status).toBe(401);
     expect(await missing.text()).toBe("Authentication required.");
 
+    const duplicateCookie = await harness.app.request(
+      "http://example.test/protected/context",
+      {
+        headers: {
+          Cookie: `${authenticatedSessionCookieName}=${"a".repeat(64)}; ${authenticatedSessionCookieName}=${"b".repeat(64)}`,
+        },
+      },
+    );
+    expect(duplicateCookie.status).toBe(401);
+
     const session = await harness.sessions.establish(principal);
     const authenticated = await harness.app.request(
       "http://example.test/protected/context",
       {
         headers: {
-          Cookie: `${authenticatedSessionCookieName}=${session.sessionId}`,
+          Cookie: `${authenticatedSessionCookieName}=${session.bearerToken}`,
         },
       },
     );
@@ -97,7 +109,7 @@ describe("HTTP authenticated-session boundary", () => {
       "http://example.test/protected/context",
       {
         headers: {
-          Cookie: `${authenticatedSessionCookieName}=${expiredSession.sessionId}`,
+          Cookie: `${authenticatedSessionCookieName}=${expiredSession.bearerToken}`,
         },
       },
     );
@@ -105,19 +117,19 @@ describe("HTTP authenticated-session boundary", () => {
 
     const revoked = createHarness();
     const revokedSession = await revoked.sessions.establish(principal);
-    await revoked.sessions.revoke(revokedSession.sessionId);
+    await revoked.sessions.revoke(revokedSession.bearerToken);
     const revokedResponse = await revoked.app.request(
       "http://example.test/protected/context",
       {
         headers: {
-          Cookie: `${authenticatedSessionCookieName}=${revokedSession.sessionId}`,
+          Cookie: `${authenticatedSessionCookieName}=${revokedSession.bearerToken}`,
         },
       },
     );
     expect(revokedResponse.status).toBe(401);
   });
 
-  it("uses conservative bounded cookie semantics without reusing the synthetic demo cookie", () => {
+  it("uses OIDC-compatible bounded cookie semantics without reusing the synthetic demo cookie", () => {
     const sessionId = "d".repeat(64);
     expect(
       createAuthenticatedSessionCookie(
@@ -126,7 +138,7 @@ describe("HTTP authenticated-session boundary", () => {
         1800,
       ),
     ).toBe(
-      `${authenticatedSessionCookieName}=${sessionId}; Path=/; Max-Age=1800; HttpOnly; SameSite=Strict; Secure`,
+      `${authenticatedSessionCookieName}=${sessionId}; Path=/app; Max-Age=1800; HttpOnly; SameSite=Lax; Secure`,
     );
     expect(
       createAuthenticatedSessionCookie(
@@ -136,7 +148,7 @@ describe("HTTP authenticated-session boundary", () => {
       ),
     ).not.toContain("Secure");
     expect(clearAuthenticatedSessionCookie("https://app.example.test/")).toBe(
-      `${authenticatedSessionCookieName}=; Path=/; Max-Age=0; HttpOnly; SameSite=Strict; Secure`,
+      `${authenticatedSessionCookieName}=; Path=/app; Max-Age=0; HttpOnly; SameSite=Lax; Secure`,
     );
     expect(authenticatedSessionCookieName).not.toBe("ldw_guided_demo_session");
   });
