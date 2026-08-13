@@ -1,8 +1,5 @@
 export type ExternalAuthenticationProvider =
-  | "oidc"
-  | "saml"
-  | "entra"
-  | "external";
+  "oidc" | "saml" | "entra" | "external";
 
 export interface AuthenticatedPrincipal {
   provider: ExternalAuthenticationProvider;
@@ -26,7 +23,9 @@ export interface IdentityMappingStore {
 
 export class UnknownIdentityMappingError extends Error {
   public constructor() {
-    super("The authenticated identity is not provisioned for this application.");
+    super(
+      "The authenticated identity is not provisioned for this application.",
+    );
     this.name = "UnknownIdentityMappingError";
   }
 }
@@ -90,9 +89,10 @@ export function buildProviderSubjectMappingKey(
 export class IdentityMappingService {
   public constructor(private readonly store: IdentityMappingStore) {}
 
-  public async resolve(
-    principal: AuthenticatedPrincipal,
-  ): Promise<{ identity: NormalizedIdentity; principal: AuthenticatedPrincipal }> {
+  public async resolve(principal: AuthenticatedPrincipal): Promise<{
+    identity: NormalizedIdentity;
+    principal: AuthenticatedPrincipal;
+  }> {
     const normalized = normalizeAuthenticatedPrincipal(principal);
     const identity = await this.store.findByProviderIdentity(
       normalized.provider,
