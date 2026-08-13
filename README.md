@@ -23,11 +23,14 @@ Implemented synthetic/test-only product capabilities include:
 - versioned Backup & Portability export of application state and external content references;
 - tenant presentation settings, member lifecycle, Roles & Access, custom workspace roles, workflow
   definition authoring/lifecycle, and controlled non-destructive document retirement; and
-- formatting, linting, strict TypeScript, invariant/migration tests, Playwright, axe accessibility,
-  responsive checks, dependency audit, history-aware secret detection, and Worker build validation.
+- formatting, linting, strict TypeScript, migration/invariant and upgrade-path tests, Playwright, axe
+  accessibility, responsive checks, dependency audit, history-aware secret detection, Worker build
+  validation, and CI supply-chain regression checks.
 
-PR #39, controlled template evidence detail, is the final synthetic evidence-completeness slice before
-the production-readiness phase.
+The repository has moved from synthetic feature breadth into explicit production-readiness gates.
+Production Readiness Foundation I established the threat/architecture boundaries; Production
+Readiness Foundation II establishes the repository operations, migration, supply-chain, and recovery
+engineering baseline. Neither foundation creates a production customer deployment.
 
 ## Production-readiness posture
 
@@ -44,24 +47,48 @@ not implement or authorize:
 - customer data or PHI; or
 - paid runtime services, analytics, or tracking.
 
-The formal security boundary is documented in
-[the threat model](docs/THREAT_MODEL.md). The threat model distinguishes existing controls from
-planned mitigations and is not a certification or compliance determination.
+The formal security boundary is documented in [the threat model](docs/THREAT_MODEL.md). Operational,
+migration, backup, and recovery rules are documented in
+[Operations, Migration, Backup, and Recovery](docs/OPERATIONS_RECOVERY.md). These engineering
+documents distinguish implemented controls from future requirements and are not compliance
+certifications or customer RPO/RTO commitments.
 
 ### Recommended sequence
 
 The approved high-level sequence is:
 
-1. **Production Readiness Foundation I — Threat Model & Architecture Boundaries**;
-2. **Operations & Supply-Chain Foundation**;
+1. **Production Readiness Foundation I — Threat Model & Architecture Boundaries** — established;
+2. **Production Readiness Foundation II — Operations & Supply-Chain** — current foundation;
 3. **Production Identity & Tenant Boundary**;
 4. **Content Ingestion Architecture**;
 5. an **explicitly approved controlled staging vertical slice** with synthetic/non-sensitive content;
    and
-6. later retention, backup/recovery, and customer-readiness gates.
+6. later retention, complete backup/recovery, and customer-readiness gates.
 
 These names describe dependencies only. They do not authorize future releases, production
 infrastructure, customer data, PHI, or paid services.
+
+## Repository and supply-chain security
+
+Normal GitHub Actions validation remains read-only with `permissions: contents: read` and no
+`pull_request_target` workflow. Every permanent CI checkout uses `persist-credentials: false`, so the
+checkout step does not leave the GitHub token in local Git configuration for later commands.
+
+Permanent third-party Action references in CI are immutable upstream commit pins:
+
+- `actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1` (`v7`);
+- `pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86` (`v6`); and
+- `actions/setup-node@820762786026740c76f36085b0efc47a31fe5020` (`v7`).
+
+Dependabot's `github-actions` ecosystem remains enabled so pin updates can arrive as reviewable pull
+requests. Repository tests guard against returning CI to floating major tags, credential-persisting
+checkout, write token permissions, or `pull_request_target`.
+
+CodeQL was evaluated for this public TypeScript repository and deliberately deferred in Foundation II.
+It is applicable and available without a new paid subscription, but an advanced result-upload
+workflow normally requires `security-events: write`. This release preserves the no-write PR validation
+boundary rather than adding a privileged PR workflow solely for another signal. A later CodeQL/default
+setup decision or ruleset change requires separate review.
 
 ## Identity and authorization
 
@@ -114,6 +141,22 @@ repository abstraction, ORM migration, PostgreSQL adapter, or database rewrite i
 
 See [ADR 0002](docs/adr/0002-d1-sqlite-initial-production-persistence.md).
 
+### Schema evolution
+
+Ordered SQL files under `migrations/` are the authoritative executable D1/SQLite schema/evolution
+source. Released migrations are forward-only immutable history; corrections require a new ordered
+migration rather than editing a released file.
+
+`scripts/migration-files.ts` validates that the repository's migration sequence is contiguous and
+deterministic and applies the actual SQL. E2E database setup uses the same loader.
+`tests/unit/migration-upgrade-path.test.ts` proves both clean creation through the current schema and
+the explicitly supported immediately-prior upgrade path `0010 -> 0011`, including representative
+record survival and critical invariant preservation.
+
+Future production migration requires pre-change state capture/backup, recovery readiness, ordered
+execution, post-change schema/invariant verification, application smoke checks, and recorded evidence.
+See [Operations, Migration, Backup, and Recovery](docs/OPERATIONS_RECOVERY.md).
+
 ### Content
 
 R2 is the initial binary-content adapter behind a create-once, SHA-256-verifying `ContentStore`.
@@ -127,8 +170,6 @@ safe retrieval headers, and retention/deletion interaction.
 
 ### Document-control invariants
 
-- Ordered SQL files under `migrations/` are the authoritative executable D1/SQLite schema/evolution
-  source.
 - Tenant-owned relational references are constrained to prevent cross-tenant attachment.
 - Workflow definitions are immutable by version; running instances remain bound to the exact version
   they started with.
@@ -142,6 +183,32 @@ safe retrieval headers, and retention/deletion interaction.
 - Portable JSON export is versioned and validated, but it references external binaries and is not a
   complete production backup.
 - LDW remains a configurable reference theme rather than a hard-coded tenant identity.
+
+## Backup, recovery, and portability boundary
+
+Four concepts must remain distinct:
+
+1. **Portable application JSON export** — validated application metadata/state plus external content
+   references; useful for portability, not a complete backup.
+2. **D1 metadata/state recovery** — provider/state-level protection for relational metadata, evidence,
+   authorization, audit history, and schema state.
+3. **R2 controlled-content recovery** — independent recoverability of the exact binary objects whose
+   canonical SHA-256 identities are recorded by application metadata.
+4. **Complete recoverable application state** — coordinated D1 + R2 + schema/migration version +
+   relevant configuration/deployment mapping + evidence integrity, followed by reconciliation.
+
+D1 and R2 are not one application-atomic transaction, so restore procedures must detect missing
+objects, orphan content, hash mismatches, and metadata/content restore-point skew rather than silently
+relinking or deleting evidence.
+
+`tests/unit/recovery-drill.test.ts` rebuilds a clean current SQLite schema from real migrations,
+restores bounded synthetic relational evidence, and revalidates foreign keys, document/template
+hashes, workflow/approval bindings, role binding, schema state, and append-only audit protection. It
+is intentionally a **local synthetic assurance drill**, not proof of production D1/R2 disaster
+recovery and not an RPO/RTO claim.
+
+Customer RPO/RTO, backup schedule/retention, R2 recovery mechanism, encryption/key ownership,
+recovery authority, and full production reconciliation remain deployment decisions.
 
 ## Threat model highlights
 
@@ -190,8 +257,8 @@ pnpm audit --audit-level=high
 ```
 
 `pnpm check` runs formatting, linting, type checking, history-aware secret scanning, unit/invariant
-tests, and a Worker dry-run build. GitHub Actions separately runs `quality`, `browser`, and `secrets`;
-all three are required on protected `main`.
+and migration/recovery tests, and a Worker dry-run build. GitHub Actions separately runs `quality`,
+`browser`, and `secrets`; all three are required on protected `main`.
 
 ## Repository map
 
@@ -202,12 +269,12 @@ all three are required on protected `main`.
 - `src/infrastructure/` — Cloudflare D1/R2 adapters and application-owned content-key builders.
 - `src/http/` — Hono composition, shared HTTP/session/form concerns, dependency wiring, and bounded
   route groups.
-- `src/ui/` — semantic server-rendered synthetic application/admin surfaces and configurable theme.
+- `scripts/migration-files.ts` — deterministic loader/validator for the authoritative migration SQL.
 - `migrations/` — authoritative ordered D1/SQLite schema and integrity invariants.
-- `tests/` — executable migration, domain, authorization, portability, architecture, security-header,
-  accessibility, browser, and responsive checks.
-- `docs/` — architecture, ADRs, threat model, status, contracts, identity/authorization boundary, and
-  continuation notes.
+- `tests/` — executable migration/upgrade/recovery, domain, authorization, portability, architecture,
+  supply-chain, security-header, accessibility, browser, and responsive checks.
+- `docs/` — architecture, ADRs, threat model, operations/recovery, status, contracts,
+  identity/authorization boundary, and continuation notes.
 
 ## Deployment boundary
 
@@ -219,6 +286,7 @@ custom domain merely to exercise the application.
 ## Documentation
 
 - [Threat Model](docs/THREAT_MODEL.md)
+- [Operations, Migration, Backup, and Recovery](docs/OPERATIONS_RECOVERY.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [ADR 0001: Cloudflare-first modular monolith](docs/adr/0001-cloudflare-first-modular-monolith.md)
 - [ADR 0002: D1/SQLite initial production persistence](docs/adr/0002-d1-sqlite-initial-production-persistence.md)

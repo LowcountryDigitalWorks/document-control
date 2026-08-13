@@ -1,263 +1,406 @@
 # Document Control Threat Model
 
-- Status: Production Readiness Foundation I baseline
+- Status: Production Readiness Foundation II baseline
 - Date: 2026-08-12
 - Scope: `LowcountryDigitalWorks/document-control`
 
 ## Purpose and limits
 
-This document describes the security boundaries, assets, actors, threats, existing controls, and
-future security gates for Document Control. It is a design and engineering threat model. It is **not**
-a certification, audit opinion, compliance assessment, or determination of suitability for HIPAA,
-CMMC, FedRAMP, SOC 2, or any other regulatory or assurance framework.
+This is the engineering threat model for Document Control. It identifies protected assets, actors,
+trust boundaries, current mitigations, future gates, and residual decisions. It is not a
+certification, audit opinion, compliance assessment, or determination of suitability for HIPAA,
+CMMC, FedRAMP, SOC 2, or another assurance framework.
 
-The repository is pre-production. Current interactive product-shaped routes are synthetic/test-only.
-Production authentication, production tenant provisioning, arbitrary customer uploads, malware
-scanning/quarantine, production retention/legal hold, production backup/recovery, and production
-Cloudflare resources are not implemented by this baseline. Customer data and PHI remain prohibited.
+The repository remains pre-production. Product-shaped interactive routes are synthetic/test-only.
+Production authentication, tenant provisioning, customer uploads, malware scanning/quarantine,
+retention/legal hold, complete production backup/recovery, production Cloudflare resources, customer
+data, and PHI are not implemented or authorized by this baseline.
+
+Foundation II adds CI supply-chain hardening, deterministic migration/upgrade assurance, migration
+and recovery discipline, a repository-controlled recovery architecture/runbook, and local synthetic
+recovery validation. Those controls do not create a production deployment or establish RPO/RTO.
 
 ## Security objectives and invariants
 
-The security design aims to preserve these properties as the product moves toward production:
+1. Tenant-owned records must not cross tenant boundaries.
+2. Authentication source is not application authorization; active membership and internal role
+   bindings determine authority.
+3. Approval applies only to the exact document-version ID, SHA-256 content identity, workflow
+   instance, and workflow-definition version recorded as evidence.
+4. Template and workflow histories remain immutable/versioned where defined as evidence.
+5. Audit history is append-only; corrections add evidence rather than rewriting history.
+6. Browser-supplied IDs, claims, paths, filenames, content types, and role labels are untrusted.
+7. Content keys are application-owned references rather than caller-controlled storage paths.
+8. Export, administration, migration, backup, recovery, and deployment paths must not bypass ordinary
+   authorization or repository governance.
+9. Secrets and authentication/recovery material must not enter source control, portable exports,
+   migration examples, ordinary audit evidence, or recovery records.
+10. Released migrations are forward-only immutable history; corrections use a new ordered migration.
+11. Portable JSON, D1 metadata/state recovery, R2 binary recovery, and complete recoverable state are
+    distinct concepts.
+12. A future security control is not an implemented capability until it is enforced and validated.
 
-1. Tenant-owned records cannot be read, attached, or mutated across tenant boundaries.
-2. Identity source does not directly grant application authority; active membership and internal role
-   bindings determine application permissions.
-3. A controlled document approval applies only to the exact document-version ID and exact SHA-256
-   content identity approved through the exact workflow instance/definition version.
-4. Template and workflow histories remain versioned and immutable where the data model defines them
-   as evidence.
-5. Audit history is append-only; corrections are additional events rather than rewritten evidence.
-6. Browser-supplied IDs, names, claims, filenames, content types, paths, and role labels are not
-   treated as authority or content identity by themselves.
-7. Content storage keys are application-owned references rather than arbitrary user-controlled object
-   paths.
-8. Export, administrative, recovery, and operational paths are security boundaries and must not become
-   alternate ways to bypass ordinary authorization.
-9. Production secrets and authentication material are never stored in application roles, portable
-   exports, source control, or audit evidence.
-10. A capability remains unavailable until its security prerequisites are implemented and validated;
-    documentation must not imply that a future control already exists.
+## Protected assets
 
-## Assets
-
-The protected assets include:
-
-- controlled document binaries;
-- controlled template binaries;
-- document and template metadata, version identities, lifecycle state, and provenance;
-- workflow definitions, exact workflow-definition versions, and workflow instances;
-- review decisions and comments;
-- approvals and exact version/hash/workflow evidence;
-- append-only audit records and bounded audit projections;
-- identity subjects, tenant memberships, role definitions, role bindings, and permission grants;
-- tenant/workspace configuration and presentation/terminology configuration;
-- portable exports and evidence exports;
-- content-provider references, application-owned object keys, and canonical SHA-256 hashes;
-- future authentication sessions, IdP claims, tokens, anti-CSRF material, and provisioning mappings;
-- future quarantine/scanner state and ingestion decision evidence;
-- production secrets, deployment credentials, and service bindings;
-- migration state, backups, restore material, disaster-recovery records, and recovery credentials;
-- CI/CD configuration, workflow authority, branch governance, release artifacts, and deployment state.
+Protected assets include controlled document/template binaries; exact SHA-256 identities and content
+references; document/template metadata, immutable versions, lifecycle state, and provenance; workflow
+definitions/versions/instances; review and approval evidence; append-only audit records; identity
+subjects, memberships, roles, bindings, permissions, and tenant/workspace configuration; portable and
+evidence exports; migration files/order/schema state; future session/IdP/scanner state; production
+secrets, deployment/recovery credentials and keys; backup/restore material; CI workflow authority and
+Action dependencies; branch governance; release artifacts; and future deployment state.
 
 ## Actors
 
 ### Ordinary authenticated member
 
-A future production user who has an authenticated application identity, active tenant membership, and
-one or more internal role bindings. The current synthetic application exercises equivalent
-application authorization with server-controlled test identities but does not authenticate users.
+A future production user with a validated application identity, active tenant membership, and one or
+more internal role bindings. Current synthetic identities exercise authorization logic but do not
+constitute production authentication.
 
-### Privileged workspace or tenant administrator
+### Privileged tenant/workspace administrator
 
-A legitimate administrator with greater configuration, member, role, workflow, template, export, or
-workspace authority. Administrative authority is powerful but remains tenant/workspace scoped where
-specified and must be auditable.
+A legitimate administrator with configuration, member, role, workflow, template, export, or
+workspace authority. Privilege remains scoped by the application permission model and must be
+auditable.
 
 ### Platform administrator
 
-A deliberately broad application role capable of platform-level administration. Compromise or misuse
-of this role has high impact and requires stronger operational controls in production.
+A deliberately broad application role. Compromise has high impact and requires stronger production
+operational controls and a future break-glass model.
 
 ### External identity provider
 
-A future OIDC, SAML, Microsoft Entra ID, Active Directory-connected, or other approved provider that
-asserts external identity. Provider identity must be normalized into application-owned identity,
-membership, and role-binding semantics rather than becoming the authorization model itself.
+A future Entra/OIDC/SAML/AD-connected or other approved provider. Provider claims are authentication
+input; immutable external identities/groups must normalize into application-owned membership and
+role-binding semantics.
 
 ### Infrastructure and provider services
 
-Cloudflare Worker runtime, D1, R2, future identity/scanning services, and any later approved
-infrastructure provider used by the application.
+Cloudflare Worker, D1, R2, GitHub Actions, dependency sources, and any future approved identity,
+scanning, backup, or monitoring providers.
 
-### Malicious or compromised legitimate user
+### Release or recovery operator
 
-An authenticated member or administrator intentionally abusing authority, or a legitimate account
-whose browser/session/identity provider has been compromised.
+A future human or service identity performing migration, deployment, backup, restore, credential
+rotation, or recovery verification. These are privileged operational boundaries and require minimum
+scope plus explicit human approval where consequential.
 
-### Unauthenticated Internet user
+### Malicious/compromised legitimate user and unauthenticated Internet user
 
-A user with no trusted application identity. Current production-shaped interactive routes are not
-publicly authorized; future public login, upload, download, and invitation entrypoints must assume
-hostile Internet input.
+Assume hostile inputs and possible misuse of legitimate authority. Future public login, invitation,
+upload, and download paths must be designed against that threat rather than relying on synthetic-demo
+assumptions.
 
-### Background or system process
+### Background/system process
 
 Future scanner, cleanup, reconciliation, migration, backup, restore, notification, or provisioning
-processes. These processes require bounded service identity and must not implicitly inherit platform
-administrator authority.
+processes. Such services require bounded identities and must not implicitly inherit platform admin.
 
 ## Trust boundaries
 
 ### Browser -> Worker/application
 
-All request metadata, URLs, IDs, form values, cookies, filenames, content types, and uploaded bytes are
-untrusted at this boundary. The current synthetic application uses server-controlled tenant/subject
-context, strict synthetic cookies, and same-origin POST checks; those are not a production login
-session design.
+All request metadata, cookies, IDs, form values, filenames, content types, paths, and future uploaded
+bytes are untrusted. Current synthetic state-changing routes use server-owned tenant/subject context,
+opaque cookies, and same-origin checks; these are not a production session design.
 
-### External identity provider -> normalized application identity
+### External IdP -> normalized application identity
 
-Future provider assertions are authentication input only. Immutable provider subject/group identifiers
-must map into application-owned identity subjects and provisioning/membership state. Display names,
-emails, domains, and arbitrary group labels must not directly grant permissions.
+Future assertions must validate issuer/audience/signature/state/nonce as appropriate and map immutable
+provider identities into application-owned subjects/memberships. Display names, emails, domains, or
+arbitrary group labels must not directly grant application permissions.
 
-### Identity -> membership -> role binding -> permission authorization
+### Identity -> membership -> role binding -> permission
 
-This is the primary authorization boundary. Active membership and internal application role bindings
-must be evaluated for the requested tenant/workspace scope before protected work occurs.
+This is the primary authorization boundary. Active tenant membership and scoped internal role
+bindings must authorize protected work before persistence or presentation.
 
 ### Application -> D1/SQLite
 
-D1 is the accepted initial production metadata/state-store architecture. Application services
-currently issue material SQL/SQLite-specific queries through `DatabaseProvider`; relational
-constraints and triggers provide defense in depth for critical invariants.
+D1/SQLite is the accepted initial production metadata/state architecture. Application persistence is
+materially SQL/SQLite coupled through `DatabaseProvider`; relational constraints/triggers reinforce
+critical invariants.
 
 ### Application -> R2
 
-R2 is the initial content-store adapter. Current create-once storage verifies SHA-256 on create and
-read. The current adapter materializes bytes in memory and is not an approved production upload
-pipeline.
+R2 is the initial binary-content adapter. Current storage is create-once and SHA-256 verifying. The
+adapter is not an approved arbitrary customer-upload pipeline.
 
-### Future upload -> quarantine -> validation/scanner -> accepted content
+### Ordered migrations -> schema state
 
-This boundary is not implemented. Arbitrary customer bytes must not enter the controlled-content
-store until file policy, bounded streaming, type/signature validation, quarantine, malware scanning,
-failure compensation, and safe retrieval are designed and reviewed.
+SQL under `migrations/` is executable schema authority. Foundation II validates contiguous order,
+clean creation, and the supported prior-to-current upgrade with real SQL. Production migration
+remains a privileged operation requiring pre-change recovery readiness and post-change validation.
+
+### Future upload -> quarantine/validation/scanner -> accepted content
+
+Not implemented. Customer bytes must not enter controlled storage until file policy, bounded
+processing, signature/type validation, quarantine, malware scanning, failure compensation, safe
+retrieval, and retention interaction are reviewed.
 
 ### Export/download boundary
 
-Exports can concentrate sensitive metadata and evidence. Authorization, bounded projections,
-no-store responses, safe filenames/headers, and explicit export scope are required. Existing JSON
-portability output is application state with external content references, not a complete binary
-backup.
-
-### Administrative operations
-
-Member, role, workflow, template, configuration, and future provisioning/retention actions are
-privileged state changes. Administrative UI/API paths must not weaken authorization or evidence merely
-because the operator is an administrator.
+Exports concentrate metadata/evidence and require authorization, bounded projections, safe response
+headers, and explicit scope. Existing portable JSON contains external content references and is not a
+complete binary backup.
 
 ### Backup/recovery boundary
 
-Future backups and restores can bypass ordinary request-time controls by operating on complete data
-sets. Backup encryption, access control, restoration authorization, integrity verification, and
-recovery audit evidence are future production requirements.
+Recovery copies, credentials, keys, restore authority, and provider restore actions are privileged.
+D1 and R2 are not one application-atomic recovery unit, so restoration requires sequencing,
+SHA-256/invariant checks, and metadata/content reconciliation.
 
 ### CI/deployment boundary
 
-Repository branch rules, required checks, Actions dependencies, repository credentials, deployment
-credentials, release artifacts, and Cloudflare deployment authority can change the software or its
-runtime. Compromise here can bypass application controls entirely.
+A compromised repository workflow, Action dependency, branch rule, repository credential, or future
+deployment credential can bypass application controls. Foundation II keeps permanent CI read-only,
+disables checkout credential persistence, pins official Actions to immutable SHAs, retains Dependabot
+maintenance, and mechanically tests that posture.
 
 ## Threat register
 
-The release gates referenced below are planning labels only; naming a later gate does not authorize
-implementation.
+Each threat below states the current mitigation followed by the unresolved/future requirement.
 
-| Threat                                                       | Existing mitigation                                                                                                                                                                                                                                              | Planned mitigation / release gate                                                                                                                                                                                | Residual or open decision                                                                                                                      |
-| ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| Cross-tenant IDOR or data access                             | Tenant IDs are carried on tenant-owned records; composite foreign keys constrain cross-tenant attachment; authorized services and reads scope tenant/workspace IDs; document/template detail deliberately collapses authorization denial and not-found behavior. | Production Identity & Tenant Boundary must establish authenticated tenant context and ensure every production route uses authorized facades; controlled staging must exercise hostile cross-tenant IDs.          | Production tenant provisioning and authenticated routing are not implemented. Authorization tests must expand with every new production route. |
-| Tenant enumeration through response differences              | Current document/template detail paths return the same not-found surface for authorization denial and unknown/cross-session records.                                                                                                                             | Establish a production error-mapping policy before authenticated tenant routing; test timing/body/status behavior on sensitive lookup paths.                                                                     | Administrative and future invitation/login endpoints may need different UX while still avoiding tenant discovery.                              |
-| Privilege escalation                                         | Application permissions are internal data; bounded custom roles cannot grant wildcard `*`, `tenant.manage`, `workspace.manage`, or `role.manage`; administrative mutations use authorized facades; DB constraints reinforce scope.                               | Production Identity & Tenant Boundary must test privilege transitions, stale sessions, and admin boundaries with real authenticated identities.                                                                  | Break-glass/platform-administrator controls and production role-provisioning ownership remain undecided.                                       |
-| Confused deputy between provider identity and internal roles | Provider type/subject describes identity source only; authorization follows identity -> active membership -> internal role binding -> permission.                                                                                                                | Production identity adapters must map immutable external IDs into the existing internal model and default deny unknown mappings.                                                                                 | Exact supported providers, mapping ownership, JIT/SCIM behavior, and group-to-role approval remain open.                                       |
-| Malicious or compromised IdP claims                          | No production IdP is currently trusted. Existing design forbids granting authority from display name/email domain alone.                                                                                                                                         | Validate issuer, audience, signature, nonce/state, authorized tenant configuration, immutable subject/group IDs, and provisioning mappings during Production Identity & Tenant Boundary.                         | IdP-specific claims and conditional-access expectations are undecided.                                                                         |
-| Stale authorization after membership suspension/revocation   | Authorization requires active tenant membership; suspension immediately makes new application authorization checks fail while preserving bindings/history.                                                                                                       | Production session design must define revalidation cadence/session revocation and IdP deprovisioning reconciliation.                                                                                             | Whether sessions are revoked immediately, short-lived, or continuously revalidated is unresolved.                                              |
-| Compromised administrator                                    | Privileged operations are separated into explicit permissions and produce audit evidence for existing administration. Destructive deletion is intentionally absent.                                                                                              | Production Identity & Tenant Boundary and later operations work must define stronger administrator authentication, break-glass, alerting/review, separation where justified, and recovery controls.              | Required admin MFA/conditional access and independent approval for high-impact actions remain deployment decisions.                            |
-| Session theft or fixation                                    | Current synthetic cookie is server-issued UUID, HttpOnly, SameSite=Strict, path-scoped to `/demo`, and Secure on HTTPS. It is explicitly not a production session.                                                                                               | Production Identity & Tenant Boundary must use a production session design with rotation/fixation defense, secure cookie attributes, expiry/revocation, and authentication binding.                              | Production session store/lifetime/provider is unresolved.                                                                                      |
-| CSRF                                                         | Current synthetic state-changing POSTs require same-origin `Origin`; synthetic cookies are SameSite=Strict.                                                                                                                                                      | Production session work must define CSRF strategy appropriate to authenticated routes and any cross-site IdP redirects; browser tests must cover it.                                                             | Whether same-origin validation alone remains sufficient for every production mutation depends on final auth/session architecture.              |
-| Request replay and idempotency                               | Critical current workflows use immutable IDs, exact current-version checks, unique relational constraints, and no-op handling in several administrative services; approval/review stale-version checks prevent replay onto superseded versions.                  | Production mutation endpoints must classify replay-safe vs one-time commands and add idempotency/concurrency controls where external retries can duplicate side effects.                                         | No general idempotency-key contract exists today.                                                                                              |
-| Malicious file upload                                        | Arbitrary/customer uploads are absent; synthetic routes expose no file input.                                                                                                                                                                                    | Content Ingestion Architecture must define allowed types, quarantine, scanning, rejection, lifecycle, and audit evidence before uploads are enabled.                                                             | Scanner/vendor, scan-result semantics, and failure policy remain undecided.                                                                    |
-| Dangerous or deceptive metadata                              | Current controlled version metadata is server-generated/bounded in existing synthetic flows; storage keys are application-owned.                                                                                                                                 | Content ingestion must bound/normalize filenames, content types, user descriptions, archive metadata, and other untrusted fields and encode safely on display/export.                                            | Exact filename and metadata preservation policy is unresolved.                                                                                 |
-| MIME/content-type/extension confusion                        | No arbitrary upload path exists; stored R2 content type is metadata and SHA-256 is the content-identity anchor.                                                                                                                                                  | Content ingestion must validate magic/signature where practical, compare declared MIME/extension/signature, and define safe serving headers.                                                                     | Allowed file-type matrix and handling of ambiguous formats are unresolved.                                                                     |
-| Filename/path handling abuse                                 | R2 object keys are constructed by application-owned builders rather than caller-provided arbitrary paths; evidence exports use fixed/sanitized filenames.                                                                                                        | Future upload/download code must store original display filename separately from object keys, reject controls/path traversal semantics, and use safe `Content-Disposition`.                                      | Final normalization and Unicode filename policy is unresolved.                                                                                 |
-| Object-storage key/reference leakage                         | Ordinary document/template evidence views exclude content keys; per-document evidence manifest excludes keys; R2 keys are application-owned. Portable tenant export deliberately includes external content references under tenant-wide export authority.        | Production download APIs must authorize logical records before resolving storage references and avoid exposing direct bucket credentials or unbounded signed URLs.                                               | Whether any customer-facing export should retain raw provider keys or use logical manifests needs later review.                                |
-| Upload resource exhaustion                                   | No arbitrary upload exists. Current R2 adapter materializes bytes and is explicitly synthetic/bootstrap appropriate only.                                                                                                                                        | Content Ingestion Architecture must define per-file/request limits, streaming/bounded-memory processing, concurrency/rate limits, and quotas before customer uploads.                                            | Exact limits vary by deployment and allowed content types.                                                                                     |
-| Decompression bomb or complex-format denial of service       | No archive/document parsing pipeline exists.                                                                                                                                                                                                                     | Content ingestion must constrain archive expansion, recursion, parser CPU/memory/time, and isolate risky parsing/scanning.                                                                                       | Allowed archive and complex-document formats remain undecided.                                                                                 |
-| Race during version creation/upload                          | Current metadata workflow enforces current-version and sequence invariants in services/database; R2 objects are create-once. There is no production cross-resource upload transaction.                                                                           | Content ingestion must define reservation/state transitions, concurrency tokens, idempotent object creation, and reconciliation for competing version submissions.                                               | Exact ingestion state machine and transaction/compensation protocol remain open.                                                               |
-| D1/R2 partial success                                        | Repository documentation explicitly does not claim a cross-resource transaction; R2 create-once semantics reduce overwrite risk.                                                                                                                                 | Content Ingestion Architecture must specify order of operations, durable ingestion states, compensating actions, retry behavior, and reconciliation.                                                             | Whether metadata-first or quarantine/object-first ordering best meets operational needs remains to be decided.                                 |
-| Orphaned objects or metadata                                 | No production upload orchestration exists, so no cleanup claim is made. Immutable storage keys make orphan identification possible when references are well defined.                                                                                             | Add reconciliation/orphan detection and safe cleanup only after retention/legal-hold interaction is designed.                                                                                                    | Cleanup grace periods, ownership, and legal-hold precedence remain unresolved.                                                                 |
-| Workflow-definition or workflow-instance tampering           | Definitions are immutable by version; instances are pinned to exact definition/version; DB triggers constrain state/definition references; lifecycle changes do not rewrite historical instances.                                                                | Production authorization must protect every workflow admin/mutation route; later operations should detect integrity failures and unauthorized direct data changes.                                               | Operational database-access controls and integrity monitoring are deployment decisions.                                                        |
-| Exact-version approval/evidence tampering                    | Application and SQLite enforce exact document-version ID, SHA-256, workflow instance, and definition version; stale review/approval evidence is rejected; later versions do not inherit earlier approvals.                                                       | Controlled staging must exercise concurrency and hostile identifiers through authenticated routes; backup/restore must preserve the same invariants.                                                             | Production signing/notarization beyond database/audit integrity is not currently required or selected.                                         |
-| Audit tampering or leakage                                   | SQLite triggers reject audit update/delete; corrections are append-only events; ordinary audit views/CSV expose bounded primitive summaries under `audit.read`; raw payloads/subject IDs are not generally exposed.                                              | Operations foundation must define production audit retention, privileged DB access, monitoring, and external archival only if justified.                                                                         | Production log-retention period and external SIEM/archive are unresolved.                                                                      |
-| Export as exfiltration                                       | Tenant-wide portable export requires tenant `export.create`; workspace CSV/document evidence are narrower authorized surfaces; downloads use no-store and fixed/sanitized filenames where implemented.                                                           | Production identity/routing must enforce export authority with real sessions; later policy must define export audit/approval and operational monitoring.                                                         | Whether high-impact exports need additional confirmation or dual authorization remains open.                                                   |
-| Retention or deletion failure                                | Destructive document deletion is absent; document retirement is terminal and preserves history/evidence; no false retention claim is made.                                                                                                                       | Later retention/customer-readiness gate must define retention schedules, legal hold, disposition evidence, content/reference cleanup, retries, and failed-deletion handling.                                     | Policy, record classes, legal-hold authority, and customer-specific requirements remain undecided.                                             |
-| Backup or restore compromise                                 | Current portable JSON export is validated application state with external binary references and is explicitly not a complete production backup.                                                                                                                  | Operations & Supply-Chain Foundation must define migration/backup/recovery procedure; later production work must secure backup storage, encryption, access, integrity verification, restore testing, and audit.  | RPO/RTO, backup provider, key ownership, binary backup model, and retention remain undecided.                                                  |
-| Recovery procedure bypasses normal authorization             | No production restore tooling exists.                                                                                                                                                                                                                            | Recovery design must require explicit authorized operators, controlled credentials, immutable recovery logs, integrity checks, and post-restore authorization/state reconciliation.                              | Break-glass recovery approval and emergency access model remain undecided.                                                                     |
-| Production secret leakage                                    | Repository policy forbids committed secrets; CI performs current/history-aware secret detection; application roles/exports do not contain credentials by design.                                                                                                 | Operations & Supply-Chain Foundation and deployment design must use scoped deployment secrets, minimal CI permissions, rotation/revocation, and incident procedures.                                             | Final secret store and production deployment credential model are not selected.                                                                |
-| CI or deployment compromise                                  | `main` requires PR flow, linear history, resolved review threads, squash merges, and required `quality`, `browser`, and `secrets` checks. CI has read-only repository contents permission.                                                                       | Operations & Supply-Chain Foundation should evaluate immutable Action SHA pinning, checkout credential persistence, CodeQL, deployment-environment protections, artifact provenance, and scoped deploy identity. | Production deployment workflow/resources are not provisioned or authorized.                                                                    |
+### Cross-tenant access and enumeration
+
+Current: tenant IDs live on tenant-owned records; composite relational constraints prevent many
+cross-tenant attachments; authorized services scope tenant/workspace IDs; sensitive detail paths avoid
+revealing cross-session/cross-tenant existence.
+
+Future/residual: Production Identity & Tenant Boundary must establish authenticated tenant context,
+consistent production error mapping, and hostile cross-tenant route tests. Tenant provisioning and
+real authenticated routing are not implemented.
+
+### Privilege escalation and compromised administrators
+
+Current: internal roles/permissions, active membership checks, bounded custom roles, and authorized
+facades constrain operations; administrative actions preserve audit evidence.
+
+Future/residual: define production MFA/conditional-access expectations, stale-session/revocation
+behavior, role-provisioning ownership, alerting, separation of duties, and break-glass/platform-admin
+controls.
+
+### Confused deputy or malicious IdP claims
+
+Current: provider identity does not itself grant application permissions.
+
+Future/residual: production adapters must validate provider assertions and map immutable provider
+subjects/groups to internal membership/role state with default-deny behavior. JIT/SCIM/group mapping
+and deprovisioning remain undecided.
+
+### Session theft/fixation and CSRF
+
+Current: synthetic cookies are server-issued, HttpOnly, SameSite=Strict, path scoped, and Secure on
+HTTPS; synthetic mutations require same-origin requests.
+
+Future/residual: production session rotation, lifetime/revocation, authentication binding, CSRF
+strategy, and IdP redirect behavior must be designed and tested. Synthetic cookies are not production
+sessions.
+
+### Replay, race, and stale workflow actions
+
+Current: immutable IDs, exact current-version/hash checks, unique constraints, workflow-version
+pinning, and application/database stale review/approval guards reject superseded evidence.
+
+Future/residual: production external retries may require idempotency/concurrency contracts and
+content-ingestion reservation/reconciliation state.
+
+### Malicious file uploads and metadata/content confusion
+
+Current: arbitrary/customer uploads are absent; application storage keys are application-owned.
+
+Future/residual: Content Ingestion Architecture must define allowed types, size/streaming bounds,
+magic/signature/MIME/extension validation, filename normalization, quarantine, malware scanning,
+parser isolation, decompression limits, safe serving headers, quotas, and failure policy.
+
+### D1/R2 partial success and orphan state
+
+Current: no false cross-resource transaction claim is made; R2 objects are create-once; recovery
+procedure explicitly detects missing metadata/content and hash mismatch rather than silently cleaning
+or relinking evidence.
+
+Future/residual: ingestion must define durable state transitions, compensation/retry, idempotency, and
+orphan reconciliation. Cleanup cannot be finalized before retention/legal-hold policy.
+
+### Workflow/template/approval evidence tampering
+
+Current: workflow definitions are immutable/versioned; instances are pinned; template versions
+preserve exact provenance/content identity; approvals bind exact version/hash/workflow evidence;
+database triggers reinforce key invariants.
+
+Future/residual: authenticated staging must exercise hostile identifiers and concurrency. Any future
+recovery/import path must preserve the same evidence invariants.
+
+### Audit tampering or leakage
+
+Current: database triggers reject audit update/delete; user-facing audit projections are bounded;
+local recovery validation confirms append-only enforcement after reconstruction.
+
+Future/residual: production audit retention, privileged database access, monitoring, archival/SIEM,
+and recovery evidence policy remain deployment decisions.
+
+### Export as exfiltration
+
+Current: tenant-wide portability export requires `export.create`; narrower evidence/audit exports use
+narrower authorization and no-store/safe response behavior.
+
+Future/residual: real sessions must enforce the same authority. Additional confirmation, dual
+approval, alerting, or export-monitoring requirements remain undecided.
+
+### Retention/deletion failure
+
+Current: destructive document deletion is absent; retirement preserves historical evidence; recovery
+docs forbid silent orphan cleanup.
+
+Future/residual: retention schedules, legal hold, controlled disposition, content/reference cleanup,
+retry/failure evidence, and customer-specific policy remain a later gate.
+
+### Migration skipped, reordered, or released history rewritten
+
+Current: `scripts/migration-files.ts` requires contiguous deterministic migration names/order; E2E and
+upgrade tests use the same real SQL; the operational rule is forward-only immutable released history.
+
+Future/residual: every future schema release must extend the expected sequence and supported upgrade
+path. Stronger released-migration checksum evidence may be added later if operational value justifies
+it.
+
+### Migration failure or application/schema mismatch
+
+Current: upgrade-path tests exercise current SQL, and the operations runbook requires exact version
+identification, pre-change state capture, recovery readiness, post-migration invariants, and smoke
+checks.
+
+Future/residual: actual deployment tooling, rollback compatibility windows, and operator approval must
+be validated against the selected production Cloudflare deployment.
+
+### Backup/restore compromise or incomplete recovery
+
+Current: portable JSON is explicitly not a complete backup; recovery architecture separates D1, R2,
+portable export, and complete state; recovery material/credentials/authority are privileged; local
+synthetic recovery verifies selected relational/evidence reconstruction only.
+
+Future/residual: define RPO/RTO, independent R2 recovery, backup retention/schedule/encryption/key
+ownership, recovery authority, real restore testing, and protected recovery evidence.
+
+### D1/R2 restore-point mismatch or binary hash mismatch
+
+Current: recovery procedure requires missing-object/orphan detection, exact key/version mapping,
+canonical SHA-256 validation, and reconciliation before return to service.
+
+Future/residual: complete production D1/R2 reconciliation tooling and an acceptable consistency window
+remain undecided.
+
+### Recovery procedure bypasses normal authorization
+
+Current: no production restore tool exists; the runbook requires explicit approval for consequential
+restore/resource/credential actions and minimum-scope identities.
+
+Future/residual: define production recovery operator, break-glass, multi-person approval, immutable
+recovery evidence, and return-to-service authority.
+
+### Production secret or deployment credential leakage
+
+Current: repository policy forbids committed secrets; CI performs history-aware secret detection;
+roles, portable exports, migration examples, and recovery docs exclude credentials.
+
+Future/residual: production secret storage, deployment identity, rotation/revocation, incident
+response, and environment protection remain undecided.
+
+### CI dependency compromise
+
+Current: permanent external Actions are pinned to verified official full commit SHAs and Dependabot
+GitHub Actions updates remain enabled for reviewable maintenance.
+
+Future/residual: continue reviewing upstream pin changes. Additional provenance/signing controls may
+be considered if they add practical value.
+
+### CI credential persistence or workflow privilege escalation
+
+Current: normal CI has `contents: read`, all checkouts use `persist-credentials: false`, no permanent
+validation workflow pushes, and regression tests reject write permissions or `pull_request_target`.
+
+Future/residual: any future deployment workflow must be separated from untrusted PR validation and
+use minimum scoped deployment identity plus environment approvals.
+
+### Missing static-analysis signal
+
+Current: strict TypeScript, ESLint, unit/invariant/architecture tests, browser/accessibility tests,
+dependency audit, secret scanning, and build validation are enforced. CodeQL was evaluated but not
+added because an advanced result-upload workflow normally requires `security-events: write`, which is
+outside this release's read-only PR posture.
+
+Future/residual: reconsider CodeQL default setup or a separately scoped trusted analysis workflow
+under explicit governance approval. It is not a required check in Foundation II.
+
+## Foundation II implemented controls
+
+Foundation II establishes these repository controls without adding a product feature:
+
+- immutable official commit pins for permanent CI Actions;
+- `persist-credentials: false` for every permanent CI checkout;
+- read-only permanent CI permissions and no `pull_request_target`;
+- Dependabot GitHub Actions maintenance for pinned references;
+- regression tests for CI pin/credential/permission/trigger posture;
+- deterministic contiguous migration discovery/application using actual SQL;
+- clean-schema and immediately-prior `0010 -> 0011` upgrade assurance with representative data and
+  invariant checks;
+- forward-only released-migration discipline and explicit destructive-change approval requirements;
+- a durable operations/migration/backup/recovery runbook;
+- explicit distinction among portable JSON, D1 recovery, R2 recovery, and complete recoverable state;
+- D1/R2 non-atomic consistency and reconciliation requirements;
+- documented failure, containment, recovery, validation, and human-approval directions; and
+- deterministic local synthetic recovery validation against a fresh migrated SQLite database.
+
+Foundation II does not implement production backup scheduling, R2 recovery, a production restore,
+recovery automation, production authentication, customer uploads, production Cloudflare resources,
+retention/legal hold, customer data, PHI, PostgreSQL, paid security features, analytics/tracking, or
+paid services.
 
 ## Security gates before production capabilities
 
-### Production Readiness Foundation I
+### Production Readiness Foundation I — established
 
-This baseline records the threat model, makes the persistence constraint explicit, decomposes HTTP
-composition/routes, and adds architecture/security regressions. It does not close production identity
-or upload threats.
+Threat/architecture boundaries, D1/SQLite persistence decision, HTTP decomposition, and architecture/
+security regressions remain authoritative.
 
-### Operations & Supply-Chain Foundation
+### Production Readiness Foundation II — current foundation
 
-Expected design scope includes migration/backup/recovery procedure, supported-schema upgrade testing,
-CI supply-chain hardening, deployment/recovery operational boundaries, and related documentation.
-This label does not authorize those changes by itself.
+Repository supply-chain hardening, migration upgrade assurance, migration/recovery discipline,
+backup/recovery architecture, and local synthetic recovery assurance are established. This does not
+create production disaster recovery.
 
 ### Production Identity & Tenant Boundary
 
-Must establish real authentication/session semantics, authenticated tenant context, provisioning,
-IdP normalization/mapping, revocation/deprovisioning behavior, production CSRF/session controls, and
+Must establish production authentication/session semantics, authenticated tenant context,
+provisioning/IdP normalization, revocation/deprovisioning, production CSRF/session controls, and
 hostile cross-tenant authorization tests before production user access.
 
 ### Content Ingestion Architecture
 
-Must define allowed content, bounded streaming, type/signature validation, quarantine, scanning,
+Must establish file policy, bounded processing, type/signature validation, quarantine/scanning,
 SHA-256 identity, D1/R2 state transitions, partial-failure compensation, orphan reconciliation, safe
-retrieval, and retention/deletion interaction before customer uploads.
+retrieval, and retention interaction before customer uploads.
 
 ### Explicitly approved controlled staging vertical slice
 
-Only after the preceding relevant designs are approved may a staging environment be explicitly
-authorized using synthetic/non-sensitive test content to exercise real identity, storage, scanning,
-and workflow integration. Creating such infrastructure is not authorized by this threat model.
+Only after the relevant preceding gates are approved may a staging environment be explicitly
+authorized with synthetic/non-sensitive content. This threat model does not authorize provisioning.
 
-### Later retention, backup, and customer-readiness gates
+### Later retention, complete backup/recovery, and customer-readiness gates
 
-Retention/legal hold/destruction, complete production backup/restore, operational monitoring, final
-customer deployment profiles, and regulated-data decisions remain later gates. Customer data and PHI
-must not be introduced merely to test readiness.
+Retention/legal hold/destruction, complete production backup/restore, monitoring, final deployment
+profiles, and regulated-data decisions remain later work. Customer data or PHI must not be introduced
+merely to test readiness.
 
 ## Review triggers
 
-Revisit this threat model when any of the following occurs:
+Revisit this model when production identity/session or tenant provisioning is designed; file upload,
+parsing, scanning, or download is designed; a migration changes critical invariants or the supported
+upgrade window; a second persistence/content provider is required; production D1/R2/Worker/custom
+domain resources are proposed; retention/deletion/backup/recovery is implemented; a production
+credential/deployment workflow is proposed; CodeQL or another tool would require new permissions or
+ruleset changes; external SIEM/archive/runtime integration is proposed; or an incident/finding
+invalidates an assumption here.
 
-- production authentication/session or IdP integration is designed;
-- production tenant provisioning is introduced;
-- arbitrary file upload, parsing, scanning, or download is designed;
-- a second persistence/content provider is required;
-- production D1/R2/Worker resources or a custom domain are proposed;
-- retention, legal hold, deletion, backup, or recovery is designed;
-- external SIEM/archive, notification, workflow automation, or third-party runtime integration is
-  proposed;
-- a security finding, incident, or changed trust boundary invalidates an assumption here.
-
-Every review should distinguish controls that are already enforced from controls that are only
-planned. A planned mitigation must never be represented as an implemented security property.
+Every review must continue distinguishing implemented controls from planned mitigations.

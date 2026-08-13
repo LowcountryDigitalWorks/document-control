@@ -1,5 +1,5 @@
-import { readdir, readFile } from "node:fs/promises";
 import { DatabaseSync } from "node:sqlite";
+import { applyMigrationFiles, loadOrderedMigrations } from "./migration-files";
 
 type SqlValue = string | number | bigint | Uint8Array | null;
 
@@ -19,22 +19,7 @@ interface TestPreparedStatement {
 
 export async function createE2eD1Database(): Promise<D1Database> {
   const database = new DatabaseSync(":memory:");
-  const migrationDirectory = new URL("../migrations/", import.meta.url);
-  const migrationNames = (await readdir(migrationDirectory))
-    .filter((name) => /^\d{4}_[a-z0-9_]+\.sql$/u.test(name))
-    .sort((left, right) => left.localeCompare(right));
-
-  if (migrationNames.length === 0) {
-    throw new Error(
-      "No ordered D1/SQLite migrations were found for E2E setup.",
-    );
-  }
-
-  for (const migrationName of migrationNames) {
-    database.exec(
-      await readFile(new URL(migrationName, migrationDirectory), "utf8"),
-    );
-  }
+  applyMigrationFiles(database, await loadOrderedMigrations());
 
   const createPrepared = (
     sql: string,
