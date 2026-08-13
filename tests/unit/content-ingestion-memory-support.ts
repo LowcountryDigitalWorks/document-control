@@ -12,32 +12,48 @@ import { sha256 } from "../../src/domain/hash";
 
 export class SequenceIds implements ContentIngestionIdentifierGenerator {
   private value = 0;
-  public nextId(): string { this.value += 1; return `generated-${this.value}`; }
+  public nextId(): string {
+    this.value += 1;
+    return `generated-${this.value}`;
+  }
 }
 
 export class MemoryStore implements ContentStore {
   public readonly objects = new Map<string, ContentObject>();
   public createCalls = 0;
   public failCreate = false;
+  public persistThenFailCreate = false;
   public tamperRead = false;
-  public async get(key: string, expectedHash: string): Promise<ContentObject | null> {
+
+  public async get(
+    key: string,
+    expectedHash: string,
+  ): Promise<ContentObject | null> {
     const found = this.objects.get(key);
     if (!found) return null;
-    if (this.tamperRead || found.contentHash !== expectedHash) throw new Error("integrity");
+    if (this.tamperRead || found.contentHash !== expectedHash)
+      throw new Error("integrity");
     return { ...found, bytes: found.bytes.slice(0) };
   }
+
   public async create(key: string, object: ContentObject): Promise<void> {
     this.createCalls += 1;
     if (this.failCreate) throw new Error("storage");
     if (this.objects.has(key)) throw new Error("immutable");
-    if (await sha256(new Uint8Array(object.bytes)) !== object.contentHash) throw new Error("hash");
+    if ((await sha256(new Uint8Array(object.bytes))) !== object.contentHash)
+      throw new Error("hash");
     this.objects.set(key, { ...object, bytes: object.bytes.slice(0) });
+    if (this.persistThenFailCreate) throw new Error("ambiguous storage outcome");
   }
 }
 
 export class StubValidator implements ContentValidator {
-  public result: ContentValidationResult = { outcome: "accepted", acceptedMediaType: "application/pdf" };
+  public result: ContentValidationResult = {
+    outcome: "accepted",
+    acceptedMediaType: "application/pdf",
+  };
   public fail = false;
+
   public async validate(): Promise<ContentValidationResult> {
     if (this.fail) throw new Error("validator");
     return this.result;
@@ -49,22 +65,121 @@ export class MemoryIngestionRepository implements ContentIngestionRepository {
   public readonly events: ContentIngestionAuditEvent[] = [];
   public failStagedOnce = false;
   public inFlightOverride: number | null = null;
-  public async countInFlight(tenantId: string, workspaceId: string): Promise<number> {
+
+  public async countInFlight(
+    tenantId: string,
+    workspaceId: string,
+  ): Promise<number> {
     if (this.inFlightOverride !== null) return this.inFlightOverride;
-    return [...this.records.values()].filter((r) => r.tenantId === tenantId && r.workspaceId === workspaceId && ["intake_initiated", "staged", "validation_pending"].includes(r.state)).length;
+    return [...this.records.values()].filter(
+      (record) =>
+        record.tenantId === tenantId &&
+        record.workspaceId === workspaceId &&
+        ["intake_initiated", "staged", "validation_pending"].includes(
+          record.state,
+        ),
+    ).length;
   }
-  public async find(tenantId: string, workspaceId: string, id: string): Promise<ContentIngestionRecord | null> {
-    const r = this.records.get(id);
-    return r && r.tenantId === tenantId && r.workspaceId === workspaceId ? { ...r } : null;
+
+  public async find(
+    tenantId: string,
+    workspaceId: string,
+    id: string,
+  ): Promise<ContentIngestionRecord | null> {
+    const record = this.records.get(id);
+    return record &&
+      record.tenantId === tenantId &&
+      record.workspaceId === workspaceId
+      ? { ...record }
+      : null;
   }
-  public async initiate(record: ContentIngestionRecord, event: ContentIngestionAuditEvent): Promise<void> { this.records.set(record.id, { ...record }); this.events.push(event); }
-  public async recordReceived(record: ContentIngestionRecord, hash: string, length: number, event: ContentIngestionAuditEvent): Promise<void> { this.patch(record, { contentHash: hash, byteLength: length }); this.events.push(event); }
-  public async markStaged(record: ContentIngestionRecord, at: string, event: ContentIngestionAuditEvent): Promise<void> { if (this.failStagedOnce) { this.failStagedOnce = false; throw new Error("db"); } this.patch(record, { state: "staged", stagedAt: at }); this.events.push(event); }
-  public async markValidationPending(record: ContentIngestionRecord): Promise<void> { this.patch(record, { state: "validation_pending" }); }
-  public async markAccepted(record: ContentIngestionRecord, media: string, at: string, event: ContentIngestionAuditEvent): Promise<void> { this.patch(record, { state: "accepted", acceptedMediaType: media, acceptedAt: at }); this.events.push(event); }
-  public async markRejected(record: ContentIngestionRecord, code: "unsupported_content" | "malformed_content", at: string, event: ContentIngestionAuditEvent): Promise<void> { this.patch(record, { state: "rejected", failureCode: code, rejectedAt: at }); this.events.push(event); }
-  public async markProcessingFailed(record: ContentIngestionRecord, code: Exclude<ContentIngestionFailureCode, "unsupported_content" | "malformed_content">, at: string, event: ContentIngestionAuditEvent): Promise<void> { this.patch(record, { state: "processing_failed", failureCode: code, failedAt: at }); this.events.push(event); }
-  private patch(record: ContentIngestionRecord, patch: Partial<ContentIngestionRecord>): void {
+
+  public async initiate(
+    record: ContentIngestionRecord,
+    event: ContentIngestionAuditEvent,
+  ): Promise<void> {
+    this.records.set(record.id, { ...record });
+    this.events.push(event);
+  }
+
+  public async recordReceived(
+    record: ContentIngestionRecord,
+    hash: string,
+    length: number,
+    event: ContentIngestionAuditEvent,
+  ): Promise<void> {
+    this.patch(record, { contentHash: hash, byteLength: length });
+    this.events.push(event);
+  }
+
+  public async markStaged(
+    record: ContentIngestionRecord,
+    at: string,
+    event: ContentIngestionAuditEvent,
+  ): Promise<void> {
+    if (this.failStagedOnce) {
+      this.failStagedOnce = false;
+      throw new Error("db");
+    }
+    this.patch(record, { state: "staged", stagedAt: at });
+    this.events.push(event);
+  }
+
+  public async markValidationPending(
+    record: ContentIngestionRecord,
+  ): Promise<void> {
+    this.patch(record, { state: "validation_pending" });
+  }
+
+  public async markAccepted(
+    record: ContentIngestionRecord,
+    media: string,
+    at: string,
+    event: ContentIngestionAuditEvent,
+  ): Promise<void> {
+    this.patch(record, {
+      state: "accepted",
+      acceptedMediaType: media,
+      acceptedAt: at,
+    });
+    this.events.push(event);
+  }
+
+  public async markRejected(
+    record: ContentIngestionRecord,
+    code: "unsupported_content" | "malformed_content",
+    at: string,
+    event: ContentIngestionAuditEvent,
+  ): Promise<void> {
+    this.patch(record, {
+      state: "rejected",
+      failureCode: code,
+      rejectedAt: at,
+    });
+    this.events.push(event);
+  }
+
+  public async markProcessingFailed(
+    record: ContentIngestionRecord,
+    code: Exclude<
+      ContentIngestionFailureCode,
+      "unsupported_content" | "malformed_content"
+    >,
+    at: string,
+    event: ContentIngestionAuditEvent,
+  ): Promise<void> {
+    this.patch(record, {
+      state: "processing_failed",
+      failureCode: code,
+      failedAt: at,
+    });
+    this.events.push(event);
+  }
+
+  private patch(
+    record: ContentIngestionRecord,
+    patch: Partial<ContentIngestionRecord>,
+  ): void {
     const current = this.records.get(record.id);
     if (!current) throw new Error("missing");
     this.records.set(record.id, { ...current, ...patch });
