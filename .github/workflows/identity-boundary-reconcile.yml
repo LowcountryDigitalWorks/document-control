@@ -1,23 +1,21 @@
-name: Identity Boundary Reconciliation
+name: Identity Boundary Finalizer
 
 on:
   push:
     branches: [release/production-identity-tenant-boundary-1]
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
-  group: identity-boundary-reconciliation
+  group: identity-boundary-finalizer
   cancel-in-progress: true
 
 jobs:
-  reconcile:
+  finalize:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          persist-credentials: false
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
@@ -25,49 +23,13 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: python scripts/identity-boundary-reconcile.py
-      - name: Apply repository formatter in runner only
-        run: >-
-          pnpm exec prettier --write
-          src/application/authentication.ts
-          src/application/session.ts
-          src/application/tenant-context.ts
-          src/http/authentication.ts
-          src/infrastructure/database-identity-mapping-store.ts
-          src/infrastructure/database-tenant-context-resolver.ts
-          src/infrastructure/crypto-session-id-generator.ts
-          src/local-auth/deterministic-identity-adapter.ts
-          src/local-auth/in-memory-session-store.ts
-          tests/unit/authentication-session.test.ts
-          tests/unit/http-authentication.test.ts
-          tests/unit/tenant-authentication-boundary.test.ts
-          docs/ARCHITECTURE.md
-          docs/IDENTITY_AUTHORIZATION_BOUNDARY.md
-          docs/THREAT_MODEL.md
-          docs/OPERATIONS_RECOVERY.md
-          docs/STATUS.md
-          docs/HANDOFF.md
-      - name: Upload reconciled permanent files
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: identity-boundary-reconciled
-          path: |
-            src/application/authentication.ts
-            src/application/session.ts
-            src/application/tenant-context.ts
-            src/http/authentication.ts
-            src/infrastructure/database-identity-mapping-store.ts
-            src/infrastructure/database-tenant-context-resolver.ts
-            src/infrastructure/crypto-session-id-generator.ts
-            src/local-auth/deterministic-identity-adapter.ts
-            src/local-auth/in-memory-session-store.ts
-            tests/unit/authentication-session.test.ts
-            tests/unit/http-authentication.test.ts
-            tests/unit/tenant-authentication-boundary.test.ts
-            docs/ARCHITECTURE.md
-            docs/IDENTITY_AUTHORIZATION_BOUNDARY.md
-            docs/THREAT_MODEL.md
-            docs/OPERATIONS_RECOVERY.md
-            docs/STATUS.md
-            docs/HANDOFF.md
-          if-no-files-found: error
-          retention-days: 1
+      - run: pnpm format
+      - run: pnpm check
+      - name: Commit permanent candidate and remove temporary finalizer
+        run: |
+          git rm .github/workflows/identity-boundary-reconcile.yml scripts/identity-boundary-reconcile.py
+          git add src tests docs
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Finalize production identity and tenant boundary I"
+          git push origin HEAD:release/production-identity-tenant-boundary-1
