@@ -45,8 +45,9 @@ export function tamperJwtSignature(jwt: string): string {
   const parts = jwt.split(".");
   if (parts.length !== 3) throw new Error("Synthetic JWT is malformed.");
   const signature = parts[2] as string;
-  const replacement = signature.endsWith("A") ? "B" : "A";
-  return `${parts[0]}.${parts[1]}.${signature.slice(0, -1)}${replacement}`;
+  if (signature.length === 0) throw new Error("Synthetic JWT has no signature.");
+  const replacement = signature.startsWith("A") ? "B" : "A";
+  return `${parts[0]}.${parts[1]}.${replacement}${signature.slice(1)}`;
 }
 
 function base64UrlEncodeJson(value: unknown): string {
