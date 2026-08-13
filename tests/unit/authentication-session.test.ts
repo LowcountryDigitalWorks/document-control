@@ -14,6 +14,7 @@ import {
   type SessionIdGenerator,
   type SessionSecurityEvent,
 } from "../../src/application/session";
+import { Sha256SessionTokenVerifier } from "../../src/infrastructure/sha256-session-token-verifier";
 import { DeterministicIdentityAdapter } from "../../src/local-auth/deterministic-identity-adapter";
 import { InMemorySessionStore } from "../../src/local-auth/in-memory-session-store";
 
@@ -66,6 +67,7 @@ function createHarness() {
     mapping,
     store,
     new SequenceSessionIdGenerator(["a".repeat(64), "b".repeat(64)]),
+    new Sha256SessionTokenVerifier(),
     clock,
     30 * 60 * 1000,
     {
@@ -114,41 +116,48 @@ describe("provider-neutral authentication and session core", () => {
     ).rejects.toBeInstanceOf(UnknownIdentityMappingError);
   });
 
-  it("issues opaque bounded sessions and exposes only normalized request context", async () => {
+  it("issues opaque bounded bearer tokens and exposes only normalized request context", async () => {
     const harness = createHarness();
     const session = await harness.service.establish(principal);
 
-    expect(session.sessionId).toMatch(/^[0-9a-f]{64}$/u);
+    expect(session.bearerToken).toMatch(/^[0-9a-f]{64}$/u);
     expect(session.subjectId).toBe("subject-internal-1");
     expect(session.expiresAt).toBe("2026-08-13T01:31:00.000Z");
-    await expect(harness.service.resolve(session.sessionId)).resolves.toEqual({
+    const resolved = await harness.service.resolve(session.bearerToken);
+    expect(resolved).toEqual({
       subjectId: "subject-internal-1",
       authenticatedAt: "2026-08-13T01:00:00.000Z",
       createdAt: "2026-08-13T01:01:00.000Z",
       expiresAt: "2026-08-13T01:31:00.000Z",
     });
 
-    const serialized = JSON.stringify({ session, events: harness.events });
-    expect(serialized).not.toContain("presentation-only@example.test");
-    expect(serialized).not.toContain("Presentation Only");
-    expect(serialized).not.toMatch(
+    const serializedSecurityState = JSON.stringify({
+      resolved,
+      events: harness.events,
+    });
+    expect(serializedSecurityState).not.toContain(session.bearerToken);
+    expect(serializedSecurityState).not.toContain(
+      "presentation-only@example.test",
+    );
+    expect(serializedSecurityState).not.toContain("Presentation Only");
+    expect(serializedSecurityState).not.toMatch(
       /accessToken|refreshToken|idToken|password|mfa/iu,
     );
   });
 
-  it("denies expired and explicitly revoked sessions", async () => {
+  it("denies expired and explicitly revoked sessions independent of cleanup", async () => {
     const expired = createHarness();
     const expiredSession = await expired.service.establish(principal);
     expired.setNow("2026-08-13T01:31:00.000Z");
     await expect(
-      expired.service.resolve(expiredSession.sessionId),
+      expired.service.resolve(expiredSession.bearerToken),
     ).rejects.toBeInstanceOf(AuthenticationRequiredError);
 
     const revoked = createHarness();
     const revokedSession = await revoked.service.establish(principal);
-    await revoked.service.revoke(revokedSession.sessionId);
+    await revoked.service.revoke(revokedSession.bearerToken);
     await expect(
-      revoked.service.resolve(revokedSession.sessionId),
+      revoked.service.resolve(revokedSession.bearerToken),
     ).rejects.toBeInstanceOf(AuthenticationRequiredError);
     expect(revoked.events.map((event) => event.type)).toEqual([
       "session.established",
@@ -156,19 +165,19 @@ describe("provider-neutral authentication and session core", () => {
     ]);
   });
 
-  it("rotates the opaque identifier without extending the original expiry", async () => {
+  it("rotates the bearer token and durable verifier without extending the original expiry", async () => {
     const harness = createHarness();
     const original = await harness.service.establish(principal);
     harness.setNow("2026-08-13T01:05:00.000Z");
-    const rotated = await harness.service.rotate(original.sessionId);
+    const rotated = await harness.service.rotate(original.bearerToken);
 
-    expect(rotated.sessionId).not.toBe(original.sessionId);
+    expect(rotated.bearerToken).not.toBe(original.bearerToken);
     expect(rotated.expiresAt).toBe(original.expiresAt);
     await expect(
-      harness.service.resolve(original.sessionId),
+      harness.service.resolve(original.bearerToken),
     ).rejects.toBeInstanceOf(AuthenticationRequiredError);
     await expect(
-      harness.service.resolve(rotated.sessionId),
+      harness.service.resolve(rotated.bearerToken),
     ).resolves.toMatchObject({
       subjectId: "subject-internal-1",
       expiresAt: original.expiresAt,
