@@ -1,8 +1,5 @@
 import type { OidcSecurityPrimitives } from "../application/oidc";
 
-const pkceAlphabet =
-  "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~";
-
 export class WebCryptoOidcSecurityPrimitives
   implements OidcSecurityPrimitives
 {
@@ -20,13 +17,9 @@ export class WebCryptoOidcSecurityPrimitives
   }
 
   public async randomPkceVerifier(): Promise<string> {
-    const bytes = new Uint8Array(64);
+    const bytes = new Uint8Array(32);
     crypto.getRandomValues(bytes);
-    let value = "";
-    for (const byte of bytes) {
-      value += pkceAlphabet[byte % pkceAlphabet.length];
-    }
-    return value;
+    return toBase64Url(bytes);
   }
 
   public async sha256Hex(value: string): Promise<string> {
