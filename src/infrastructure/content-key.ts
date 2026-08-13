@@ -14,6 +14,12 @@ export interface TemplateVersionKeyParts {
   versionId: string;
 }
 
+export interface ContentIngestionKeyParts {
+  tenantId: string;
+  workspaceId: string;
+  ingestionId: string;
+}
+
 export function buildDocumentVersionContentKey(
   parts: DocumentVersionKeyParts,
 ): string {
@@ -43,6 +49,20 @@ export function buildTemplateVersionContentKey(
     "versions",
     segment(parts.versionId),
     "content",
+  ].join("/");
+}
+
+export function buildContentIngestionContentKey(
+  parts: ContentIngestionKeyParts,
+): string {
+  return [
+    "tenants",
+    segment(parts.tenantId),
+    "workspaces",
+    segment(parts.workspaceId),
+    "content-ingestions",
+    segment(parts.ingestionId),
+    "staged-content",
   ].join("/");
 }
 
