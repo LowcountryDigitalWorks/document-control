@@ -73,6 +73,16 @@ describe("HTTP authenticated-session boundary", () => {
     expect(missing.status).toBe(401);
     expect(await missing.text()).toBe("Authentication required.");
 
+    const duplicateCookie = await harness.app.request(
+      "http://example.test/protected/context",
+      {
+        headers: {
+          Cookie: `${authenticatedSessionCookieName}=${"a".repeat(64)}; ${authenticatedSessionCookieName}=${"b".repeat(64)}`,
+        },
+      },
+    );
+    expect(duplicateCookie.status).toBe(401);
+
     const session = await harness.sessions.establish(principal);
     const authenticated = await harness.app.request(
       "http://example.test/protected/context",

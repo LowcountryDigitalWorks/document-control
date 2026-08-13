@@ -335,9 +335,16 @@ export function normalizeReturnTarget(value: string): string {
 
   const applicationOrigin = "https://document-control.invalid";
   const parsed = new URL(value, applicationOrigin);
+  let decodedPathname: string;
+  try {
+    decodedPathname = decodeURIComponent(parsed.pathname);
+  } catch {
+    throw new Error("OIDC return target is invalid.");
+  }
   if (
     parsed.origin !== applicationOrigin ||
-    !parsed.pathname.startsWith("/app")
+    (decodedPathname !== "/app" && !decodedPathname.startsWith("/app/")) ||
+    decodedPathname.includes("\\")
   ) {
     throw new Error("OIDC return target is outside the application boundary.");
   }

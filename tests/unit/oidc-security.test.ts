@@ -360,7 +360,9 @@ describe("OIDC Authorization Code security boundary", () => {
       "https://evil.example.test/app",
       "//evil.example.test/app",
       "/not-the-app",
+      "/application",
       "/app\\evil.example.test",
+      "/app/%5Cevil.example.test",
     ]) {
       expect(() => normalizeReturnTarget(target)).toThrow();
     }

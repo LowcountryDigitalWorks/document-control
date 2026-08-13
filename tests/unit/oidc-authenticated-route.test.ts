@@ -28,6 +28,7 @@ import {
   createAuthenticationMiddleware,
   type AuthenticatedHttpEnvironment,
 } from "../../src/http/authentication";
+import { hasSameOrigin } from "../../src/http/demo-session";
 import {
   clearOidcAuthorizationTransactionCookie,
   createOidcAuthorizationTransactionCookie,
@@ -290,6 +291,9 @@ async function createHarness() {
   });
 
   app.post("/app/logout", async (context) => {
+    if (!hasSameOrigin(context.req.url, context.req.header("Origin"))) {
+      return context.text("Request not allowed.", 403);
+    }
     const cookieHeader = context.req.header("Cookie") ?? "";
     const match = cookieHeader.match(
       new RegExp(`${authenticatedSessionCookieName}=([0-9a-f]{64})`, "u"),
@@ -523,11 +527,31 @@ describe("test-only authenticated OIDC route composition", () => {
     const harness = await createHarness();
     const { sessionCookie } = await performOidcLogin(harness);
 
+    const crossOriginLogout = await harness.app.request(
+      "https://app.example.test/app/logout",
+      {
+        method: "POST",
+        headers: {
+          Cookie: sessionCookie,
+          Origin: "https://evil.example.test",
+        },
+      },
+    );
+    expect(crossOriginLogout.status).toBe(403);
+    const stillAuthenticated = await harness.app.request(
+      "https://app.example.test/app/protected/tenant-a/workspace-a",
+      { headers: { Cookie: sessionCookie } },
+    );
+    expect(stillAuthenticated.status).toBe(200);
+
     const logout = await harness.app.request(
       "https://app.example.test/app/logout",
       {
         method: "POST",
-        headers: { Cookie: sessionCookie },
+        headers: {
+          Cookie: sessionCookie,
+          Origin: "https://app.example.test",
+        },
       },
     );
     expect(logout.status).toBe(200);
