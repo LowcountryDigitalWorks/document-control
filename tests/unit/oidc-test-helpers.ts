@@ -1,5 +1,7 @@
+import type { OidcSigningJwk } from "../../src/infrastructure/webcrypto-oidc-id-token-validator";
+
 export interface SyntheticOidcSigningFixture {
-  publicJwk: JsonWebKey;
+  publicJwk: OidcSigningJwk;
   sign(claims: Record<string, unknown>): Promise<string>;
 }
 
@@ -16,7 +18,10 @@ export async function createSyntheticOidcSigningFixture(
     true,
     ["sign", "verify"],
   )) as CryptoKeyPair;
-  const publicJwk = await crypto.subtle.exportKey("jwk", keyPair.publicKey);
+  const publicJwk = (await crypto.subtle.exportKey(
+    "jwk",
+    keyPair.publicKey,
+  )) as OidcSigningJwk;
   publicJwk.kid = kid;
   publicJwk.alg = "RS256";
   publicJwk.use = "sig";
