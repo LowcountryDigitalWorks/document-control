@@ -7,11 +7,17 @@ import {
 } from "../application/oidc";
 import type { Clock } from "../application/session";
 
+export interface OidcSigningJwk extends JsonWebKey {
+  kid?: string;
+  alg?: string;
+  use?: string;
+}
+
 export interface OidcProviderTrustConfiguration {
   providerId: string;
   issuer: string;
   clientId: string;
-  signingKeys: readonly JsonWebKey[];
+  signingKeys: readonly OidcSigningJwk[];
 }
 
 type JwtHeader = {
@@ -109,12 +115,16 @@ export class WebCryptoOidcIdTokenValidator implements OidcIdTokenValidator {
       throw new OidcAuthenticationError("signing_key_rejected");
     }
 
-    let signature: Uint8Array;
+    let decodedSignature: Uint8Array;
     try {
-      signature = decodeBase64Url(encodedSignature);
+      decodedSignature = decodeBase64Url(encodedSignature);
     } catch {
       throw new OidcAuthenticationError("token_malformed");
     }
+    const signature: Uint8Array<ArrayBuffer> = new Uint8Array(
+      decodedSignature.byteLength,
+    );
+    signature.set(decodedSignature);
     const signingInput = new TextEncoder().encode(
       `${encodedHeader}.${encodedPayload}`,
     );
@@ -179,9 +189,9 @@ export class WebCryptoOidcIdTokenValidator implements OidcIdTokenValidator {
 }
 
 function selectSigningKey(
-  keys: readonly JsonWebKey[],
+  keys: readonly OidcSigningJwk[],
   presentedKid: unknown,
-): JsonWebKey {
+): OidcSigningJwk {
   if (typeof presentedKid !== "string" || presentedKid.length === 0) {
     throw new OidcAuthenticationError("signing_key_rejected");
   }
@@ -195,7 +205,7 @@ function selectSigningKey(
   if (matches.length !== 1) {
     throw new OidcAuthenticationError("signing_key_rejected");
   }
-  return matches[0] as JsonWebKey;
+  return matches[0] as OidcSigningJwk;
 }
 
 function validateIssuerAndAudience(
