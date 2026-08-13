@@ -131,7 +131,9 @@ describe("provider-neutral authentication and session core", () => {
     const serialized = JSON.stringify({ session, events: harness.events });
     expect(serialized).not.toContain("presentation-only@example.test");
     expect(serialized).not.toContain("Presentation Only");
-    expect(serialized).not.toMatch(/accessToken|refreshToken|idToken|password|mfa/iu);
+    expect(serialized).not.toMatch(
+      /accessToken|refreshToken|idToken|password|mfa/iu,
+    );
   });
 
   it("denies expired and explicitly revoked sessions", async () => {
@@ -165,7 +167,9 @@ describe("provider-neutral authentication and session core", () => {
     await expect(
       harness.service.resolve(original.sessionId),
     ).rejects.toBeInstanceOf(AuthenticationRequiredError);
-    await expect(harness.service.resolve(rotated.sessionId)).resolves.toMatchObject({
+    await expect(
+      harness.service.resolve(rotated.sessionId),
+    ).resolves.toMatchObject({
       subjectId: "subject-internal-1",
       expiresAt: original.expiresAt,
     });

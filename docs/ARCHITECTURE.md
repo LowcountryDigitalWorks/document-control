@@ -132,8 +132,32 @@ workspace scope and are checked against membership and workspace boundaries.
 
 Authentication source remains separate from application authorization. A future identity provider
 must normalize external principals/groups into identity subjects, active memberships, and internal
-role bindings. Production authentication/SSO/session management is not implemented by this release.
-See `docs/IDENTITY_AUTHORIZATION_BOUNDARY.md`.
+role bindings. Provider-neutral authenticated-principal, identity-mapping, session, and tenant-context contracts now exist, but no live identity provider, production session store, or authenticated production route is connected. See `docs/IDENTITY_AUTHORIZATION_BOUNDARY.md`.
+
+## Production authentication and tenant-context boundary
+
+Production Identity & Tenant Boundary I inserts authentication ahead of tenant-scoped authorization without changing who grants authority:
+
+```text
+validated provider assertion (future provider adapter)
+  -> AuthenticatedPrincipal (provider + exact issuer + immutable subject)
+  -> application-owned identity_subject mapping
+  -> opaque authenticated session
+  -> HTTP authentication middleware
+  -> active tenant/workspace context
+  -> existing authorized application service
+  -> live membership + role binding + permission + resource scope
+```
+
+`AuthenticatedPrincipal` contains no access token, refresh token, ID token, password, MFA material, or browser authority. Email/display name are optional bounded presentation metadata only. External mapping uses the existing `(provider, provider_subject)` uniqueness, where `provider_subject` is a canonical JSON tuple of exact issuer plus immutable external subject. Unknown mappings fail closed.
+
+`SessionService` owns provider-neutral lifetime, lookup, expiry, explicit revocation/logout, and rotation through injectable ports. `CryptoSessionIdGenerator` produces 256-bit opaque random identifiers. The only session-store implementation supplied in this release is `src/local-auth/in-memory-session-store.ts`, an isolated local/test adapter that is not wired into the Worker.
+
+`DatabaseTenantContextResolver` requires active application membership and verifies workspace ownership inside the selected tenant. Browser tenant/workspace values remain selectors, not authority. Permission decisions stay in `DatabaseAuthorizationPolicy` and authorized application facades, which re-read current membership and role state for every protected operation.
+
+`src/http/authentication.ts` provides bounded middleware for future protected routes. It resolves only the opaque session reference and places only normalized internal subject/session timestamps into request context. Missing, expired, or revoked state receives the same bounded 401 response. The middleware is intentionally not registered in `src/http/app.ts` because no live provider or production session store is present.
+
+The `/demo` application remains structurally separate with its own `ldw_guided_demo_session` namespace, synthetic identities, and `/demo` cookie path. The demo cookie cannot satisfy the authenticated-session parser and `src/local-auth` is not imported by normal Worker composition.
 
 ## Controlled templates
 

@@ -122,6 +122,44 @@ no IdP choice authorizes direct provider-group-to-permission behavior.
 
 This document does not select or configure a production identity provider, create an Entra
 application registration, connect Active Directory, enable SSO, implement SCIM/group sync, or add
-production credentials. Production login sessions and production tenant provisioning are also not
-implemented. Those remain future deployment decisions with separate security, rollback, ownership,
-and validation review.
+production credentials. Production Identity & Tenant Boundary I now provides provider-neutral
+authenticated-principal, identity-mapping, session, tenant-context, and HTTP authentication contracts
+plus deterministic local/test adapters. No live provider, production session store, authenticated
+production route, or production tenant-provisioning flow is implemented. Those remain future
+deployment decisions with separate security, rollback, ownership, and validation review.
+
+## Production Identity & Tenant Boundary I — implemented contracts
+
+### Authenticated principal and mapping
+
+A successfully validated future provider adapter must emit `AuthenticatedPrincipal` with only provider family, exact issuer, immutable external subject, authenticated-at timestamp, and optional bounded email/display-name presentation metadata. Email, domain, display name, external group name, and provider role label never grant Document Control authority.
+
+External identity maps to `identity_subjects` as `provider + canonical JSON([issuer, immutable subject])`. Provider remains the existing schema column and the canonical tuple is stored in `provider_subject` for provisioned external identities. The existing unique `(provider, provider_subject)` constraint is sufficient, so this release adds no migration. Unknown mappings fail closed and there is no JIT or email-domain auto-enrollment.
+
+Raw access/refresh/ID tokens, passwords, MFA material, private keys, client secrets, unrestricted claim payloads, and cookies are excluded from the principal, application authorization request, and session security-event contract.
+
+### Session core
+
+`SessionService` is independent of a specific IdP and production session technology. A session contains a 256-bit opaque identifier, internal `subjectId`, authentication timestamp, creation timestamp, and expiry; revocation remains server-side store state. The service enforces a bounded lifetime, expiry, explicit revoke/logout, and rotation that invalidates the old identifier without extending its original expiry.
+
+`CryptoSessionIdGenerator` uses platform cryptographic randomness. `SessionStore` is injectable. `InMemorySessionStore` and `DeterministicIdentityAdapter` live under `src/local-auth/` and are local/test-only; no fake username/password login or production session store is created.
+
+Session security events are minimized to established/revoked/rotated, internal subject ID, and timestamp. A production audit sink is not selected in this release and the event contract excludes session IDs, cookies, emails, provider claims, and credentials.
+
+### Tenant context and live authorization
+
+For tenant-scoped routes, browser tenant/workspace values are selectors only. `DatabaseTenantContextResolver` requires the normalized internal subject to have active membership and verifies that a workspace belongs to the selected tenant. Failure is generic and does not reveal another tenant's object existence.
+
+Tenant-context resolution does not grant permission. Existing authorized application services and `DatabaseAuthorizationPolicy` remain the authorization boundary, so active membership and current role bindings are re-read on each protected operation. A valid opaque session therefore does not preserve authority after membership suspension or role removal.
+
+### HTTP cookie and CSRF posture
+
+`src/http/authentication.ts` resolves the separate `ldw_authenticated_session` cookie and passes only normalized internal subject/session timestamps into Hono context. Missing, malformed, expired, or revoked sessions return the same `401 Authentication required.` response.
+
+Local/test cookie delivery is HttpOnly, Secure on HTTPS, explicitly time-bounded, `SameSite=Strict`, and currently `Path=/`. The exact production cookie path and SameSite/redirect policy must be re-reviewed with the actual OIDC/SAML/Entra callback model. Existing same-origin mutation protection and global CSP/security headers remain unchanged; future authenticated mutations must preserve CSRF protection.
+
+### Synthetic demo isolation and unresolved provider work
+
+The `/demo` experience keeps its own `ldw_guided_demo_session` cookie, synthetic identities, and server-derived synthetic tenant/workspace context. The new authentication middleware is not registered in `src/http/app.ts` and the demo cookie is not accepted as a production-authenticated session.
+
+Before live production identity, separately select and validate provider/protocol, signature/issuer/audience/state/nonce checks, app registration/redirect ownership, production session storage, provider logout/revocation, provider/client credentials, MFA/conditional access, provisioning/SCIM/group mapping and deprovisioning, production cookie/CSRF redirect semantics, break-glass administration, monitoring, and audit sink behavior.

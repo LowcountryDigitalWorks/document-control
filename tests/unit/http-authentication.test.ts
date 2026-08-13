@@ -155,7 +155,17 @@ describe("HTTP authenticated-session boundary", () => {
     expect(appSource).not.toContain("local-auth");
     expect(demoSource).toContain("ldw_guided_demo_session");
     expect(demoSource).not.toContain(authenticatedSessionCookieName);
-    expect(hasSameOrigin("https://app.example.test/path", "https://app.example.test")).toBe(true);
-    expect(hasSameOrigin("https://app.example.test/path", "https://evil.example.test")).toBe(false);
+    expect(
+      hasSameOrigin(
+        "https://app.example.test/path",
+        "https://app.example.test",
+      ),
+    ).toBe(true);
+    expect(
+      hasSameOrigin(
+        "https://app.example.test/path",
+        "https://evil.example.test",
+      ),
+    ).toBe(false);
   });
 });

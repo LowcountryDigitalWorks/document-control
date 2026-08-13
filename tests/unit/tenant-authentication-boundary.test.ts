@@ -151,7 +151,11 @@ describe("authenticated tenant and authorization boundary", () => {
     const sessions = new SessionService(
       mapping,
       store,
-      { async generate() { return "c".repeat(64); } },
+      {
+        async generate() {
+          return "c".repeat(64);
+        },
+      },
       clock,
       30 * 60 * 1000,
     );
@@ -161,11 +165,7 @@ describe("authenticated tenant and authorization boundary", () => {
     const authenticated = await sessions.resolve(session.sessionId);
 
     await expect(
-      tenantContext.resolve(
-        authenticated.subjectId,
-        "tenant-a",
-        "workspace-a",
-      ),
+      tenantContext.resolve(authenticated.subjectId, "tenant-a", "workspace-a"),
     ).resolves.toEqual({
       subjectId: "subject-authenticated",
       tenantId: "tenant-a",
@@ -188,11 +188,7 @@ describe("authenticated tenant and authorization boundary", () => {
       subjectId: "subject-authenticated",
     });
     await expect(
-      tenantContext.resolve(
-        authenticated.subjectId,
-        "tenant-a",
-        "workspace-a",
-      ),
+      tenantContext.resolve(authenticated.subjectId, "tenant-a", "workspace-a"),
     ).rejects.toBeInstanceOf(TenantContextDeniedError);
     await expect(
       authorization.assertAllowed({
@@ -209,11 +205,7 @@ describe("authenticated tenant and authorization boundary", () => {
     );
     run(database, "DELETE FROM role_bindings WHERE id = 'binding-a'");
     await expect(
-      tenantContext.resolve(
-        authenticated.subjectId,
-        "tenant-a",
-        "workspace-a",
-      ),
+      tenantContext.resolve(authenticated.subjectId, "tenant-a", "workspace-a"),
     ).resolves.toBeDefined();
     await expect(
       authorization.assertAllowed({

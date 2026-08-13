@@ -39,9 +39,7 @@ export interface Clock {
 }
 
 export type SessionSecurityEventType =
-  | "session.established"
-  | "session.revoked"
-  | "session.rotated";
+  "session.established" | "session.revoked" | "session.rotated";
 
 export interface SessionSecurityEvent {
   type: SessionSecurityEventType;
@@ -95,11 +93,17 @@ export class SessionService {
       expiresAt: new Date(now.getTime() + this.sessionLifetimeMs).toISOString(),
     };
     await this.store.save(session);
-    await this.recordSecurityEvent("session.established", session.subjectId, now);
+    await this.recordSecurityEvent(
+      "session.established",
+      session.subjectId,
+      now,
+    );
     return session;
   }
 
-  public async resolve(sessionId: string): Promise<AuthenticatedRequestContext> {
+  public async resolve(
+    sessionId: string,
+  ): Promise<AuthenticatedRequestContext> {
     const session = await this.requireActiveSession(sessionId);
     return {
       subjectId: session.subjectId,
@@ -112,7 +116,10 @@ export class SessionService {
   public async revoke(sessionId: string): Promise<void> {
     const session = await this.requireActiveSession(sessionId);
     const now = this.clock.now();
-    const revoked = await this.store.revoke(session.sessionId, now.toISOString());
+    const revoked = await this.store.revoke(
+      session.sessionId,
+      now.toISOString(),
+    );
     if (!revoked) throw new AuthenticationRequiredError();
     await this.recordSecurityEvent("session.revoked", session.subjectId, now);
   }
@@ -157,7 +164,9 @@ export class SessionService {
   private async generateOpaqueSessionId(): Promise<string> {
     const sessionId = await this.idGenerator.generate();
     if (!isOpaqueSessionIdentifier(sessionId)) {
-      throw new Error("Session ID generator returned an invalid opaque identifier.");
+      throw new Error(
+        "Session ID generator returned an invalid opaque identifier.",
+      );
     }
     return sessionId;
   }

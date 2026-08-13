@@ -62,7 +62,9 @@ export function createAuthenticatedSessionCookie(
   maxAgeSeconds: number,
 ): string {
   if (!isOpaqueSessionIdentifier(sessionId)) {
-    throw new Error("Authenticated-session cookie requires an opaque session ID.");
+    throw new Error(
+      "Authenticated-session cookie requires an opaque session ID.",
+    );
   }
   if (!Number.isSafeInteger(maxAgeSeconds) || maxAgeSeconds <= 0) {
     throw new Error("Authenticated-session cookie lifetime is invalid.");
