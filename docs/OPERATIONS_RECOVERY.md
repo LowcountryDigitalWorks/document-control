@@ -334,6 +334,16 @@ tooling, production recovery-drill cadence, and future retention/legal-hold inte
 
 Those decisions require explicit architecture/operations review before customer data is allowed.
 
+## Authentication/session operational boundary after Production Identity & Tenant Boundary I
+
+External identity mappings now use existing D1 application state: `identity_subjects.provider` plus canonical issuer/immutable-subject data in `provider_subject`. Those mappings, memberships, and role bindings remain part of the D1 metadata/state recovery boundary.
+
+Authenticated session state is deliberately not added to D1 or the portable export. `SessionStore` is an application port and the only supplied implementation is isolated local/test memory. A future production store must define availability, cleanup, revocation propagation, monitoring, and incident invalidation without turning provider tokens or session secrets into portable business records.
+
+Production recovery must fail closed when session state is unavailable or untrusted. Do not recreate authenticated sessions from portable exports, audit records, email/display metadata, or provider claims. Depending on the eventual provider/store, forcing re-authentication after recovery may be safer than restoring ephemeral session state and must be decided explicitly.
+
+Provider/client secrets, signing keys, access/refresh/ID tokens, MFA material, session identifiers/cookies, and recovery credentials remain excluded from repository docs, portable exports, and ordinary application audit data.
+
 ## Cost and implementation impact
 
 Foundation II provisions no production resource, purchases no security product, adds no runtime

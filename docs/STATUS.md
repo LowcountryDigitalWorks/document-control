@@ -661,7 +661,7 @@ production authentication or public-demo hardening.
 
 ## Intentionally not implemented
 
-- Production authentication/SSO, production session management, or identity-provider integration.
+- Live production authentication/SSO or identity-provider integration; production session storage and provider login/logout wiring remain unselected. Provider-neutral authentication/session contracts now exist under Production Identity & Tenant Boundary I.
 - Production tenant provisioning.
 - Customer or arbitrary public document uploads or malware scanning.
 - Production authenticated tenant application routing; current app-shaped routes are synthetic/test
@@ -728,3 +728,16 @@ production authentication or public-demo hardening.
 - The operations runbook covers migration failure, old-code/new-schema mismatches, failed deployment after schema change, D1/R2 restore mismatch, missing R2 object, hash mismatch, corrupted/incomplete portable export, damaged deployment configuration, compromised deployment credential, and failed recovery verification with detection, containment, recovery direction, validation, and human-approval boundaries.
 - Customer RPO/RTO, R2 backup/recovery mechanism, backup schedule/retention/encryption/key ownership, recovery authority/break-glass model, complete production D1/R2 reconciliation, deployment configuration recovery source, monitoring/SIEM, and production recovery-drill cadence remain unresolved deployment decisions.
 - No new runtime dependency, schema migration, production authentication, customer upload, production infrastructure, customer data, PHI, PostgreSQL, paid security feature, analytics/tracking, or paid service is introduced. Expected new recurring cost remains `$0`.
+
+### Production Identity & Tenant Boundary I — Authentication Contracts & Session Core
+
+- Added a provider-neutral `AuthenticatedPrincipal` using provider, exact issuer, immutable external subject, authentication time, and optional bounded presentation metadata. Email/display name cannot grant authority and raw tokens/credentials/MFA material are absent.
+- External identity maps to the existing application-owned `identity_subjects` record through `provider + canonical JSON([issuer, subject])`; unknown mappings fail closed. No JIT/email-domain enrollment is implemented and no migration is required.
+- Added provider-neutral `SessionService` with 256-bit opaque IDs, bounded lifetime, expiry, explicit revoke/logout, and rotation that invalidates the old ID without extending expiry. The store, clock, ID generator, and minimized audit sink are ports.
+- `CryptoSessionIdGenerator` uses cryptographic randomness. The only supplied session store and deterministic identity adapter are under `src/local-auth/` and remain local/test-only.
+- `DatabaseTenantContextResolver` requires active membership and verifies tenant/workspace ownership. Existing authorized facades continue to evaluate current roles/permissions, so suspension or role removal immediately removes authority despite a valid session.
+- Added bounded HTTP authentication middleware for future protected routes. It accepts only the separate opaque authenticated-session cookie and passes normalized internal context; it is intentionally not registered in `src/http/app.ts` yet.
+- Local/test cookie semantics are HttpOnly, Secure on HTTPS, explicitly time-bounded, and SameSite=Strict. Existing same-origin mutation protection and global security headers/CSP remain unchanged; final redirect/cookie/CSRF policy awaits a real provider.
+- Session security events are minimized to established/revoked/rotated plus internal subject and timestamp. No production audit sink is selected.
+- The existing `/demo` experience remains separate with `ldw_guided_demo_session` and synthetic identities. It is not production authentication.
+- No live Entra/OIDC/SAML provider, production credentials, production session store, SCIM/JIT, tenant provisioning, production Cloudflare resources, customer upload, customer data, PHI, PostgreSQL, or paid service is introduced. Expected recurring cost remains `$0`.

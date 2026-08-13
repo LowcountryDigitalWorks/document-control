@@ -12,9 +12,11 @@ certification, audit opinion, compliance assessment, or determination of suitabi
 CMMC, FedRAMP, SOC 2, or another assurance framework.
 
 The repository remains pre-production. Product-shaped interactive routes are synthetic/test-only.
-Production authentication, tenant provisioning, customer uploads, malware scanning/quarantine,
-retention/legal hold, complete production backup/recovery, production Cloudflare resources, customer
-data, and PHI are not implemented or authorized by this baseline.
+Production Identity & Tenant Boundary I adds provider-neutral authentication/session contracts and
+deterministic local/test adapters, but no live identity provider, production session store, or
+authenticated production application route is connected. Tenant provisioning, customer uploads,
+malware scanning/quarantine, retention/legal hold, complete production backup/recovery, production
+Cloudflare resources, customer data, and PHI remain unimplemented and unauthorized.
 
 Foundation II adds CI supply-chain hardening, deterministic migration/upgrade assurance, migration
 and recovery discipline, a repository-controlled recovery architecture/runbook, and local synthetic
@@ -168,9 +170,13 @@ Current: tenant IDs live on tenant-owned records; composite relational constrain
 cross-tenant attachments; authorized services scope tenant/workspace IDs; sensitive detail paths avoid
 revealing cross-session/cross-tenant existence.
 
-Future/residual: Production Identity & Tenant Boundary must establish authenticated tenant context,
-consistent production error mapping, and hostile cross-tenant route tests. Tenant provisioning and
-real authenticated routing are not implemented.
+Current: Production Identity & Tenant Boundary I adds normalized authenticated context plus
+`DatabaseTenantContextResolver`, which requires active membership and verifies workspace ownership
+inside the selected tenant. Browser tenant/workspace IDs are selectors only and denial is generic.
+
+Future/residual: wire this boundary only after a real provider and production session store are
+approved, then add end-to-end hostile-ID tests against authenticated production-shaped routes. Tenant
+provisioning and live authenticated routing remain unimplemented.
 
 ### Privilege escalation and compromised administrators
 
@@ -185,18 +191,27 @@ controls.
 
 Current: provider identity does not itself grant application permissions.
 
-Future/residual: production adapters must validate provider assertions and map immutable provider
-subjects/groups to internal membership/role state with default-deny behavior. JIT/SCIM/group mapping
-and deprovisioning remain undecided.
+Current: provider-neutral principal normalization requires provider + exact issuer + immutable
+external subject. `IdentityMappingService` maps only that canonical identity to an application-owned
+subject and unknown mappings fail closed; email/display metadata cannot grant authority.
+
+Future/residual: the real provider adapter must validate signatures, issuer/audience, state/nonce and
+other protocol requirements before emitting `AuthenticatedPrincipal`. JIT/SCIM/group mapping,
+provider deprovisioning, and group ownership remain undecided.
 
 ### Session theft/fixation and CSRF
 
 Current: synthetic cookies are server-issued, HttpOnly, SameSite=Strict, path scoped, and Secure on
 HTTPS; synthetic mutations require same-origin requests.
 
-Future/residual: production session rotation, lifetime/revocation, authentication binding, CSRF
-strategy, and IdP redirect behavior must be designed and tested. Synthetic cookies are not production
-sessions.
+Current: provider-neutral `SessionService` enforces opaque 256-bit IDs, bounded lifetime, expiry,
+revocation/logout, and rotation that invalidates the prior ID without extending expiry. HTTP
+middleware accepts only the separate authenticated-session cookie and passes normalized internal
+context; the demo cookie remains isolated.
+
+Future/residual: select a production session store and real IdP binding; validate provider logout and
+server-side cleanup; finalize cookie/SameSite/CSRF behavior against the actual redirect flow; and test
+session theft/replay/rotation behavior end to end.
 
 ### Replay, race, and stale workflow actions
 
@@ -357,6 +372,21 @@ recovery automation, production authentication, customer uploads, production Clo
 retention/legal hold, customer data, PHI, PostgreSQL, paid security features, analytics/tracking, or
 paid services.
 
+## Production Identity & Tenant Boundary I implemented controls
+
+- Provider-neutral principal normalization uses provider, exact issuer, immutable external subject, and authentication timestamp; optional email/display metadata cannot affect authority.
+- Canonical external identity mapping resolves to an application-owned subject and unknown mappings fail closed. No JIT/email-domain enrollment is added.
+- Opaque 256-bit session identifiers have explicit bounded lifetime, expiry, revocation/logout, and rotation semantics through an injectable store.
+- Only isolated local/test identity and in-memory session adapters are supplied; there is no live provider or production session store.
+- Session security events contain only type, internal subject ID, and timestamp.
+- Authenticated tenant/workspace context requires current active membership and verifies workspace ownership.
+- Existing authorized services continue to re-read role/permission state, so suspension or role removal takes effect despite a valid session.
+- Bounded HTTP middleware returns one generic authentication failure and passes no provider claims/tokens into authorization.
+- Conservative local/test cookie semantics coexist with unchanged same-origin/CSP/security-header protections.
+- Tests mechanically keep the synthetic `/demo` session separate from the production-auth contract.
+
+Residual production work includes live assertion validation, provider/client registration and credentials, production session storage, redirect/login/logout endpoints, MFA/conditional-access policy, provisioning/SCIM/group mapping, deprovisioning, final cookie/CSRF semantics, break-glass administration, monitoring/audit sink, and authenticated controlled staging.
+
 ## Security gates before production capabilities
 
 ### Production Readiness Foundation I — established
@@ -370,11 +400,13 @@ Repository supply-chain hardening, migration upgrade assurance, migration/recove
 backup/recovery architecture, and local synthetic recovery assurance are established. This does not
 create production disaster recovery.
 
-### Production Identity & Tenant Boundary
+### Production Identity & Tenant Boundary I — authentication contracts established
 
-Must establish production authentication/session semantics, authenticated tenant context,
-provisioning/IdP normalization, revocation/deprovisioning, production CSRF/session controls, and
-hostile cross-tenant authorization tests before production user access.
+Provider-neutral principal normalization, fail-closed identity mapping, session lifecycle semantics,
+authenticated tenant/workspace context, bounded HTTP middleware, isolated local/test adapters, and
+revocation/cross-tenant tests are established. Live provider assertion validation, production session
+storage, provider provisioning/deprovisioning, final redirect/cookie/CSRF semantics, and authenticated
+controlled staging remain future gates before production user access.
 
 ### Content Ingestion Architecture
 
