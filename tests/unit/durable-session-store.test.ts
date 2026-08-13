@@ -84,10 +84,9 @@ const principal: AuthenticatedPrincipal = {
   authenticatedAt: "2026-08-13T02:00:00.000Z",
 };
 
-async function createHarness(tokens: readonly string[] = [
-  "a".repeat(64),
-  "b".repeat(64),
-]) {
+async function createHarness(
+  tokens: readonly string[] = ["a".repeat(64), "b".repeat(64)],
+) {
   const database = new DatabaseSync(":memory:");
   applyMigrationFiles(database, await loadOrderedMigrations());
   const timestamp = "2026-08-13T02:00:00.000Z";
@@ -173,7 +172,9 @@ describe("D1/SQLite durable authenticated session store", () => {
   it("atomically revokes the old verifier when rotating and rolls back on verifier collision", async () => {
     const harness = await createHarness();
     const original = await harness.sessions.establish(principal);
-    const originalVerifier = await harness.verifier.derive(original.bearerToken);
+    const originalVerifier = await harness.verifier.derive(
+      original.bearerToken,
+    );
     const collisionVerifier = await harness.verifier.derive("b".repeat(64));
 
     harness.database
@@ -188,7 +189,9 @@ describe("D1/SQLite durable authenticated session store", () => {
         "2026-08-13T02:31:00.000Z",
       );
 
-    await expect(harness.sessions.rotate(original.bearerToken)).rejects.toThrow();
+    await expect(
+      harness.sessions.rotate(original.bearerToken),
+    ).rejects.toThrow();
     const originalAfterCollision = harness.database
       .prepare(
         "SELECT revoked_at FROM authenticated_sessions WHERE verifier = ?",
@@ -200,10 +203,7 @@ describe("D1/SQLite durable authenticated session store", () => {
     ).resolves.toBeDefined();
     harness.database.close();
 
-    const successful = await createHarness([
-      "c".repeat(64),
-      "d".repeat(64),
-    ]);
+    const successful = await createHarness(["c".repeat(64), "d".repeat(64)]);
     const first = await successful.sessions.establish(principal);
     successful.setNow("2026-08-13T02:05:00.000Z");
     const rotated = await successful.sessions.rotate(first.bearerToken);

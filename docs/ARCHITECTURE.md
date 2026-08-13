@@ -306,3 +306,54 @@ The current high-level sequence is:
 These labels describe sequencing dependencies only. They do not authorize future implementation,
 production infrastructure, customer data, PHI, paid services, or deployment changes. Each later gate
 requires its own inspection, decision, validation, and approval.
+
+## Production Identity & Tenant Boundary II — OIDC security and durable sessions
+
+Boundary II adds protocol and persistence infrastructure behind the provider-neutral identity boundary
+without registering a live authentication route in the production Worker composition.
+
+The authentication architecture is now:
+
+`OIDC Authorization Code + state/nonce/PKCE -> signed assertion validation -> AuthenticatedPrincipal -> application identity mapping -> bearer/verifier session -> live tenant membership -> live role/permission -> resource scope`
+
+OIDC-specific protocol objects remain outside domain/application authorization. Provider claims cannot
+directly become roles or permissions.
+
+### OIDC components
+
+- `src/application/oidc.ts` owns provider-neutral OIDC authorization transaction, code-exchange,
+  validation, return-target, and bounded security-event contracts.
+- `src/infrastructure/webcrypto-oidc-security.ts` owns platform-random state/nonce/PKCE generation and
+  SHA-256 operations.
+- `src/infrastructure/webcrypto-oidc-id-token-validator.ts` performs provider-bound RS256 verification
+  against configured trusted public JWK material and validates issuer/audience/time/subject/nonce.
+- `src/http/oidc.ts` owns the narrow transaction-cookie/callback extraction boundary.
+- `src/local-auth/in-memory-oidc-authorization-transaction-store.ts` is deliberately local/test-only.
+
+A future live provider adapter must supply authorization-code exchange and trusted key configuration;
+this release provides no network provider client, discovery client, app registration, or credential.
+
+### Durable session persistence
+
+ADR 0003 accepts D1/SQLite as the initial authoritative authenticated-session state architecture.
+Migration `0012_authenticated_session_verifiers.sql` adds `authenticated_sessions`, keyed by a
+SHA-256 verifier rather than the raw 256-bit browser bearer token. The table stores internal subject,
+authentication/creation/expiry timestamps, revocation, and a verifier-only rotation marker.
+
+`DatabaseSessionStore` uses authoritative D1 reads and writes. Rotation relies on transactional D1
+batch semantics so conditional old-session revocation and replacement insertion succeed or roll back
+together. No KV/cache/index is session or authorization truth. Cleanup indexes optimize eventual
+storage hygiene only; expiry/revocation checks determine validity.
+
+The HTTP middleware still receives only an opaque browser bearer and only emits normalized internal
+subject/session timestamps to request context. Authorization remains in existing authorized
+application facades and `DatabaseAuthorizationPolicy`.
+
+### Composition boundary
+
+The permanent Worker application does not register live OIDC start/callback routes in this release.
+A test-only Hono composition proves the future path end-to-end using synthetic cryptography and the
+real application/D1 authorization adapters. `/demo` remains unchanged and isolated.
+
+No runtime dependency, Cloudflare resource, production secret, customer data path, or paid service is
+introduced.

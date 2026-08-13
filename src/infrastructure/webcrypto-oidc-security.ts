@@ -1,8 +1,6 @@
 import type { OidcSecurityPrimitives } from "../application/oidc";
 
-export class WebCryptoOidcSecurityPrimitives
-  implements OidcSecurityPrimitives
-{
+export class WebCryptoOidcSecurityPrimitives implements OidcSecurityPrimitives {
   public async randomHex(byteLength: number): Promise<string> {
     if (
       !Number.isSafeInteger(byteLength) ||

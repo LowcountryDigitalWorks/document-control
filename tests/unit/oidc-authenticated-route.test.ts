@@ -58,8 +58,7 @@ const providerConfiguration: OidcProviderConfiguration = {
   id: "synthetic-route-oidc",
   issuer: "https://identity.example.test/route-tenant/v2.0",
   clientId: "document-control-route-test",
-  authorizationEndpoint:
-    "https://identity.example.test/oauth2/v2.0/authorize",
+  authorizationEndpoint: "https://identity.example.test/oauth2/v2.0/authorize",
   redirectUri: "https://app.example.test/auth/oidc/callback",
 };
 
@@ -105,12 +104,12 @@ class TransactionalSqliteDatabaseProvider implements DatabaseProvider {
   }
 }
 
-class SyntheticAuthorizationCodeExchange
-  implements OidcAuthorizationCodeExchange
-{
+class SyntheticAuthorizationCodeExchange implements OidcAuthorizationCodeExchange {
   private readonly exchanges = new Map<string, RegisteredExchange>();
 
-  public constructor(private readonly security: WebCryptoOidcSecurityPrimitives) {}
+  public constructor(
+    private readonly security: WebCryptoOidcSecurityPrimitives,
+  ) {}
 
   public register(
     authorizationCode: string,

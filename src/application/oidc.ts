@@ -176,7 +176,9 @@ export class OidcAuthorizationService {
     assertOpaqueTransactionIdentifier(state);
     assertOpaqueTransactionIdentifier(nonce);
     if (!pkceVerifierPattern.test(pkceVerifier)) {
-      throw new Error("OIDC PKCE verifier generator returned an invalid value.");
+      throw new Error(
+        "OIDC PKCE verifier generator returned an invalid value.",
+      );
     }
 
     const stateVerifier = await this.security.sha256Hex(state);
@@ -211,7 +213,11 @@ export class OidcAuthorizationService {
     );
     authorizationUrl.searchParams.set("code_challenge_method", "S256");
 
-    return { transactionId, authorizationUrl: authorizationUrl.href, expiresAt };
+    return {
+      transactionId,
+      authorizationUrl: authorizationUrl.href,
+      expiresAt,
+    };
   }
 
   public async complete(input: {
@@ -355,7 +361,10 @@ function normalizeProviderConfiguration(
     provider.authorizationEndpoint,
     "OIDC authorization endpoint",
   );
-  const redirectUri = normalizeHttpsUrl(provider.redirectUri, "OIDC redirect URI");
+  const redirectUri = normalizeHttpsUrl(
+    provider.redirectUri,
+    "OIDC redirect URI",
+  );
   const clientId = provider.clientId.trim();
   if (
     clientId.length === 0 ||

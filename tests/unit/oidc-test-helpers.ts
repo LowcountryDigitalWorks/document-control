@@ -50,9 +50,7 @@ export function tamperJwtSignature(jwt: string): string {
 }
 
 function base64UrlEncodeJson(value: unknown): string {
-  return base64UrlEncodeBytes(
-    new TextEncoder().encode(JSON.stringify(value)),
-  );
+  return base64UrlEncodeBytes(new TextEncoder().encode(JSON.stringify(value)));
 }
 
 function base64UrlEncodeBytes(bytes: Uint8Array): string {

@@ -206,7 +206,9 @@ function validateIssuerAndAudience(
   }
 
   const audiences = Array.isArray(claims.aud)
-    ? claims.aud.filter((audience): audience is string => typeof audience === "string")
+    ? claims.aud.filter(
+        (audience): audience is string => typeof audience === "string",
+      )
     : typeof claims.aud === "string"
       ? [claims.aud]
       : [];
@@ -300,7 +302,11 @@ function parseJsonObject<T extends object>(
 ): T {
   try {
     const parsed: unknown = JSON.parse(new TextDecoder().decode(bytes));
-    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    if (
+      typeof parsed !== "object" ||
+      parsed === null ||
+      Array.isArray(parsed)
+    ) {
       throw new Error("JWT member is not an object.");
     }
     return parsed as T;

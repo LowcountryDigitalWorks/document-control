@@ -20,8 +20,7 @@ const provider: OidcProviderConfiguration = {
   id: "synthetic-oidc",
   issuer: "https://identity.example.test/tenant/v2.0",
   clientId: "document-control-test-client",
-  authorizationEndpoint:
-    "https://identity.example.test/oauth2/v2.0/authorize",
+  authorizationEndpoint: "https://identity.example.test/oauth2/v2.0/authorize",
   redirectUri: "https://app.example.test/auth/oidc/callback",
 };
 
@@ -33,12 +32,12 @@ type RegisteredExchange = {
   idToken: string;
 };
 
-class SyntheticAuthorizationCodeExchange
-  implements OidcAuthorizationCodeExchange
-{
+class SyntheticAuthorizationCodeExchange implements OidcAuthorizationCodeExchange {
   private readonly exchanges = new Map<string, RegisteredExchange>();
 
-  public constructor(private readonly security: WebCryptoOidcSecurityPrimitives) {}
+  public constructor(
+    private readonly security: WebCryptoOidcSecurityPrimitives,
+  ) {}
 
   public register(
     authorizationCode: string,
@@ -314,9 +313,7 @@ describe("OIDC Authorization Code security boundary", () => {
     const pkcePrepared = await prepareCompletion(pkceHarness);
     pkceHarness.exchange.register(
       pkcePrepared.authorizationCode,
-      await pkceHarness.security.sha256Base64Url(
-        "z".repeat(43),
-      ),
+      await pkceHarness.security.sha256Base64Url("z".repeat(43)),
       pkcePrepared.idToken,
     );
     await expectOidcRejection(

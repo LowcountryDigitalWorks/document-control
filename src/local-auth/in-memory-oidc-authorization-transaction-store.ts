@@ -3,9 +3,7 @@ import type {
   OidcAuthorizationTransactionStore,
 } from "../application/oidc";
 
-export class InMemoryOidcAuthorizationTransactionStore
-  implements OidcAuthorizationTransactionStore
-{
+export class InMemoryOidcAuthorizationTransactionStore implements OidcAuthorizationTransactionStore {
   private readonly transactions = new Map<
     string,
     OidcAuthorizationTransaction

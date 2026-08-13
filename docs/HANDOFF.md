@@ -343,3 +343,79 @@ Foundation II strengthens engineering and operations controls without adding an 
 - Session security events contain only established/revoked/rotated, internal subject ID, and timestamp. No production audit sink is selected and no token/cookie/email claim/MFA/credential payload may be logged.
 - Future live identity work still requires provider/protocol assertion validation, registration/redirect ownership, production session storage, provider logout/revocation, MFA/conditional access, provisioning/SCIM/group mapping/deprovisioning, break-glass administration, monitoring/audit sink, and authenticated controlled staging.
 - No customer uploads, production Cloudflare resources, production tenant provisioning, retention/legal hold, customer data, PHI, PostgreSQL, analytics/tracking, or paid service is introduced. Expected recurring cost remains `$0`.
+
+## Production Identity & Tenant Boundary II handoff
+
+Repository: `LowcountryDigitalWorks/document-control`
+
+Authorized base: `137bd2658763c12be36dfb385c6c3f4aecdb3c68`
+
+Branch: `release/production-identity-tenant-boundary-2`
+
+Draft PR: `#43 — Production Identity & Tenant Boundary II — OIDC Security & Durable Session Architecture`
+
+### Work completed
+
+- Added Authorization Code OIDC security contracts, short-lived one-time callback transactions,
+  state/nonce verifier handling, PKCE S256, bounded return targets, and minimized security-event types.
+- Added platform Web Crypto state/nonce/PKCE/digest primitives and provider-bound RS256 ID-token
+  validation against trusted configured public JWK material.
+- Revised the session boundary so raw browser bearer tokens never reach durable storage; D1 stores
+  only domain-separated SHA-256 verifier digests.
+- Added `DatabaseSessionStore`, transactional replacement-verifier-bound rotation, immediate
+  revocation/expiry denial, and cleanup that is explicitly non-authoritative for validity.
+- Added migration `0012_authenticated_session_verifiers.sql` and upgraded migration tests through
+  clean `0012` plus `0011 -> 0012`.
+- Added ADR `docs/adr/0003-d1-verifier-only-durable-session-state.md`.
+- Added bounded OIDC transaction-cookie helpers and updated the production-style authenticated cookie
+  to `Path=/app`, `SameSite=Lax`, HttpOnly, bounded lifetime, HTTPS Secure, and matching logout clear.
+- Added deterministic/no-network synthetic cryptographic tests and a test-only full authenticated route
+  composition through current membership and permission authorization.
+
+### Architectural decisions
+
+- D1/SQLite is the initial authoritative durable session-state store.
+- The browser credential is 256-bit opaque random bearer material; the durable lookup key is a
+  domain-separated SHA-256 verifier. No password-hashing semantics are added for this high-entropy
+  secret.
+- D1 transactional batch semantics are required for rotation; KV/cache/index state is not
+  authentication truth.
+- OIDC provider assertions remain outside application authorization. Claims normalize only to
+  `AuthenticatedPrincipal`; current internal membership/role/permission/scope remains authoritative.
+- The permanent test validator accepts only RS256 against configured public JWKs and uses Web Crypto;
+  no custom signature algorithm or new JWT/OIDC dependency was added.
+- Authorization transaction state remains local/in-memory for this non-live release; production
+  persistence is a future staging decision.
+
+### Assumptions and boundaries
+
+- No live Microsoft Entra, Google, Okta, Auth0, or other provider is contacted.
+- No production app registration, client secret, certificate, signing private key, Cloudflare resource,
+  session cleanup schedule, provider discovery/JWKS network client, or live login route is created.
+- `/demo` remains synthetic and isolated.
+- Existing mutation CSRF/same-origin protections remain authoritative; `SameSite=Lax` for login redirect
+  cookies does not replace them.
+- Expected new recurring cost is `$0`.
+
+### Unresolved next-stage work
+
+Before controlled authenticated staging, explicitly decide and review:
+
+- actual provider/application registration and ownership;
+- discovery/JWKS retrieval, cache/freshness, signing-key rollover, issuer/audience configuration, and
+  redirect URI control;
+- production authorization-code exchange client and provider credential management if required;
+- durable/distributed production authorization-transaction state;
+- provider logout, disabled-user/session-revocation behavior, final idle/absolute session policy, and
+  cleanup schedule;
+- MFA/Conditional Access expectations;
+- tenant provisioning, SCIM/JIT/group mapping/deprovisioning;
+- break-glass/platform administration;
+- production audit/monitoring/SIEM behavior; and
+- controlled authenticated staging and recovery validation.
+
+### Recommended next action
+
+The authoritative orchestrator should review PR #43 at its final frozen head and exact normal CI
+results. This specialist workstream must not merge it. No production identity-provider configuration
+or Cloudflare provisioning should begin solely from this handoff.
