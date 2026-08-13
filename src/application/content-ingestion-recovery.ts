@@ -25,6 +25,8 @@ export async function recoverCandidate(
   if (isTerminal(record.state)) return record;
   if (!record.contentHash || record.byteLength === null) return record;
 
+  const contentHash = record.contentHash;
+  const byteLength = record.byteLength;
   const stored = await loadCandidateForRecovery(
     repository,
     store,
@@ -46,10 +48,7 @@ export async function recoverCandidate(
         input.actorSubjectId,
         input.occurredAt,
         "content.intake.staged",
-        {
-          byteLength: candidate.byteLength,
-          contentHash: candidate.contentHash,
-        },
+        { byteLength, contentHash },
       ),
     );
     candidate = {
