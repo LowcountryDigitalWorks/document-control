@@ -11,7 +11,8 @@ CREATE TABLE authenticated_sessions (
       replaced_by_verifier IS NULL OR
       (length(replaced_by_verifier) = 64 AND replaced_by_verifier NOT GLOB '*[^0-9a-f]*')
     ),
-  CHECK (expires_at > created_at),
+  CHECK (julianday(expires_at) > julianday(created_at)),
+  CHECK (revoked_at IS NULL OR julianday(revoked_at) >= julianday(created_at)),
   CHECK (replaced_by_verifier IS NULL OR revoked_at IS NOT NULL)
 );
 
