@@ -26,7 +26,7 @@ Important lifecycle audit evidence is emitted by D1/SQLite triggers from the aut
 
 `accepted` means only that the configured ingestion validation policy accepted the candidate. It does **not** mean malware-clean, safe-to-open, OCR-processed, approved, or promoted to a document version.
 
-If object storage succeeds but D1 cannot record `staged`, D1 already owns the exact key, expected SHA-256, and byte length. Recovery verifies that exact object before resuming. Missing or integrity-mismatched objects fail closed.
+D1 records the exact application-owned storage key, expected SHA-256, and byte length before object creation. A provider-neutral `ContentStore.create()` error is treated as an indeterminate write result because the immutable object may have committed before the error reached the application. The intake therefore remains recoverable rather than being declared terminal immediately. Recovery checks that exact key, hash, and length: if the expected object exists, processing resumes without another create; if the object is confirmed missing, the intake fails closed as `stored_content_missing`. If object storage succeeds but D1 cannot record `staged`, the same recovery contract applies. Integrity-mismatched objects fail closed.
 
 ## Consequences
 
