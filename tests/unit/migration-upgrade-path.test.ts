@@ -7,7 +7,7 @@ import {
 } from "../../scripts/migration-files";
 
 const timestamp = "2026-08-12T12:00:00.000Z";
-const priorChangeSummary = "Upgrade path state before session persistence.";
+const priorChangeSummary = "Upgrade path state before content ingestion.";
 
 const expectedMigrationNames = [
   "0001_initial.sql",
@@ -22,6 +22,8 @@ const expectedMigrationNames = [
   "0010_current_workflow_action_integrity.sql",
   "0011_document_version_change_summary.sql",
   "0012_authenticated_session_verifiers.sql",
+  "0013_content_ingestions.sql",
+  "0014_content_ingestion_audit_triggers.sql",
 ] as const;
 
 type SqlParameter = string | number | null;
@@ -162,6 +164,23 @@ describe("ordered D1/SQLite migration upgrade path", () => {
       "replaced_by_verifier",
     ]);
 
+    const ingestionColumns = database
+      .prepare("PRAGMA table_info(content_ingestions)")
+      .all() as { name: string }[];
+    expect(ingestionColumns.map((column) => column.name)).toContain(
+      "content_hash",
+    );
+    expect(ingestionColumns.map((column) => column.name)).toContain(
+      "accepted_media_type",
+    );
+
+    const ingestionAuditTrigger = database
+      .prepare(
+        "SELECT name FROM sqlite_master WHERE type = 'trigger' AND name = ?",
+      )
+      .get("content_ingestions_audit_state") as { name: string } | undefined;
+    expect(ingestionAuditTrigger?.name).toBe("content_ingestions_audit_state");
+
     const trigger = database
       .prepare(
         "SELECT name FROM sqlite_master WHERE type = 'trigger' AND name = ?",
@@ -173,13 +192,13 @@ describe("ordered D1/SQLite migration upgrade path", () => {
     database.close();
   });
 
-  it("upgrades 0011 to the session-verifier schema while preserving records and invariants", async () => {
+  it("upgrades 0012 to the content-ingestion schema while preserving records and invariants", async () => {
     const migrations = await loadOrderedMigrations();
     const database = new DatabaseSync(":memory:");
 
-    applyMigrationFiles(database, migrations.slice(0, -1));
+    applyMigrationFiles(database, migrations.slice(0, -2));
     seedPriorSupportedState(database);
-    applyMigrationFiles(database, migrations.slice(-1));
+    applyMigrationFiles(database, migrations.slice(-2));
 
     const version = database
       .prepare(
@@ -200,6 +219,20 @@ describe("ordered D1/SQLite migration upgrade path", () => {
       .prepare("SELECT event_type FROM audit_events WHERE id = ?")
       .get("audit-upgrade-1") as { event_type: string };
     expect(audit.event_type).toBe("document.created");
+
+    const ingestionColumns = database
+      .prepare("PRAGMA table_info(content_ingestions)")
+      .all() as { name: string }[];
+    expect(ingestionColumns.map((column) => column.name)).toContain(
+      "content_hash",
+    );
+
+    const ingestionAuditTrigger = database
+      .prepare(
+        "SELECT name FROM sqlite_master WHERE type = 'trigger' AND name = ?",
+      )
+      .get("content_ingestions_audit_state") as { name: string } | undefined;
+    expect(ingestionAuditTrigger?.name).toBe("content_ingestions_audit_state");
 
     run(
       database,
