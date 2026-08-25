@@ -11,13 +11,16 @@ The repository contains a TypeScript/Hono Cloudflare Worker modular monolith wit
 D1/SQLite migrations, application authorization, versioned document-control evidence, and a
 synthetic/test-only server-rendered product surface.
 
-Implemented synthetic/test-only product capabilities include:
+Implemented synthetic/test-only and non-live readiness capabilities include:
 
 - tenant/workspace-aware documents and immutable versions with bounded change summaries;
 - provider-neutral identity subjects, memberships, roles, scoped permissions, and authorization;
+- non-live OIDC Authorization Code/PKCE validation and verifier-only durable-session architecture;
 - controlled template lifecycle, exact immutable version provenance, and read-only template evidence;
 - versioned workflow definitions, workspace workflow selection, review evidence, and exact approvals;
 - exact-version/hash stale-work rejection across workflow, review, and approval behavior;
+- application-owned staged content-ingestion identity, immutable object keys, SHA-256/length integrity,
+  lifecycle state, deterministic D1/R2 reconciliation, and accepted-content authorization;
 - workspace Overview, Documents, Templates, Reviews & Approvals, Audit Log, and administration;
 - bounded metadata search/filtering, bounded CSV audit evidence, and per-document JSON evidence;
 - versioned Backup & Portability export of application state and external content references;
@@ -28,19 +31,20 @@ Implemented synthetic/test-only product capabilities include:
   validation, and CI supply-chain regression checks.
 
 The repository has moved from synthetic feature breadth into explicit production-readiness gates.
-Production Readiness Foundation I established the threat/architecture boundaries; Production
-Readiness Foundation II establishes the repository operations, migration, supply-chain, and recovery
-engineering baseline. Neither foundation creates a production customer deployment.
+Production Readiness Foundations I and II, Production Identity & Tenant Boundary I and II, and Content
+Ingestion Architecture I are established on accepted `main`. These gates establish threat/architecture,
+operations/supply-chain/recovery, non-live identity/session, and staged content-ingestion boundaries;
+they do not create a production customer deployment.
 
 ## Production-readiness posture
 
 Document Control is **not** currently a production customer deployment. The current repository does
 not implement or authorize:
 
-- production authentication, SSO, or production session management;
+- live production authentication, SSO, IdP integration, or production login enablement;
 - production tenant provisioning;
-- arbitrary/customer file uploads;
-- malware scanning or quarantine;
+- arbitrary/customer file uploads or public upload endpoints;
+- authoritative production malware scanning or quarantine;
 - production D1/R2/Worker/customer resources;
 - retention/legal hold or destructive production disposition;
 - complete production backup/restore or disaster recovery;
@@ -58,9 +62,9 @@ certifications or customer RPO/RTO commitments.
 The approved high-level sequence is:
 
 1. **Production Readiness Foundation I — Threat Model & Architecture Boundaries** — established;
-2. **Production Readiness Foundation II — Operations & Supply-Chain** — current foundation;
-3. **Production Identity & Tenant Boundary**;
-4. **Content Ingestion Architecture**;
+2. **Production Readiness Foundation II — Operations & Supply-Chain** — established;
+3. **Production Identity & Tenant Boundary I and II** — established as non-live readiness architecture;
+4. **Content Ingestion Architecture I — Intake, Integrity & Storage Boundaries** — established;
 5. an **explicitly approved controlled staging vertical slice** with synthetic/non-sensitive content;
    and
 6. later retention, complete backup/recovery, and customer-readiness gates.
@@ -109,8 +113,10 @@ itself. Application authority follows:
 The current tenant-member administration surface uses **Staged / Active / Suspended** states. Staged
 is stored as `invited`, but no invitation email or credential is created. Directly provisioned
 members use the `local` provider marker without storing passwords, MFA material, recovery codes, or
-tokens. Production authentication, invitation delivery, IdP provisioning, group mapping, JIT/SCIM,
-and stale-session behavior remain future decisions.
+tokens. Boundary II adds non-live OIDC and durable verifier-only session architecture, but no live
+provider route or production login is enabled. Production invitation delivery, IdP provisioning,
+group mapping, JIT/SCIM, live-provider network behavior, and stale-provider-session behavior remain
+future decisions.
 
 See [Identity and authorization boundary](docs/IDENTITY_AUTHORIZATION_BOUNDARY.md).
 
@@ -150,8 +156,9 @@ migration rather than editing a released file.
 `scripts/migration-files.ts` validates that the repository's migration sequence is contiguous and
 deterministic and applies the actual SQL. E2E database setup uses the same loader.
 `tests/unit/migration-upgrade-path.test.ts` proves both clean creation through the current schema and
-the explicitly supported immediately-prior upgrade path `0010 -> 0011`, including representative
-record survival and critical invariant preservation.
+the explicitly supported immediately-prior upgrade path through `0012_authenticated_session_verifiers.sql`
+into `0013_content_ingestions.sql` and `0014_content_ingestion_audit_triggers.sql`, including
+representative record survival and critical invariant preservation.
 
 Future production migration requires pre-change state capture/backup, recovery readiness, ordered
 execution, post-change schema/invariant verification, application smoke checks, and recorded evidence.
@@ -160,13 +167,17 @@ See [Operations, Migration, Backup, and Recovery](docs/OPERATIONS_RECOVERY.md).
 ### Content
 
 R2 is the initial binary-content adapter behind a create-once, SHA-256-verifying `ContentStore`.
-Application-owned keys prevent callers from inventing arbitrary object paths. The current R2 adapter
-materializes bytes in memory and is **not** an approved production upload pipeline.
+Application-owned keys prevent callers from inventing arbitrary object paths. Content Ingestion
+Architecture I now establishes application-owned intake identity, bounded materialized staging,
+authoritative SHA-256/length metadata, lifecycle state, immutable create semantics, read-time
+integrity verification, accepted-only retrieval, and deterministic exact-key/hash/length
+reconciliation across D1 and object storage. The current R2 adapter still materializes bytes in memory
+and is **not** an approved production upload pipeline.
 
-Before customer uploads can exist, the Content Ingestion Architecture gate must define allowed file
-types, size limits, bounded streaming, signature/type validation, quarantine, malware scanning,
-SHA-256 verification, D1/R2 state transitions, partial-failure compensation, orphan reconciliation,
-safe retrieval headers, and retention/deletion interaction.
+Before customer uploads can exist, later production gates still must establish final allowed
+file/signature policy, streaming transport, authoritative malware scanning/quarantine, public-upload
+abuse controls/WAF/rate limits/quotas, scheduled orphan reconciliation, retention/legal-hold/disposition,
+production storage monitoring/recovery, customer provisioning, and controlled production activation.
 
 ### Document-control invariants
 
