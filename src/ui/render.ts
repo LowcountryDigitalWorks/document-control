@@ -34,7 +34,7 @@ export function renderHome(theme: ThemeConfig): string {
   <a class="skip-link" href="#main">Skip to main content</a>
   <header class="site-header">
     <div class="shell header-inner">
-      <a class="wordmark" href="/" aria-label="${escapeHtml(theme.appName)} home">
+      <a class="wordmark" href="/">
         <span>${escapeHtml(theme.companyName)}</span>
         <strong>${escapeHtml(theme.appName)}</strong>
       </a>
