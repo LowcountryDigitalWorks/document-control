@@ -36,7 +36,7 @@
     "@playwright/test": "1.62.1",
     "@types/node": "22.20.1",
     "eslint": "10.13.0",
-    "globals": "17.11.0",
+    "globals": "17.13.0",
     "prettier": "3.9.6",
     "source-map-js": "1.2.2",
     "tsx": "4.23.15",
