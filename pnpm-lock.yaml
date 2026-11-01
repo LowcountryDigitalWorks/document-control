@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       hono:
-        specifier: 4.13.1
-        version: 4.13.1
+        specifier: 4.13.14
+        version: 4.13.14
     devDependencies:
       '@axe-core/playwright':
         specifier: 4.14.0
@@ -23,7 +23,7 @@ importers:
         version: 10.0.1(eslint@10.13.0(supports-color@10.2.2))
       '@hono/node-server':
         specifier: 2.1.0
-        version: 2.1.0(hono@4.13.1)
+        version: 2.1.0(hono@4.13.14)
       '@playwright/test':
         specifier: 1.62.1
         version: 1.62.1
@@ -1106,8 +1106,8 @@ packages:
     resolution: {integrity: sha512-iZyKG96/JwPz1N55vj2Ie2vXbhu440zfUfJvSwEqEbeLluk7NnapfGqa7LH0mOsnDxTF85Mx8/dyR6HfqcbmbQ==}
     engines: {node: '>=20'}
 
-  hono@4.13.1:
-    resolution: {integrity: sha512-kdJoFVv2xmayw6cY09H7AbMJMt8Jn5jdlEdXsP7AGBdF2DIptVlKlOLKXP41yPip4/a3yQPv9gVcJYI8YY04dw==}
+  hono@4.13.14:
+    resolution: {integrity: sha512-yhRLQ21U6qa9Hsu2N7Qcbh8tE+WKEcoErjIo56LeSGiGXGp9sA7UpE86Ui9uexb61KakiGwuHMn2QdV7w6i6kQ==}
     engines: {node: '>=16.9.0'}
 
   hookified@1.15.1:
@@ -1804,9 +1804,9 @@ snapshots:
       '@eslint/core': 1.2.1
       levn: 0.4.1
 
-  '@hono/node-server@2.1.0(hono@4.13.1)':
+  '@hono/node-server@2.1.0(hono@4.13.14)':
     dependencies:
-      hono: 4.13.1
+      hono: 4.13.14
 
   '@humanfs/core@0.19.2':
     dependencies:
@@ -2399,7 +2399,7 @@ snapshots:
     dependencies:
       hookified: 1.15.1
 
-  hono@4.13.1: {}
+  hono@4.13.14: {}
 
   hookified@1.15.1: {}
 
